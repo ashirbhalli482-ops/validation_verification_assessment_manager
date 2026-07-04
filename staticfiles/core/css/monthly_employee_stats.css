@@ -1,0 +1,36 @@
+.monthly-stats-section { padding-bottom: 0 !important; }
+.monthly-stats-section .row.mb-4:last-child { margin-bottom: 0 !important; }
+.monthly-stats-card .chart-wrapper { height: 60px !important; }
+.monthly-stats-card canvas { height: 60px !important; }
+.monthly-stats-section canvas { max-height: 260px; }
+.monthly-stats-section .card { margin-bottom: 1rem; }
+
+/* ApexCharts sizing for this page */
+#apex-monthlyStatus, #apex-priority { min-height: 280px; }
+#apex-employeeStatus, #apex-monthlyTrend { min-height: 340px; }
+
+/* Improve legend spacing and readability */
+.apexcharts-legend { padding-top: 8px !important; }
+.apexcharts-legend .apexcharts-legend-text { font-size: 12px !important; }
+
+/* Center legends under charts (works for LTR and RTL) */
+#apex-monthlyStatus .apexcharts-legend,
+#apex-priority .apexcharts-legend,
+#apex-employeeStatus .apexcharts-legend,
+#apex-monthlyTrend .apexcharts-legend,
+.monthly-stats-section .apexcharts-legend {
+  width: 100% !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  text-align: center !important;
+}
+
+/* Ensure proper centering in Arabic (RTL) */
+html[lang="ar"] #apex-monthlyStatus .apexcharts-legend,
+html[lang="ar"] #apex-priority .apexcharts-legend,
+html[lang="ar"] #apex-employeeStatus .apexcharts-legend,
+html[lang="ar"] #apex-monthlyTrend .apexcharts-legend {
+  direction: ltr; /* legend layout uses flex; this prevents RTL from shifting alignment */
+}
+

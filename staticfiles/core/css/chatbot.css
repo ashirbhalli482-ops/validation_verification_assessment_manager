@@ -1,0 +1,1045 @@
+/* Chatbot Styles */
+
+.chat-messages {
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+}
+
+.message-bubble {
+    word-wrap: break-word;
+    position: relative;
+}
+
+.user-message .message-bubble {
+    background-color: #007bff !important;
+    color: white !important;
+}
+
+.assistant-message .message-bubble {
+    background-color: #ffffff !important;
+    border: 1px solid #dee2e6;
+    color: #333 !important;
+}
+
+.message-time {
+    font-size: 0.75rem;
+    opacity: 0.8;
+}
+
+.user-message .message-time {
+    color: rgba(255, 255, 255, 0.8) !important;
+}
+
+.assistant-message .message-time {
+    color: #6c757d !important;
+}
+
+/* Typing indicator animation */
+.typing-dots {
+    display: inline-block;
+}
+
+.typing-dots span {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: #6c757d;
+    margin: 0 2px;
+    animation: typing 1.4s infinite ease-in-out;
+}
+
+.typing-dots span:nth-child(1) {
+    animation-delay: -0.32s;
+}
+
+.typing-dots span:nth-child(2) {
+    animation-delay: -0.16s;
+}
+
+@keyframes typing {
+    0%, 80%, 100% {
+        transform: scale(0.8);
+        opacity: 0.5;
+    }
+    40% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+/* Chat sessions sidebar */
+.chat-session-item {
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.chat-session-item:hover {
+    background-color: #f8f9fa;
+}
+
+.chat-session-item:hover .delete-session-btn {
+    display: inline-block !important;
+}
+
+.chat-session-item.active {
+    background-color: #007bff;
+    color: white;
+}
+
+.chat-session-item.active .delete-session-btn {
+    color: white;
+    border-color: white;
+}
+
+.delete-session-btn {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    padding: 2px 6px;
+    font-size: 0.75rem;
+}
+
+/* Message input area */
+#message-input {
+    border: 1px solid #ced4da;
+    border-radius: 0.375rem;
+    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+
+#message-input:focus {
+    border-color: #007bff;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+/* Send button */
+#send-btn {
+    height: 100%;
+    min-height: 38px;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .col-md-3 {
+        margin-bottom: 20px;
+    }
+    
+    .chat-messages {
+        height: 400px !important;
+    }
+    
+    .message-bubble {
+        max-width: 85% !important;
+    }
+}
+
+/* Loading state */
+.loading {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+/* Old inline message styles removed - now using beautiful toast notifications */
+
+/* Token badge */
+.badge-info {
+    background-color: #17a2b8;
+    font-size: 0.7rem;
+}
+
+/* Scrollbar styling for chat messages */
+.chat-messages::-webkit-scrollbar {
+    width: 6px;
+}
+
+.chat-messages::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 3px;
+}
+
+.chat-messages::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 3px;
+}
+
+.chat-messages::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
+}
+
+/* Animation for new messages */
+.message {
+    animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Auto-resize textarea */
+#message-input {
+    resize: none;
+    overflow: hidden;
+    min-height: 38px;
+    max-height: 120px;
+}
+
+/* Focus states */
+.chat-session-item:focus {
+    outline: 2px solid #007bff;
+    outline-offset: 2px;
+}
+
+/* Beautiful Modal Styling for All Chat Modals */
+#newChatModal .modal-content,
+#renameSessionModal .modal-content,
+#deleteChatSessionModal .modal-content {
+    border: none;
+    border-radius: 15px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    overflow: hidden;
+}
+
+/* New Chat Modal Styling */
+#newChatModal .modal-header {
+    background: linear-gradient(135deg, #007bff, #0056b3);
+    border: none;
+    padding: 20px 25px;
+}
+
+#newChatModal .modal-title {
+    font-weight: 600;
+    font-size: 1.2rem;
+}
+
+#newChatModal .modal-body {
+    padding: 30px 25px;
+    background-color: #fafafa;
+}
+
+#newChatModal .fa-comments {
+    animation: bounce 2s infinite;
+}
+
+@keyframes bounce {
+    0%, 20%, 50%, 80%, 100% {
+        transform: translateY(0);
+    }
+    40% {
+        transform: translateY(-10px);
+    }
+    60% {
+        transform: translateY(-5px);
+    }
+}
+
+#newChatModal .modal-footer {
+    background-color: #ffffff;
+    border: none;
+    padding: 20px 25px;
+}
+
+#newChatModal .btn {
+    border-radius: 25px;
+    padding: 10px 25px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    border: none;
+}
+
+#newChatModal .btn-secondary {
+    background-color: #6c757d;
+    color: white;
+}
+
+#newChatModal .btn-secondary:hover {
+    background-color: #5a6268;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(108, 117, 125, 0.3);
+}
+
+#newChatModal .btn-primary {
+    background: linear-gradient(135deg, #007bff, #0056b3);
+    color: white;
+}
+
+#newChatModal .btn-primary:hover {
+    background: linear-gradient(135deg, #0056b3, #004085);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 123, 255, 0.4);
+}
+
+/* Rename Session Modal Styling */
+#renameSessionModal .modal-header {
+    background: linear-gradient(135deg, #17a2b8, #138496);
+    border: none;
+    padding: 20px 25px;
+}
+
+#renameSessionModal .modal-title {
+    font-weight: 600;
+    font-size: 1.2rem;
+}
+
+#renameSessionModal .modal-body {
+    padding: 30px 25px;
+    background-color: #fafafa;
+}
+
+#renameSessionModal .fa-pencil-alt {
+    animation: wiggle 2s infinite;
+}
+
+@keyframes wiggle {
+    0%, 7% {
+        transform: rotateZ(0);
+    }
+    15% {
+        transform: rotateZ(-15deg);
+    }
+    20% {
+        transform: rotateZ(10deg);
+    }
+    25% {
+        transform: rotateZ(-10deg);
+    }
+    30% {
+        transform: rotateZ(6deg);
+    }
+    35% {
+        transform: rotateZ(-4deg);
+    }
+    40%, 100% {
+        transform: rotateZ(0);
+    }
+}
+
+#renameSessionModal .modal-footer {
+    background-color: #ffffff;
+    border: none;
+    padding: 20px 25px;
+}
+
+#renameSessionModal .btn {
+    border-radius: 25px;
+    padding: 10px 25px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    border: none;
+}
+
+#renameSessionModal .btn-secondary {
+    background-color: #6c757d;
+    color: white;
+}
+
+#renameSessionModal .btn-secondary:hover {
+    background-color: #5a6268;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(108, 117, 125, 0.3);
+}
+
+#renameSessionModal .btn-info {
+    background: linear-gradient(135deg, #17a2b8, #138496);
+    color: white;
+}
+
+#renameSessionModal .btn-info:hover {
+    background: linear-gradient(135deg, #138496, #117a8b);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(23, 162, 184, 0.4);
+}
+
+/* Delete Confirmation Modal Styling */
+#deleteChatSessionModal .modal-content {
+    border: none;
+    border-radius: 15px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    overflow: hidden;
+}
+
+#deleteChatSessionModal .modal-header {
+    background: linear-gradient(135deg, #dc3545, #c82333);
+    border: none;
+    padding: 20px 25px;
+}
+
+#deleteChatSessionModal .modal-title {
+    font-weight: 600;
+    font-size: 1.2rem;
+}
+
+#deleteChatSessionModal .modal-body {
+    padding: 30px 25px;
+    background-color: #fafafa;
+}
+
+#deleteChatSessionModal .fa-trash-alt {
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.05);
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+
+#deleteChatSessionModal .modal-footer {
+    background-color: #ffffff;
+    border: none;
+    padding: 20px 25px;
+}
+
+#deleteChatSessionModal .btn {
+    border-radius: 25px;
+    padding: 10px 25px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    border: none;
+}
+
+#deleteChatSessionModal .btn-secondary {
+    background-color: #6c757d;
+    color: white;
+}
+
+#deleteChatSessionModal .btn-secondary:hover {
+    background-color: #5a6268;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(108, 117, 125, 0.3);
+}
+
+#deleteChatSessionModal .btn-danger {
+    background: linear-gradient(135deg, #dc3545, #c82333);
+    color: white;
+}
+
+#deleteChatSessionModal .btn-danger:hover {
+    background: linear-gradient(135deg, #c82333, #bd2130);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(220, 53, 69, 0.4);
+}
+
+/* Common Button Styling for All Modals */
+#newChatModal .btn:active,
+#renameSessionModal .btn:active,
+#deleteChatSessionModal .btn:active {
+    transform: translateY(0);
+}
+
+/* Form Input Styling */
+#newChatModal .form-control,
+#renameSessionModal .form-control {
+    border-radius: 10px;
+    border: 2px solid #e9ecef;
+    transition: all 0.3s ease;
+    font-size: 1rem;
+}
+
+#newChatModal .form-control:focus,
+#renameSessionModal .form-control:focus {
+    border-color: #007bff;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+    transform: translateY(-1px);
+}
+
+#delete-session-name {
+    color: #dc3545;
+    font-weight: 600;
+    font-size: 1.1rem;
+}
+
+/* Modal backdrop and animations */
+#newChatModal.modal.fade .modal-dialog,
+#renameSessionModal.modal.fade .modal-dialog,
+#deleteChatSessionModal.modal.fade .modal-dialog {
+    transition: transform 0.3s ease-out;
+    transform: translate(0, -50px);
+}
+
+#newChatModal.modal.show .modal-dialog,
+#renameSessionModal.modal.show .modal-dialog,
+#deleteChatSessionModal.modal.show .modal-dialog {
+    transform: none;
+}
+
+/* Enhanced form styling */
+#newChatModal .form-group label,
+#renameSessionModal .form-group label {
+    color: #495057;
+    margin-bottom: 8px;
+}
+
+#newChatModal .form-text,
+#renameSessionModal .form-text {
+    font-size: 0.875rem;
+    margin-top: 5px;
+}
+
+/* Beautiful Toast Notifications */
+.toast-container {
+    pointer-events: none;
+}
+
+.toast {
+    pointer-events: auto;
+    border: none;
+    border-radius: 12px;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+    margin-bottom: 15px;
+    min-width: 300px;
+    max-width: 400px;
+    animation: slideInRight 0.5s ease-out;
+}
+
+@keyframes slideInRight {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+.toast-header {
+    border-radius: 12px 12px 0 0;
+    padding: 12px 16px;
+    border: none;
+    font-weight: 600;
+}
+
+.toast-body {
+    padding: 16px;
+    background-color: #ffffff;
+    border-radius: 0 0 12px 12px;
+    font-size: 0.95rem;
+    line-height: 1.4;
+}
+
+/* Success Toast Styling */
+#success-toast .toast-header {
+    background: linear-gradient(135deg, #28a745, #20c997) !important;
+}
+
+#success-toast .toast-body {
+    background: linear-gradient(135deg, #f8fff9, #e8f5e8);
+    color: #155724;
+    border-left: 4px solid #28a745;
+}
+
+/* Error Toast Styling */
+#error-toast .toast-header {
+    background: linear-gradient(135deg, #dc3545, #e74c3c) !important;
+}
+
+#error-toast .toast-body {
+    background: linear-gradient(135deg, #fff8f8, #ffeaea);
+    color: #721c24;
+    border-left: 4px solid #dc3545;
+}
+
+/* Toast Close Button */
+.toast .close {
+    font-size: 1.2rem;
+    opacity: 0.8;
+    transition: opacity 0.3s ease;
+}
+
+.toast .close:hover {
+    opacity: 1;
+}
+
+/* Toast Animation on Hide */
+.toast.fade {
+    animation: slideOutRight 0.3s ease-in;
+}
+
+@keyframes slideOutRight {
+    from {
+        transform: translateX(0);
+        opacity: 1;
+    }
+    to {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+}
+
+/* Toast Progress Bar (Optional Enhancement) */
+.toast::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    height: 3px;
+    background: linear-gradient(90deg, rgba(255,255,255,0.3), rgba(255,255,255,0.1));
+    border-radius: 0 0 12px 12px;
+    animation: progressBar 4s linear;
+}
+
+@keyframes progressBar {
+    from {
+        width: 100%;
+    }
+    to {
+        width: 0%;
+    }
+}
+
+/* Dark mode support (if needed) */
+@media (prefers-color-scheme: dark) {
+    .chat-messages {
+        background-color: #2d3748;
+        border-color: #4a5568;
+    }
+    
+    .assistant-message .message-bubble {
+        background-color: #4a5568 !important;
+        color: #e2e8f0 !important;
+        border-color: #718096;
+    }
+    
+    .chat-session-item:hover {
+        background-color: #4a5568;
+    }
+    
+    /* Dark mode for New Chat Modal */
+    #newChatModal .modal-body {
+        background-color: #2d3748;
+        color: #e2e8f0;
+    }
+    
+    #newChatModal .modal-footer {
+        background-color: #2d3748;
+    }
+    
+    #newChatModal .text-muted {
+        color: #a0aec0 !important;
+    }
+    
+    #newChatModal .form-control {
+        background-color: #4a5568;
+        border-color: #718096;
+        color: #e2e8f0;
+    }
+    
+    #newChatModal .form-control:focus {
+        background-color: #4a5568;
+        border-color: #007bff;
+        color: #e2e8f0;
+    }
+    
+    #newChatModal .form-group label {
+        color: #e2e8f0;
+    }
+    
+    /* Dark mode for Rename Modal */
+    #renameSessionModal .modal-body {
+        background-color: #2d3748;
+        color: #e2e8f0;
+    }
+    
+    #renameSessionModal .modal-footer {
+        background-color: #2d3748;
+    }
+    
+    #renameSessionModal .text-muted {
+        color: #a0aec0 !important;
+    }
+    
+    #renameSessionModal .form-control {
+        background-color: #4a5568;
+        border-color: #718096;
+        color: #e2e8f0;
+    }
+    
+    #renameSessionModal .form-control:focus {
+        background-color: #4a5568;
+        border-color: #17a2b8;
+        color: #e2e8f0;
+    }
+    
+    #renameSessionModal .form-group label {
+        color: #e2e8f0;
+    }
+    
+    /* Dark mode for Delete Modal */
+    #deleteChatSessionModal .modal-body {
+        background-color: #2d3748;
+        color: #e2e8f0;
+    }
+    
+    #deleteChatSessionModal .modal-footer {
+        background-color: #2d3748;
+    }
+    
+    #deleteChatSessionModal .text-muted {
+        color: #a0aec0 !important;
+    }
+    
+    /* Dark mode for Toast Notifications */
+    .toast-body {
+        background-color: #2d3748 !important;
+        color: #e2e8f0 !important;
+    }
+    
+    #success-toast .toast-body {
+        background: linear-gradient(135deg, #2d3748, #1a202c) !important;
+        color: #68d391 !important;
+        border-left-color: #48bb78 !important;
+    }
+    
+    #error-toast .toast-body {
+        background: linear-gradient(135deg, #2d3748, #1a202c) !important;
+        color: #fc8181 !important;
+        border-left-color: #f56565 !important;
+    }
+}
+
+/* ============================================
+   ENHANCED CHATBOT BEAUTIFICATION
+   ============================================ */
+
+/* Chat Messages Container - Beautiful Gradient Background */
+.chat-messages {
+    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%) !important;
+    border: none !important;
+    border-radius: 15px;
+    box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.05);
+    position: relative;
+}
+
+.chat-messages::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: 
+        radial-gradient(circle at 20% 80%, rgba(120, 119, 198, 0.1), transparent 50%),
+        radial-gradient(circle at 80% 20%, rgba(255, 119, 198, 0.1), transparent 50%),
+        radial-gradient(circle at 40% 40%, rgba(120, 200, 255, 0.1), transparent 50%);
+    border-radius: 15px;
+    pointer-events: none;
+    z-index: 0;
+}
+
+/* Enhanced Message Bubbles */
+.user-message .message-bubble {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+    color: white !important;
+    border: none !important;
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4),
+                0 2px 5px rgba(0, 0, 0, 0.1);
+    transform: perspective(1000px) rotateY(-5deg);
+    transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+    position: relative;
+    z-index: 1;
+}
+
+.user-message .message-bubble::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -5px;
+    width: 0;
+    height: 0;
+    border-style: solid;
+    border-width: 0 10px 10px 0;
+    border-color: transparent #764ba2 transparent transparent;
+}
+
+.user-message .message-bubble:hover {
+    transform: perspective(1000px) rotateY(0deg) scale(1.02);
+    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5),
+                0 3px 8px rgba(0, 0, 0, 0.15);
+}
+
+.assistant-message .message-bubble {
+    background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%) !important;
+    border: 2px solid rgba(102, 126, 234, 0.2) !important;
+    color: #2d3748 !important;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08),
+                0 1px 3px rgba(0, 0, 0, 0.05);
+    transform: perspective(1000px) rotateY(5deg);
+    transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+    position: relative;
+    z-index: 1;
+}
+
+.assistant-message .message-bubble::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -5px;
+    width: 0;
+    height: 0;
+    border-style: solid;
+    border-width: 0 10px 10px 0;
+    border-color: transparent rgba(102, 126, 234, 0.2) transparent transparent;
+}
+
+.assistant-message .message-bubble:hover {
+    transform: perspective(1000px) rotateY(0deg) scale(1.02);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12),
+                0 3px 8px rgba(0, 0, 0, 0.08);
+    border-color: rgba(102, 126, 234, 0.4) !important;
+}
+
+/* Enhanced Welcome Message */
+#welcome-message {
+    background: rgba(255, 255, 255, 0.7);
+    padding: 40px;
+    border-radius: 20px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+#welcome-message i {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+#welcome-message h5 {
+    color: #2d3748;
+    font-weight: 600;
+    margin-top: 15px;
+}
+
+#welcome-message p {
+    color: #4a5568;
+    font-size: 0.95rem;
+}
+
+/* Enhanced Message Input Area - INCREASED WIDTH */
+.card-footer {
+    background: rgba(255, 255, 255, 0.95) !important;
+    backdrop-filter: blur(10px);
+    border-top: 2px solid rgba(102, 126, 234, 0.2) !important;
+    border-radius: 0 0 15px 15px;
+    padding: 20px 25px !important;
+    box-shadow: 0 -4px 15px rgba(0, 0, 0, 0.05);
+}
+
+#message-input {
+    border: 2px solid rgba(102, 126, 234, 0.3) !important;
+    border-radius: 15px !important;
+    padding: 15px 20px !important;
+    font-size: 1rem !important;
+    transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+    background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%) !important;
+    resize: vertical !important;
+    overflow: hidden;
+    min-height: 70px !important;
+    max-height: 200px !important;
+    width: 100% !important;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+}
+
+#message-input::placeholder {
+    color: #a0aec0;
+    font-weight: 400;
+}
+
+#message-input:focus {
+    border-color: #667eea !important;
+    box-shadow: 0 4px 20px rgba(102, 126, 234, 0.3),
+                0 0 0 4px rgba(102, 126, 234, 0.1) !important;
+    transform: translateY(-2px);
+    background: #ffffff !important;
+    outline: none !important;
+}
+
+/* Enhanced Send Button */
+#send-btn {
+    height: 100% !important;
+    min-height: 60px !important;
+    padding: 15px 30px !important;
+    border-radius: 15px !important;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+    border: none !important;
+    color: white !important;
+    font-weight: 600 !important;
+    font-size: 1rem !important;
+    transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+    position: relative;
+    overflow: hidden;
+}
+
+#send-btn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+    transition: left 0.5s;
+}
+
+#send-btn:hover::before {
+    left: 100%;
+}
+
+#send-btn:hover {
+    transform: translateY(-3px) scale(1.05);
+    box-shadow: 0 6px 25px rgba(102, 126, 234, 0.5);
+    background: linear-gradient(135deg, #764ba2 0%, #667eea 100%) !important;
+}
+
+#send-btn:active {
+    transform: translateY(-1px) scale(1.02);
+}
+
+#send-btn:disabled {
+    background: #cbd5e0 !important;
+    cursor: not-allowed;
+    transform: none !important;
+    box-shadow: none !important;
+}
+
+/* Enhanced Chat Form Layout */
+#chat-form {
+    align-items: stretch !important;
+    gap: 15px !important;
+}
+
+#chat-form > div {
+    display: flex;
+    flex: 1 1 0;
+    min-width: 0;
+}
+
+/* Beautiful Scrollbar */
+.chat-messages::-webkit-scrollbar {
+    width: 8px;
+}
+
+.chat-messages::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.5);
+    border-radius: 10px;
+    margin: 10px 0;
+}
+
+.chat-messages::-webkit-scrollbar-thumb {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 10px;
+    border: 2px solid rgba(255, 255, 255, 0.5);
+}
+
+.chat-messages::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+}
+
+/* Enhanced Card Styling */
+.card {
+    border: none !important;
+    border-radius: 15px !important;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1),
+                0 2px 8px rgba(0, 0, 0, 0.05) !important;
+    overflow: hidden;
+}
+
+.card-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+    color: white !important;
+    border: none !important;
+    padding: 20px 25px !important;
+    font-weight: 600 !important;
+}
+
+.card-header strong {
+    font-size: 1.2rem;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.card-header h6 {
+    font-weight: 600;
+    color: white;
+}
+
+/* Enhanced Typing Indicator */
+.typing-dots span {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
+}
+
+/* Enhanced Badges */
+.badge-info {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+    padding: 5px 10px;
+    border-radius: 15px;
+    font-weight: 500;
+    box-shadow: 0 2px 5px rgba(102, 126, 234, 0.3);
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+    .card-footer {
+        padding: 15px !important;
+    }
+    
+    #message-input {
+        min-height: 50px !important;
+        padding: 12px 15px !important;
+    }
+    
+    #send-btn {
+        min-height: 50px !important;
+        padding: 12px 20px !important;
+    }
+    
+    .user-message .message-bubble,
+    .assistant-message .message-bubble {
+        transform: none;
+    }
+}
+
+/* Enhanced Animation for Messages */
+@keyframes messageSlideIn {
+    0% {
+        opacity: 0;
+        transform: translateY(20px) scale(0.95);
+    }
+    50% {
+        transform: translateY(-2px) scale(1.02);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.message {
+    animation: messageSlideIn 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+/* Smooth Transitions for All Elements */
+.card,
+.chat-messages,
+.message-bubble,
+#message-input,
+#send-btn {
+    transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}

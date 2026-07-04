@@ -11,7 +11,7 @@ docutils
 gunicorn
 jmespath
 Pillow
-psycopg2
+psycopg2-binary
 python-dateutil
 pytz
 s3transfer
@@ -19,3 +19,4 @@ six
 static3
 openpyxl
 reportlab
+whitenoise
