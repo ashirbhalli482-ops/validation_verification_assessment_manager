@@ -1,0 +1,35 @@
+{% extends 'core/base.html' %}
+{% block breadcrumb %}
+<li class="breadcrumb-item">Admin</li>
+<li class="breadcrumb-item active">Drop-Down Lists</li>
+{% endblock %}
+{% block content %}
+<div class="container-fluid">
+  <div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <strong>Update Drop-Down List (DDL)</strong>
+      <a href="{% url 'core:dropdown-create' %}" class="btn btn-primary btn-sm"><i class="fa fa-plus"></i> New List</a>
+    </div>
+    <div class="card-body">
+      <table class="table table-striped">
+        <thead><tr><th>Name</th><th>Slug</th><th>Options</th><th>Actions</th></tr></thead>
+        <tbody>
+          {% for ddl in dropdown_lists %}
+          <tr>
+            <td>{{ ddl.name }}</td>
+            <td>{{ ddl.slug }}</td>
+            <td>{{ ddl.options.count }}</td>
+            <td>
+              <a href="{% url 'core:dropdown-edit' ddl.pk %}" class="btn btn-sm btn-primary">Edit</a>
+              <a href="{% url 'core:dropdown-delete' ddl.pk %}" class="btn btn-sm btn-danger">Delete</a>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="4" class="text-muted text-center">No drop-down lists defined.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

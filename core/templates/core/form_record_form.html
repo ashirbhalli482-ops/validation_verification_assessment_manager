@@ -1,0 +1,32 @@
+{% extends 'core/base.html' %}
+{% block content %}
+<div class="container-fluid">
+  <div class="card">
+    <div class="card-body">
+      {% include 'core/includes/form_grey_header.html' with form_def=form_def project=project record=record reviews=record.reviews.all %}
+      <form method="post">{% csrf_token %}
+        <div class="form-group">
+          <label>Your Name</label>
+          {{ form.created_by_name }}
+        </div>
+        <div class="form-group">
+          <label>Notes / Data</label>
+          <textarea name="notes" class="form-control" rows="4">{% if record %}{{ record.data.notes }}{% endif %}</textarea>
+        </div>
+        {% for ddl in dropdown_lists %}
+        <div class="form-group">
+          <label>{{ ddl.name }}</label>
+          <select name="field_{{ ddl.slug }}" class="form-control">
+            {% for opt in ddl.options.all %}{% if opt.is_active %}
+            <option value="{{ opt.value }}">{{ opt.value }}</option>
+            {% endif %}{% endfor %}
+          </select>
+        </div>
+        {% endfor %}
+        <button type="submit" class="btn btn-primary">Save Form</button>
+        <a href="{% url 'core:project-detail' project.pk %}" class="btn btn-secondary">Cancel</a>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,37 @@
+{% extends 'core/base.html' %}
+{% load form_permissions %}
+{% block content %}
+<div class="container-fluid">
+  <div class="card">
+    <div class="card-body">
+      {% include 'core/includes/form_grey_header.html' with form_def=record.form_definition project=record.project record=record reviews=reviews %}
+      <p><strong>Status:</strong> {{ record.get_status_display }}</p>
+      <div class="border p-3 mb-3 bg-light">
+        <pre class="mb-0">{{ record.data }}</pre>
+      </div>
+      <div class="btn-group">
+        {% if can_edit %}
+        <a href="{% url 'core:form-record-edit' record.pk %}" class="btn btn-warning">Edit</a>
+        {% endif %}
+        {% if can_submit %}
+        <form method="post" action="{% url 'core:form-submit' record.pk %}" class="d-inline">{% csrf_token %}
+          <button class="btn btn-primary">Submit for Senior Review</button>
+        </form>
+        {% endif %}
+        {% if can_review %}
+        <form method="post" action="{% url 'core:form-review' record.pk %}" class="d-inline">{% csrf_token %}
+          <button name="action" value="approve" class="btn btn-success">Approve Review</button>
+          <button name="action" value="return" class="btn btn-danger">Return for Editing</button>
+        </form>
+        {% endif %}
+        {% if can_finalize %}
+        <form method="post" action="{% url 'core:form-finalize' record.pk %}" class="d-inline">{% csrf_token %}
+          <button class="btn btn-dark">Finalize (Project Manager)</button>
+        </form>
+        {% endif %}
+        <a href="{% url 'core:project-detail' record.project.pk %}" class="btn btn-secondary">Back to Package</a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

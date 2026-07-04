@@ -1,0 +1,49 @@
+{% extends 'core/base.html' %}
+{% block content %}
+<div class="container-fluid">
+  <div class="card">
+    <div class="card-header d-flex justify-content-between">
+      <strong>{% if user.user_type == 'employee' %}My Authorized Projects{% else %}Projects{% endif %}</strong>
+      {% if user.user_type == 'manager' %}
+      <a href="{% url 'core:project-create' %}" class="btn btn-primary btn-sm">Create Project</a>
+      {% endif %}
+    </div>
+    <div class="card-body">
+      {% if user.user_type == 'employee' and assignments %}
+      <div class="row">
+        {% for assignment in assignments %}
+        <div class="col-md-6 col-lg-4 mb-3">
+          <div class="card h-100">
+            <div class="card-body">
+              <h5 class="card-title">{{ assignment.project.project_number }}</h5>
+              <p class="mb-1"><strong>Company:</strong> {{ assignment.project.company_name }}</p>
+              <p class="mb-1"><strong>Package:</strong> {{ assignment.project.package_instance.name }}</p>
+              <p class="mb-3"><strong>Role:</strong> {{ assignment.get_role_display }}</p>
+              <a href="{% url 'core:project-detail' assignment.project.pk %}" class="btn btn-primary btn-sm">Open Package</a>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <table class="table table-striped">
+        <thead><tr><th>Project #</th><th>Company</th><th>Package</th>{% if user.user_type == 'admin' %}<th>Manager</th>{% endif %}<th>Actions</th></tr></thead>
+        <tbody>
+          {% for project in projects %}
+          <tr>
+            <td>{{ project.project_number }}</td>
+            <td>{{ project.company_name }}</td>
+            <td>{{ project.package_instance.name }}</td>
+            {% if user.user_type == 'admin' %}<td>{{ project.manager.get_full_name }}</td>{% endif %}
+            <td><a href="{% url 'core:project-detail' project.pk %}" class="btn btn-sm btn-info">Open</a></td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="4" class="text-muted text-center">No projects.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

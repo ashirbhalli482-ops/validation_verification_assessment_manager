@@ -1,0 +1,18 @@
+{% extends 'core/base.html' %}
+{% block content %}
+<div class="container-fluid">
+  <div class="card">
+    <div class="card-header"><strong>Project Access — {{ project.project_number }}</strong></div>
+    <div class="card-body">
+      <p class="text-muted">Enter your authorized email and the project password to access your package and forms.</p>
+      <form method="post">{% csrf_token %}
+        {% for field in form %}
+        <div class="form-group">{{ field.label_tag }}{{ field }}</div>
+        {% endfor %}
+        <button type="submit" class="btn btn-primary">Access Project</button>
+        <a href="{% url 'core:login' %}" class="btn btn-secondary">Login Instead</a>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

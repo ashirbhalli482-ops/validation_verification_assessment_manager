@@ -1,0 +1,32 @@
+<div class="form-grey-header mb-3 p-3" style="background:#6c757d;color:#fff;border-radius:4px;">
+  <div class="row align-items-start">
+    <div class="col-md-8">
+      <strong>{{ form_def.code }}</strong> — {{ form_def.name }}<br>
+      <small>Project: {{ project.project_number }} | {{ project.company_name }} | {{ project.location }}</small>
+    </div>
+    <div class="col-md-4 text-md-right">
+      {% if record %}
+      <small><strong>Created by:</strong> {{ record.created_by_name }}<br>{{ record.created_date }}</small>
+      {% endif %}
+    </div>
+  </div>
+  {% if reviews %}
+  <div class="row mt-2 pt-2 border-top border-light">
+    {% for rev in reviews %}
+    <div class="col-md-4 mb-1">
+      <small>
+        <strong>Review {{ rev.review_order }}:</strong> {{ rev.reviewer_name }}<br>
+        {{ rev.reviewer_role }} — {{ rev.reviewed_at|date:"M d, Y H:i" }}
+      </small>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+  {% if record and record.status == 'finalized' %}
+  <div class="row mt-2 pt-2 border-top border-light">
+    <div class="col-12 text-md-right">
+      <small><strong>Finalized by:</strong> {{ record.finalized_by_name }} | {{ record.finalized_at|date:"M d, Y H:i" }}</small>
+    </div>
+  </div>
+  {% endif %}
+</div>

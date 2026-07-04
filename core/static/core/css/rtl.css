@@ -1,0 +1,17 @@
+/* Minimal RTL overrides. Loaded only when html[dir="rtl"] */
+
+html[dir="rtl"] body {
+  direction: rtl;
+  text-align: right;
+}
+
+html[dir="rtl"] .ml-2 { margin-left: 0 !important; margin-right: .5rem !important; }
+html[dir="rtl"] .mr-2 { margin-right: 0 !important; margin-left: .5rem !important; }
+
+
+
+html[dir="rtl"] .breadcrumb .breadcrumb-item + .breadcrumb-item::before {
+  content: "\203A"; /* single right-pointing angle quotation mark */
+}
+
+

@@ -1,0 +1,102 @@
+{% extends 'core/base.html' %}
+{% block breadcrumb %}
+<li class="breadcrumb-item">Admin</li>
+<li class="breadcrumb-item"><a href="{% url 'core:company-list' %}">Companies</a></li>
+<li class="breadcrumb-item active">{{ company.name }}</li>
+{% endblock %}
+{% block content %}
+<div class="container-fluid">
+  <div class="card company-form-card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <strong>View Company</strong>
+      <div>
+        <a href="{% url 'core:company-edit' company.pk %}" class="btn btn-warning btn-sm">
+          <i class="fa fa-edit"></i> Edit
+        </a>
+        <a href="{% url 'core:company-list' %}" class="btn btn-secondary btn-sm">Back</a>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="company-info-grid mb-4">
+        <div class="company-field-row">
+          <label class="company-field-label">Name of Client</label>
+          <div class="company-field-value company-field-readonly">{{ company.name }}</div>
+        </div>
+        <div class="company-field-row">
+          <label class="company-field-label">Client Name Abbreviation</label>
+          <div class="company-field-value company-field-readonly">{{ company.abbreviation|default:"-" }}</div>
+        </div>
+        <div class="company-field-row">
+          <label class="company-field-label">Issue Date</label>
+          <div class="company-field-value company-field-readonly">
+            {% if company.issue_date %}{{ company.issue_date|date:"Y-m-d" }}{% else %}-{% endif %}
+          </div>
+        </div>
+        <div class="company-field-row">
+          <label class="company-field-label">Version</label>
+          <div class="company-field-value company-field-readonly">{{ company.version|default:"-" }}</div>
+        </div>
+        <div class="company-field-row">
+          <label class="company-field-label">Start Date</label>
+          <div class="company-field-value company-field-readonly">
+            {% if authorization %}{{ authorization.start_date|date:"Y-m-d" }}{% else %}-{% endif %}
+          </div>
+        </div>
+        <div class="company-field-row">
+          <label class="company-field-label">End Date</label>
+          <div class="company-field-value company-field-readonly">
+            {% if authorization %}{{ authorization.end_date|date:"Y-m-d" }}{% else %}-{% endif %}
+          </div>
+        </div>
+        <div class="company-field-row">
+          <label class="company-field-label">Number of Package</label>
+          <div class="company-field-value company-field-readonly">
+            {% if authorization %}{{ authorization.package_count }}{% else %}-{% endif %}
+          </div>
+        </div>
+        <div class="company-field-row">
+          <label class="company-field-label">Project Manager (Owner)</label>
+          <div class="company-field-value company-field-readonly">{{ manager_name|default:"-" }}</div>
+        </div>
+        <div class="company-field-row">
+          <label class="company-field-label">Designated Person</label>
+          <div class="company-field-value company-field-readonly">{{ company.designated_person|default:"-" }}</div>
+        </div>
+        <div class="company-field-row">
+          <label class="company-field-label">Username</label>
+          <div class="company-field-value company-field-readonly">{{ manager_username|default:"-" }}</div>
+        </div>
+        <div class="company-field-row">
+          <label class="company-field-label">E-mail (Client)</label>
+          <div class="company-field-value company-field-readonly">{{ company.client_email|default:"-" }}</div>
+        </div>
+      </div>
+
+      {% if authorization %}
+      <h5 class="mb-3">Package Authorization</h5>
+      <div class="row mb-4">
+        <div class="col-md-4">
+          <p class="mb-1 text-muted small">Package Template</p>
+          <strong>{{ authorization.package_template.name }}</strong>
+        </div>
+        <div class="col-md-4">
+          <p class="mb-1 text-muted small">Active Forms</p>
+          <strong>{{ active_form_count }}</strong>
+        </div>
+        <div class="col-md-4">
+          <p class="mb-1 text-muted small">Deactivated Forms</p>
+          <strong>{{ inactive_form_count }}</strong>
+        </div>
+      </div>
+
+      {% if deactivated_forms %}
+      <h6>Deactivated Form Codes</h6>
+      <p class="text-muted small">{{ deactivated_forms|join:", " }}</p>
+      {% endif %}
+      {% else %}
+      <div class="alert alert-warning mb-0">No package authorization linked to this company yet.</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

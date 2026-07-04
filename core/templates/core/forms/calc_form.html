@@ -1,0 +1,30 @@
+{% extends 'core/base.html' %}
+{% block content %}
+<div class="container-fluid">
+  <div class="card">
+    <div class="card-body">
+      {% include 'core/includes/form_grey_header.html' with form_def=form_def project=project record=record %}
+      <form method="post">{% csrf_token %}
+        {{ form.created_by_name }}
+        <div class="row">
+          <div class="col-md-4 form-group"><label>Value A</label><input type="number" step="any" name="field_a" class="form-control calc-input" value="{{ record.data.a }}"></div>
+          <div class="col-md-4 form-group"><label>Value B</label><input type="number" step="any" name="field_b" class="form-control calc-input" value="{{ record.data.b }}"></div>
+          <div class="col-md-4 form-group"><label>Result (A × B)</label><input type="text" name="field_result" id="calcResult" class="form-control" readonly value="{{ record.data.result }}"></div>
+        </div>
+        <div class="form-group"><label>Notes</label><textarea name="notes" class="form-control" rows="3">{% if record %}{{ record.data.notes }}{% endif %}</textarea></div>
+        <button type="submit" class="btn btn-primary">Save</button>
+        <a href="{% url 'core:project-detail' project.pk %}" class="btn btn-secondary">Cancel</a>
+      </form>
+    </div>
+  </div>
+</div>
+<script>
+document.querySelectorAll('.calc-input').forEach(function(el){
+  el.addEventListener('input', function(){
+    var a = parseFloat(document.querySelector('[name=field_a]').value) || 0;
+    var b = parseFloat(document.querySelector('[name=field_b]').value) || 0;
+    document.getElementById('calcResult').value = (a * b).toFixed(2);
+  });
+});
+</script>
+{% endblock %}

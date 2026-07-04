@@ -1,0 +1,347 @@
+/* OpticorAI Dark/Light theme overrides */
+
+html.theme-dark,
+body.theme-dark {
+  background-color: #0f172a;
+  color: #e2e8f0;
+}
+
+body.theme-dark .app-body {
+  background-color: #0b1120;
+}
+
+body.theme-dark .main {
+  background-color: #0f172a;
+  color: #e2e8f0;
+}
+
+body.theme-dark .app-header.navbar,
+body.theme-dark .app-footer {
+  background-color: #1e293b;
+  color: #cbd5f5;
+  border-color: rgba(148, 163, 184, 0.2);
+}
+
+body.theme-dark .app-header.navbar .nav-link,
+body.theme-dark .app-header.navbar .navbar-toggler {
+  color: #cbd5f5;
+}
+
+body.theme-dark .app-header.navbar .nav-link:hover,
+body.theme-dark .app-header.navbar .nav-link:focus {
+  color: #fff;
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+body.theme-dark .sidebar {
+  background-color: #0b1120;
+  border-right-color: rgba(148, 163, 184, 0.2);
+}
+
+body.theme-dark .sidebar .nav-link {
+  color: #cbd5f5;
+}
+
+body.theme-dark .sidebar .nav-link:hover,
+body.theme-dark .sidebar .nav-link:focus {
+  background-color: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+body.theme-dark .sidebar .nav-link.active,
+body.theme-dark .sidebar .nav-link.theme-switch-active,
+body.theme-dark .sidebar .nav-dropdown.open > .nav-link {
+  background-color: rgba(148, 163, 184, 0.2);
+  color: #fff;
+}
+
+body.theme-dark .sidebar .nav-title {
+  color: #94a3b8;
+}
+
+body.theme-dark .card,
+body.theme-dark .dropdown-menu,
+body.theme-dark .list-group-item,
+body.theme-dark .modal-content {
+  background-color: #1f2937;
+  color: #e2e8f0;
+  border-color: rgba(148, 163, 184, 0.3);
+  box-shadow: 0 4px 20px rgba(2, 6, 23, 0.8);
+}
+
+body.theme-dark .card-header,
+body.theme-dark .card-footer {
+  background-color: #1e293b;
+  border-color: rgba(148, 163, 184, 0.2);
+}
+
+body.theme-dark .table td,
+body.theme-dark .table th {
+  border-color: rgba(148, 163, 184, 0.2);
+  color: #e2e8f0;
+}
+
+body.theme-dark .table-striped tbody tr:nth-of-type(odd) {
+  background-color: rgba(15, 23, 42, 0.6);
+}
+
+body.theme-dark .table-striped tbody tr:nth-of-type(even) {
+  background-color: rgba(15, 23, 42, 0.4);
+}
+
+body.theme-dark .btn-outline-primary {
+  color: #38bdf8;
+  border-color: #38bdf8;
+}
+
+body.theme-dark .btn-outline-primary:hover {
+  background-color: #38bdf8;
+  color: #0b1120;
+}
+
+body.theme-dark .breadcrumb {
+  background-color: #111c2f;
+  color: #cbd5f5;
+  border-color: rgba(148, 163, 184, 0.2);
+}
+
+body.theme-dark .breadcrumb a {
+  color: #8bafff;
+}
+
+body.theme-dark .breadcrumb a:hover {
+  color: #93c5fd;
+}
+
+body.theme-dark .progress {
+  background-color: #1e293b;
+}
+
+body.theme-dark .badge {
+  background-color: #2563eb;
+  color: #fff;
+}
+
+body.theme-dark .notifications-dropdown {
+  background-color: #1f2937;
+}
+
+body.theme-dark .notifications-dropdown .dropdown-item {
+  color: #e2e8f0;
+}
+
+body.theme-dark .notifications-dropdown .dropdown-item small {
+  color: #94a3b8;
+}
+
+body.theme-dark .theme-switch-active {
+  font-weight: 600;
+}
+body.theme-light {
+  background-color: #e4e5e6;
+  color: #151b1e;
+}
+
+body.theme-dark {
+  background-color: #0f172a;
+  color: #e2e8f0;
+}
+
+body.theme-dark .app-header.navbar {
+  background-color: #111827;
+  border-bottom: 1px solid #1f2937;
+}
+
+body.theme-dark .app-header.navbar .nav-link,
+body.theme-dark .app-header.navbar .navbar-brand,
+body.theme-dark .app-header.navbar .navbar-toggler {
+  color: #e2e8f0;
+}
+
+body.theme-dark .sidebar {
+  background-color: #0b1120;
+  border-right: 1px solid #1f2937;
+}
+
+body.theme-dark .sidebar .nav-link,
+body.theme-dark .sidebar .nav-title {
+  color: #cbd5f5;
+}
+
+body.theme-dark .sidebar .nav-link:hover,
+body.theme-dark .sidebar .nav-link:focus {
+  background-color: rgba(148, 163, 184, 0.15);
+  color: #ffffff;
+}
+
+body.theme-dark .sidebar .nav-link.active,
+body.theme-dark .sidebar .nav-dropdown.open > .nav-link,
+body.theme-dark .sidebar .nav-dropdown.active > .nav-link {
+  background-color: rgba(148, 163, 184, 0.25);
+  color: #ffffff;
+}
+
+body.theme-dark .nav-title {
+  color: #94a3b8;
+}
+
+body.theme-dark .main {
+  background-color: #111827;
+}
+
+body.theme-dark .card,
+body.theme-dark .simple-box {
+  background-color: #1f2937;
+  color: #f8fafc;
+  border-color: #334155;
+}
+
+body.theme-dark .card-header,
+body.theme-dark .card-footer {
+  background-color: #0f172a;
+  border-color: #1f2937;
+  color: #e2e8f0;
+}
+
+body.theme-dark .breadcrumb {
+  background-color: #0f172a;
+  border-color: #1f2937;
+  color: #cbd5f5;
+}
+
+body.theme-dark .breadcrumb .btn {
+  color: #cbd5f5;
+}
+
+body.theme-dark table {
+  color: inherit;
+}
+
+body.theme-dark .table thead th {
+  background-color: #1f2937;
+  border-color: #334155;
+  color: #ffffff;
+}
+
+body.theme-dark .table td,
+body.theme-dark .table th {
+  border-color: #1e293b;
+  color: #e2e8f0;
+}
+
+body.theme-dark .dropdown-menu {
+  background-color: #1f2937;
+  border-color: #334155;
+  color: #f8fafc;
+}
+
+body.theme-dark .dropdown-item {
+  color: #f8fafc;
+}
+
+body.theme-dark .dropdown-item:hover,
+body.theme-dark .dropdown-item:focus {
+  background-color: rgba(148, 163, 184, 0.2);
+}
+
+body.theme-dark .progress {
+  background-color: #1f2937;
+}
+
+body.theme-dark .progress-bar {
+  background-color: #38bdf8;
+}
+
+body.theme-dark .app-footer {
+  background-color: #0f172a;
+  color: #94a3b8;
+  border-top: 1px solid #1f2937;
+}
+
+.sidebar .nav-link.theme-option-active {
+  background-color: rgba(32, 168, 216, 0.12);
+  color: #20a8d8;
+}
+
+/* ============================================
+   COMPREHENSIVE TEXT COLOR THEME INVERSION
+   ============================================
+   Black Text -> White Text in Dark Mode
+   White Text -> Black Text in Light Mode
+   ============================================ */
+
+/* Dark Mode: Make .text-dark become white/light */
+body.theme-dark .text-dark,
+body.theme-dark a.text-dark,
+body.theme-dark .text-dark strong,
+body.theme-dark .text-dark span,
+body.theme-dark .text-dark * {
+  color: #f8fafc !important;
+}
+
+body.theme-dark a.text-dark:hover,
+body.theme-dark a.text-dark:focus {
+  color: #ffffff !important;
+}
+
+/* Dark Mode: Table body cells should have light text */
+body.theme-dark .table tbody td,
+body.theme-dark .table tbody td *,
+body.theme-dark .table tbody td a,
+body.theme-dark .table tbody td strong {
+  color: #e2e8f0 !important;
+}
+
+/* Ensure table body links are visible in dark mode */
+body.theme-dark .table tbody td a.text-dark,
+body.theme-dark .table tbody td a.text-dark strong,
+body.theme-dark .table tbody td a.text-dark * {
+  color: #f8fafc !important;
+}
+
+body.theme-dark .table tbody td a.text-dark:hover,
+body.theme-dark .table tbody td a.text-dark:focus {
+  color: #ffffff !important;
+}
+
+/* Light Mode: Make .text-white become dark/black */
+body.theme-light .text-white,
+body.theme-light a.text-white,
+body.theme-light .text-white strong,
+body.theme-light .text-white span,
+body.theme-light .text-white * {
+  color: #151b1e !important;
+}
+
+body.theme-light a.text-white:hover,
+body.theme-light a.text-white:focus {
+  color: #000000 !important;
+}
+
+/* Additional specificity for nested elements in tables */
+body.theme-dark .table tbody tr td a.text-dark strong,
+body.theme-dark .table tbody tr td a.text-dark span {
+  color: #f8fafc !important;
+}
+
+body.theme-light .table tbody tr td a.text-white strong,
+body.theme-light .table tbody tr td a.text-white span {
+  color: #151b1e !important;
+}
+
+/* ============================================
+   NAVBAR USERNAME COLOR - KEEP CONSISTENT
+   Username should remain white in both themes
+   ============================================ */
+body.theme-light .navbar-nav li.text-white,
+body.theme-light .app-header .navbar-nav li.text-white,
+body.theme-light .navbar-nav .text-white.d-none.d-md-inline {
+  color: #ffffff !important;
+}
+
+body.theme-dark .navbar-nav li.text-white,
+body.theme-dark .app-header .navbar-nav li.text-white,
+body.theme-dark .navbar-nav .text-white.d-none.d-md-inline {
+  color: #ffffff !important;
+}
+

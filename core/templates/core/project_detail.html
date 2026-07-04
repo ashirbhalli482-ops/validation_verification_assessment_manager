@@ -1,0 +1,125 @@
+{% extends 'core/base.html' %}
+{% block content %}
+<div class="container-fluid">
+  <div class="card mb-3">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <strong>{{ project.project_number }} — {{ project.company_name }}</strong>
+      {% if user.user_type == 'manager' and project.manager == user %}
+      <div>
+        <a href="{% url 'core:team-member-create' project.pk %}" class="btn btn-sm btn-primary">Authorize Team</a>
+        <a href="{% url 'core:project-edit' project.pk %}" class="btn btn-sm btn-warning">Edit Project</a>
+        <a href="{% url 'core:project-delete' project.pk %}" class="btn btn-sm btn-danger">Delete</a>
+      </div>
+      {% endif %}
+    </div>
+    <div class="card-body">
+      <div class="row">
+        <div class="col-md-6">
+          <p><strong>Company:</strong> {{ project.company_name }} | <strong>Location:</strong> {{ project.location }}</p>
+          <p><strong>Factory:</strong> {{ project.factory_name }} | <strong>Report Type:</strong> {{ project.report_type }} | <strong>Year:</strong> {{ project.year }}</p>
+          <p><strong>Package:</strong> {{ project.package_instance.name }}</p>
+        </div>
+        <div class="col-md-6">
+          {% if user.user_type == 'manager' %}
+          <p><strong>VVB Access Password:</strong> <code>{{ vvb_password }}</code> <small class="text-muted">(shared for all authorized users on this VVB)</small></p>
+          {% endif %}
+          <p><a href="{% url 'core:project-access' project.pk %}" class="btn btn-sm btn-outline-secondary">Team Member Email Login</a></p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {% if user.user_type == 'manager' %}
+  <div class="card mb-3">
+    <div class="card-header"><strong>Authorized Team Members</strong></div>
+    <div class="card-body">
+      <table class="table table-sm">
+        <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Authorized</th><th></th></tr></thead>
+        <tbody>
+          {% for m in team_members %}
+          <tr>
+            <td>{{ m.name }}</td>
+            <td>{{ m.email }}</td>
+            <td>{{ m.get_role_display }}</td>
+            <td>{{ m.authorized_at|date:"M d, Y" }}</td>
+            <td>
+              <form method="post" action="{% url 'core:team-member-remove' m.pk %}" class="d-inline">{% csrf_token %}
+                <button class="btn btn-sm btn-danger">Remove</button>
+              </form>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="5" class="text-muted">No team members authorized yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+  {% for group in sub_packages %}
+  <div class="card mb-3">
+    <div class="card-header"><strong>{{ group.sub_package.code }} — {{ group.sub_package.name }}</strong></div>
+    <div class="card-body table-responsive">
+      <table class="table table-sm table-bordered">
+        <thead><tr><th>Form</th><th>Name</th><th>Record</th><th>Action</th></tr></thead>
+        <tbody>
+          {% for row in group.form_rows %}
+          <tr>
+            <td>{{ row.form_def.code }}</td>
+            <td>{{ row.form_def.name }}</td>
+            <td>
+              {% if row.record %}
+                <span class="badge badge-info">{{ row.record.get_status_display }}</span>
+              {% else %}
+                <span class="text-muted">Not started</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if row.record %}
+                <a href="{% url 'core:form-record-detail' row.record.pk %}" class="btn btn-sm btn-info">Open</a>
+              {% elif user.user_type == 'manager' or user.user_type == 'admin' %}
+                <a href="{% url 'core:form-record-create' project.pk row.form_def.pk %}" class="btn btn-sm btn-primary">Create Record</a>
+              {% elif team_member and team_member.role == 'team_member' %}
+                <a href="{% url 'core:form-record-create' project.pk row.form_def.pk %}" class="btn btn-sm btn-primary">Create Record</a>
+              {% else %}
+                <span class="text-muted small">Not started</span>
+              {% endif %}
+              {% if row.form_def.is_public and user.user_type == 'manager' %}
+                <a href="{% url 'core:public-form' 'new' %}?project={{ project.pk }}&form={{ row.form_def.pk }}" class="btn btn-sm btn-secondary" target="_blank">Customer Link</a>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% if group.sub_package.code == 'P1-D' and can_authorize_library %}
+      <a href="{% url 'core:library-list' %}" class="btn btn-info btn-sm">View Information Library</a>
+      {% endif %}
+    </div>
+  </div>
+  {% empty %}
+  <p class="text-muted">No active forms in this package.</p>
+  {% endfor %}
+
+  {% if report_records %}
+  <div class="card mb-3">
+    <div class="card-header"><strong>Authorized Reports</strong></div>
+    <div class="card-body">
+      <table class="table table-sm">
+        <thead><tr><th>Form</th><th>Status</th><th>Action</th></tr></thead>
+        <tbody>
+          {% for rec in report_records %}
+          <tr>
+            <td>{{ rec.form_definition.code }} — {{ rec.form_definition.name }}</td>
+            <td>{{ rec.get_status_display }}</td>
+            <td><a href="{% url 'core:form-record-detail' rec.pk %}" class="btn btn-sm btn-info">View Report</a></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

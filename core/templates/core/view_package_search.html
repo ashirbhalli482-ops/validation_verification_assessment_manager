@@ -1,0 +1,19 @@
+{% extends 'core/base.html' %}
+{% block breadcrumb %}
+<li class="breadcrumb-item">Admin</li>
+<li class="breadcrumb-item active">View Package</li>
+{% endblock %}
+{% block content %}
+<div class="container-fluid">
+  <div class="card">
+    <div class="card-header"><strong>View Package (Backup Support)</strong></div>
+    <div class="card-body">
+      <p class="text-muted">Enter the Name of VVB to view and download documents (read-only).</p>
+      <form method="post">{% csrf_token %}
+        <div class="form-group">{{ form.vvb_name.label_tag }}{{ form.vvb_name }}</div>
+        <button type="submit" class="btn btn-primary">Search</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

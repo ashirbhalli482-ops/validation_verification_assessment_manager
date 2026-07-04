@@ -1,0 +1,39 @@
+{% extends 'core/base.html' %}
+{% block breadcrumb %}
+<li class="breadcrumb-item">Admin</li>
+<li class="breadcrumb-item active">Information Library</li>
+{% endblock %}
+{% block content %}
+<div class="container-fluid">
+  <div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <strong>Information Library</strong>
+      {% if user.user_type == 'admin' %}
+      <a href="{% url 'core:library-upload' %}" class="btn btn-primary btn-sm"><i class="fa fa-upload"></i> Upload Information</a>
+      {% endif %}
+    </div>
+    <div class="card-body">
+      <table class="table table-striped">
+        <thead><tr><th>Title</th><th>Category</th><th>Uploaded</th><th>Actions</th></tr></thead>
+        <tbody>
+          {% for doc in documents %}
+          <tr>
+            <td>{{ doc.title }}</td>
+            <td>{{ doc.get_category_display }}</td>
+            <td>{{ doc.uploaded_at|date:"M d, Y" }}</td>
+            <td>
+              <a href="{% url 'core:library-download' doc.pk %}" class="btn btn-sm btn-info">Download</a>
+              {% if user.user_type == 'admin' %}
+              <a href="{% url 'core:library-delete' doc.pk %}" class="btn btn-sm btn-danger">Delete</a>
+              {% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="4" class="text-muted text-center">No documents uploaded.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

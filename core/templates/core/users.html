@@ -1,0 +1,278 @@
+{% extends 'core/base.html' %}
+{% load static %}
+{% load form_permissions %}
+
+{% block breadcrumb %}
+        <li class="breadcrumb-item">Home</li>
+        <li class="breadcrumb-item">Users</li>
+        <li class="breadcrumb-item active">{% if admin_users_only %}Admins{% else %}Users View{% endif %}</li>
+{% endblock breadcrumb%}
+
+{% block content %}
+<div class="container">
+    <div class="animated fade-in">
+        <div class="row">
+            <div class="col-12 mb-3">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="d-md-flex justify-content-between align-items-center">
+                            <strong>{% if admin_users_only %}Admin Management{% else %}User Management{% endif %}</strong>
+                            {% if user.user_type == 'admin' or user.user_type == 'manager' %}
+                            <div class="btn-group mt-4 mt-md-0" role="group">
+                                <a href="{% url 'core:new-user' %}" class="btn btn-primary btn-sm">
+                                    <i class="fa fa-user-plus"></i> {% if admin_users_only %}Create Admin{% else %}Create New User{% endif %}
+                                </a>
+                                <a href="{% url 'core:dashboard' %}" class="btn btn-info btn-sm">
+                                    <i class="fa fa-chart-bar"></i> Dashboard
+                                </a>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="row text-center">
+                            <div class="col-md-4">
+                                <h4 class="text-primary">{{ total_users }}</h4>
+                                <p class="text-muted">{% if admin_users_only %}Total Admins{% else %}Total Users{% endif %}</p>
+                            </div>
+                            <div class="col-md-4">
+                                <h4 class="text-info">{{ users|length }}</h4>
+                                <p class="text-muted">On This Page</p>
+                            </div>
+                            <div class="col-md-4">
+                                <h4 class="text-warning">{{ total_users }}</h4>
+                                <p class="text-muted">Active Listed</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-12 mb-3">
+                <div class="card">
+                    <div class="card-header">
+                        <strong>{% if admin_users_only %}Admin List{% else %}User List{% endif %}</strong>
+                        {% if user.user_type == 'manager' %}
+                        <div class="float-right">
+                            <div class="btn-group" role="group">
+                                <button type="button" class="btn btn-sm btn-outline-primary" onclick="filterUsers('all')">All</button>
+                                <button type="button" class="btn btn-sm btn-outline-info" onclick="filterUsers('manager')">Managers</button>
+                                <button type="button" class="btn btn-sm btn-outline-success" onclick="filterUsers('employee')">Employees</button>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                    <div class="card-body">
+                        <form method="get" class="form-row align-items-end mb-3">
+                            <div class="col-md-{% if admin_users_only %}10{% else %}2{% endif %} mb-2">
+                                <input type="text" name="search" class="form-control" placeholder="Name or email..." value="{{ search_query }}">
+                            </div>
+                            {% if not admin_users_only %}
+                            <div class="col-md-2 mb-2">
+                                <select name="user_type" class="form-control">
+                                    <option value="">All Types</option>
+                                    <option value="manager" {% if user_type_filter == 'manager' %}selected{% endif %}>Manager</option>
+                                    <option value="employee" {% if user_type_filter == 'employee' %}selected{% endif %}>Employee</option>
+                                </select>
+                            </div>
+                            <div class="col-md-2 mb-2">
+                                <input type="text" name="designation" class="form-control" placeholder="Designation..." value="{{ designation_filter }}">
+                            </div>
+                            <div class="col-md-2 mb-2">
+                                <input type="text" name="supervisor" class="form-control" placeholder="Supervisor..." value="{{ supervisor_filter }}">
+                            </div>
+                            <div class="col-md-2 mb-2">
+                                <select name="active" class="form-control">
+                                    <option value="">All Status</option>
+                                    <option value="active" {% if active_filter == 'active' %}selected{% endif %}>Active</option>
+                                    <option value="inactive" {% if active_filter == 'inactive' %}selected{% endif %}>Inactive</option>
+                                </select>
+                            </div>
+                            {% endif %}
+                            <div class="col-md-{% if admin_users_only %}2{% else %}2{% endif %} mb-2">
+                                <button type="submit" class="btn btn-primary w-100"><i class="fa fa-search"></i> Filter</button>
+                            </div>
+                        </form>
+                        <div class="table-responsive table-responsive-sm">
+                            <table class="table table-responsive-sm table-hover table-outline mb-5" id="usersTable">
+                                <thead class="thead-light">
+                                <tr>
+                                    <th class="text-center text-nowrap" style="min-width:60px;"><i class="fa fa-user"></i></th>
+                                    <th class="text-nowrap" style="min-width:120px;">User</th>
+                                    <th class="text-nowrap" style="min-width:160px;">Email</th>
+                                    {% if not admin_users_only %}
+                                    <th class="text-nowrap d-none d-sm-table-cell" style="min-width:100px;">User Type</th>
+                                    <th class="text-nowrap d-none d-md-table-cell" style="min-width:110px;">Designation</th>
+                                    <th class="text-nowrap d-none d-md-table-cell" style="min-width:110px;">Supervisor</th>
+                                    {% endif %}
+                                    <th class="text-nowrap d-none d-lg-table-cell" style="min-width:120px;">Activity</th>
+                                    <th class="text-center text-nowrap" style="min-width:220px;">Actions</th>
+                                </tr>
+                            </thead>
+                    <tbody>
+                        {% for user1 in users %}
+                        <tr>
+                            <td class="text-center text-nowrap" style="min-width:60px;">
+                                <div class="avatar">
+                                <img src="{{ user1.avatar_url }}" class="img-avatar" alt="img">
+                                <span class="avatar-status badge-success"></span>
+                                </div>
+                            </td>
+                            <td class="text-nowrap" style="min-width:120px;">
+                                {% if admin_users_only %}
+                                <div><strong>{{ user1.username }}</strong></div>
+                                {% else %}
+                                <div>{{ user1.get_full_name }}</div>
+                                {% endif %}
+                                <div class="small text-muted">
+                                Joined: {{ user1.date_joined|date:"F d, Y" }}
+                                </div>
+                            </td>
+                            <td class="text-nowrap" style="min-width:160px;">{{ user1.email }}</td>
+                            {% if not admin_users_only %}
+                            <td class="text-nowrap d-none d-sm-table-cell" style="min-width:100px;">{{ user1.get_user_type_display }}</td>
+                            <td class="text-nowrap d-none d-md-table-cell" style="min-width:110px;">{{ user1.designation|default:'-' }}</td>
+                            <td class="text-nowrap d-none d-md-table-cell" style="min-width:110px;">{{ user1.under_supervision.get_full_name|default:'-' }}</td>
+                            {% endif %}
+                            <td class="text-nowrap d-none d-lg-table-cell" style="min-width:120px;">
+                                <div class="small text-muted">Last login</div>
+                                <strong>{% if user1.last_login %}{{ user1.last_login|date:"F d, Y H:i" }}{% else %}Never{% endif %}</strong>
+                            </td>
+                            <td class="text-center text-nowrap" style="min-width:220px;">
+                                <div class="btn-group" role="group">
+                                    <a href="{% url 'core:user' user1.id %}" class="btn btn-sm btn-info" title="View">
+                                        <i class="fa fa-eye"></i> View
+                                    </a>
+                                    {% if admin_users_only or logged_user|can_manage_user:user1 %}
+                                    <a href="{% url 'core:edit-user-profile' user1.id %}" class="btn btn-sm btn-warning" title="Edit">
+                                        <i class="fa fa-edit"></i> Edit
+                                    </a>
+                                    {% if user1 == logged_user %}
+                                    <a href="{% url 'core:delete-user' user1.id %}" class="btn btn-sm btn-danger" title="Delete"
+                                       onclick="alert('You cannot delete your own account.'); return false;">
+                                        <i class="fa fa-trash"></i> Delete
+                                    </a>
+                                    {% else %}
+                                    <a href="{% url 'core:delete-user' user1.id %}" class="btn btn-sm btn-danger" title="Delete"
+                                       onclick="return confirm('Delete this {% if admin_users_only %}admin{% else %}user{% endif %}?');">
+                                        <i class="fa fa-trash"></i> Delete
+                                    </a>
+                                    {% endif %}
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="{% if admin_users_only %}5{% else %}8{% endif %}" class="text-center text-muted py-4">
+                                {% if admin_users_only %}No admin users found.{% else %}No users found.{% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% if users.has_other_pages %}
+            <nav aria-label="User pagination">
+                <ul class="pagination justify-content-center">
+                    {% if users.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page=1{% if search_query %}&search={{ search_query }}{% endif %}{% if user_type_filter %}&user_type={{ user_type_filter }}{% endif %}{% if designation_filter %}&designation={{ designation_filter }}{% endif %}{% if supervisor_filter %}&supervisor={{ supervisor_filter }}{% endif %}{% if active_filter %}&active={{ active_filter }}{% endif %}">First</a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ users.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if user_type_filter %}&user_type={{ user_type_filter }}{% endif %}{% if designation_filter %}&designation={{ designation_filter }}{% endif %}{% if supervisor_filter %}&supervisor={{ supervisor_filter }}{% endif %}{% if active_filter %}&active={{ active_filter }}{% endif %}">Previous</a>
+                        </li>
+                    {% endif %}
+                    <li class="page-item active">
+                        <span class="page-link">
+                            Page {{ users.number }} of {{ users.paginator.num_pages }}
+                        </span>
+                    </li>
+                    {% if users.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ users.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if user_type_filter %}&user_type={{ user_type_filter }}{% endif %}{% if designation_filter %}&designation={{ designation_filter }}{% endif %}{% if supervisor_filter %}&supervisor={{ supervisor_filter }}{% endif %}{% if active_filter %}&active={{ active_filter }}{% endif %}">Next</a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ users.paginator.num_pages }}{% if search_query %}&search={{ search_query }}{% endif %}{% if user_type_filter %}&user_type={{ user_type_filter }}{% endif %}{% if designation_filter %}&designation={{ designation_filter }}{% endif %}{% if supervisor_filter %}&supervisor={{ supervisor_filter }}{% endif %}{% if active_filter %}&active={{ active_filter }}{% endif %}">Last</a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </nav>
+            {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if user.user_type == 'manager' %}
+<script>
+function filterUsers(userType) {
+    const table = document.getElementById('usersTable');
+    const rows = table.getElementsByTagName('tr');
+
+    for (let i = 1; i < rows.length; i++) {
+        const row = rows[i];
+        const userTypeCell = row.cells[3];
+
+        if (!userTypeCell) continue;
+
+        if (userType === 'all') {
+            row.style.display = '';
+        } else if (userTypeCell.textContent.trim().toLowerCase().includes(userType.toLowerCase())) {
+            row.style.display = '';
+        } else {
+            row.style.display = 'none';
+        }
+    }
+}
+</script>
+{% endif %}
+
+{% if admin_users_only and success_action %}
+<div class="modal fade" id="adminSuccessModal" tabindex="-1" role="dialog" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" role="document">
+    <div class="modal-content">
+      <div class="modal-header bg-success text-white">
+        <h5 class="modal-title">
+          {% if success_action == 'created' %}Admin Created
+          {% elif success_action == 'updated' %}Admin Updated
+          {% elif success_action == 'password' %}Password Updated
+          {% elif success_action == 'deleted' %}Admin Deleted
+          {% else %}Success{% endif %}
+        </h5>
+        <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body text-center">
+        <i class="fa fa-check-circle fa-3x text-success mb-3"></i>
+        <p class="lead mb-0">
+          {% if success_action == 'created' %}
+            Admin <strong>{{ success_user }}</strong> was created successfully.
+          {% elif success_action == 'updated' %}
+            Admin <strong>{{ success_user }}</strong> was updated successfully.
+          {% elif success_action == 'password' %}
+            Password for <strong>{{ success_user }}</strong> was updated successfully.
+          {% elif success_action == 'deleted' %}
+            Admin <strong>{{ success_user }}</strong> was deleted successfully.
+          {% else %}
+            Action completed successfully.
+          {% endif %}
+        </p>
+      </div>
+      <div class="modal-footer justify-content-center">
+        <button type="button" class="btn btn-success" data-dismiss="modal">OK</button>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    $('#adminSuccessModal').modal('show');
+  });
+</script>
+{% endif %}
+{% endblock %}

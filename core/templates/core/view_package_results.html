@@ -1,0 +1,57 @@
+{% extends 'core/base.html' %}
+{% block breadcrumb %}
+<li class="breadcrumb-item">Admin</li>
+<li class="breadcrumb-item"><a href="{% url 'core:view-package' %}">View Package</a></li>
+<li class="breadcrumb-item active">Results</li>
+{% endblock %}
+{% block content %}
+<div class="container-fluid">
+  <div class="card">
+    <div class="card-header"><strong>Backup view for "{{ form.vvb_name.value }}"</strong> <small class="text-muted">(read-only)</small></div>
+    <div class="card-body">
+      {% for auth in authorizations %}
+      <div class="card mb-3">
+        <div class="card-header">{{ auth.vvb_name }} — {{ auth.package_template.name }} ({{ auth.package_count }} packages)</div>
+        <div class="card-body">
+          <p><strong>Manager:</strong> {{ auth.manager.get_full_name }} | <strong>Period:</strong> {{ auth.start_date }} – {{ auth.end_date }}</p>
+          <h6>Package Instances (P1…Pn)</h6>
+          <ul>
+            {% for inst in auth.instances.all %}
+            <li>{{ inst.name }} ({{ inst.code }})</li>
+            {% empty %}
+            <li class="text-muted">No instances generated yet.</li>
+            {% endfor %}
+          </ul>
+          <h6>Authorized Forms</h6>
+          <ul>
+            {% for af in auth.authorized_forms.all %}
+            <li>{{ af.form_definition.code }} — {{ af.form_definition.name }}
+              {% if af.is_active %}<span class="badge badge-success">Active</span>{% else %}<span class="badge badge-secondary">Inactive</span>{% endif %}
+            </li>
+            {% empty %}
+            <li class="text-muted">No forms authorized.</li>
+            {% endfor %}
+          </ul>
+          <h6>Library Documents (view/download only)</h6>
+          <ul>
+            {% for ald in auth.authorized_library.all %}
+            {% if ald.is_active %}
+            <li>
+              {{ ald.library_document.title }} ({{ ald.library_document.get_category_display }})
+              <a href="{% url 'core:library-download' ald.library_document.pk %}" class="btn btn-xs btn-outline-primary btn-sm">Download</a>
+            </li>
+            {% endif %}
+            {% empty %}
+            <li class="text-muted">No library documents authorized for this VVB.</li>
+            {% endfor %}
+          </ul>
+        </div>
+      </div>
+      {% empty %}
+      <p class="text-muted">No authorizations found for this VVB name.</p>
+      {% endfor %}
+      <a href="{% url 'core:view-package' %}" class="btn btn-secondary">New Search</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

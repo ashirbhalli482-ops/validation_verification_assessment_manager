@@ -1,0 +1,41 @@
+{% extends 'core/base.html' %}
+{% block content %}
+<div class="container-fluid">
+  <div class="card">
+    <div class="card-header"><strong>CV Competency Review (F-01C-MRC Process)</strong></div>
+    <div class="card-body">
+      <p class="text-muted">Approve / Not Approve / In Training for each employee CV. Results feed F-01C-MRC competency records.</p>
+      <table class="table table-striped">
+        <thead>
+          <tr><th>Name</th><th>Email</th><th>Position</th><th>Role</th><th>CV</th><th>Status</th><th>Action</th></tr>
+        </thead>
+        <tbody>
+          {% for emp in employees %}
+          <tr>
+            <td>{{ emp.name }}</td>
+            <td>{{ emp.email }}</td>
+            <td>{{ emp.position }}</td>
+            <td>{{ emp.role }}</td>
+            <td>{% if emp.cv %}<a href="{{ emp.cv.url }}" target="_blank">View CV</a>{% else %}—{% endif %}</td>
+            <td>{{ emp.get_cv_approval_status_display }}</td>
+            <td>
+              <form method="post" action="{% url 'core:cv-approval' emp.pk %}">{% csrf_token %}
+                <select name="cv_approval_status" class="form-control form-control-sm d-inline w-auto">
+                  <option value="pending" {% if emp.cv_approval_status == 'pending' %}selected{% endif %}>Pending</option>
+                  <option value="approved" {% if emp.cv_approval_status == 'approved' %}selected{% endif %}>Approve</option>
+                  <option value="not_approved" {% if emp.cv_approval_status == 'not_approved' %}selected{% endif %}>Not Approved</option>
+                  <option value="in_training" {% if emp.cv_approval_status == 'in_training' %}selected{% endif %}>In Training</option>
+                </select>
+                <button type="submit" class="btn btn-sm btn-primary">Update</button>
+              </form>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="7" class="text-muted text-center">No employee records. <a href="{% url 'core:employee-record-create' %}">Create employee record</a></td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

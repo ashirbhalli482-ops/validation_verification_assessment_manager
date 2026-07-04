@@ -1,0 +1,165 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block breadcrumb %}
+        <li class="breadcrumb-item">Home</li>
+        <li class="breadcrumb-item"><a href="{% url 'core:users' %}">{% if editing_admin %}Admins{% else %}Users{% endif %}</a></li>
+        <li class="breadcrumb-item active">{% if editing_admin %}Edit Admin{% else %}Edit User Profile{% endif %}</li>
+{% endblock breadcrumb%}
+
+{% block content %}
+<div class="container-fluid">
+  <div id="ui-view" style="opacity: 1;"><div class="animated fadeIn">
+        <div class="row">
+            <div class="col-12">
+                <div class="row">
+                    <div class="col-12 col-md-6">
+                        <div class="card">
+                            <div class="card-header">
+                                <strong>{% if editing_admin %}Admin Profile{% else %}{{ target_user.get_full_name }} - Current Profile{% endif %}</strong>
+                            </div>
+                            <div class="card-body">
+                                <div class="message">
+                                    <div class="py-3 pb-5 mr-3 float-left">
+                                        <div class="avatar">
+                                            <img src="{{ target_user.avatar_url }}" class="img-avatar" alt="{{ target_user.get_full_name }}">
+                                            <span class="avatar-status badge-success"></span>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <small class="text-muted">{% if editing_admin %}{{ target_user.username }}{% else %}{{ target_user.get_full_name }}{% endif %}</small>
+                                        {% if target_user.last_login %}
+                                        <small class="text-muted float-right mt-1">Last login: {{ target_user.last_login|date:"H:i" }} on {{ target_user.last_login|date:"d/m/Y" }}</small>
+                                        {% endif %}
+                                    </div>
+                                    <div class="mt-2">
+                                        <strong>Username:</strong> {{ target_user.username }}<br>
+                                        <strong>Email:</strong> {{ target_user.email }}<br>
+                                        <strong>User Type:</strong> {{ target_user.get_user_type_display }}<br>
+                                        {% if not editing_admin %}
+                                        <strong>Designation:</strong> {{ target_user.designation|default:'-' }}<br>
+                                        <strong>Supervisor:</strong> {{ target_user.under_supervision.get_full_name|default:'-' }}<br>
+                                        {% endif %}
+                                        <strong>Status:</strong> {% if target_user.is_active %}Active{% else %}Inactive{% endif %}<br>
+                                        <strong>Date Joined:</strong> {{ target_user.date_joined|date:"F d, Y" }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <div class="card">
+                            <div class="card-header">
+                                <strong>{% if editing_admin %}Edit Admin{% else %}Edit Profile Information{% endif %}</strong>
+                            </div>
+                            <div class="card-body">
+                                <form method="post">
+                                    {% csrf_token %}
+                                    {% if form.non_field_errors %}
+                                    <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+                                    {% endif %}
+                                    {% if form.username %}
+                                    <div class="form-group">
+                                        <label for="{{ form.username.id_for_label }}">Username</label>
+                                        {{ form.username }}
+                                        {% if form.username.errors %}<div class="text-danger small">{{ form.username.errors }}</div>{% endif %}
+                                    </div>
+                                    {% endif %}
+                                    {% if form.first_name and not editing_admin %}
+                                    <div class="form-group">
+                                        <label for="{{ form.first_name.id_for_label }}">First Name</label>
+                                        {{ form.first_name }}
+                                        {% if form.first_name.errors %}<div class="text-danger small">{{ form.first_name.errors }}</div>{% endif %}
+                                    </div>
+                                    {% endif %}
+                                    {% if form.last_name and not editing_admin %}
+                                    <div class="form-group">
+                                        <label for="{{ form.last_name.id_for_label }}">Last Name</label>
+                                        {{ form.last_name }}
+                                        {% if form.last_name.errors %}<div class="text-danger small">{{ form.last_name.errors }}</div>{% endif %}
+                                    </div>
+                                    {% endif %}
+                                    {% if form.email %}
+                                    <div class="form-group">
+                                        <label for="{{ form.email.id_for_label }}">Email</label>
+                                        {{ form.email }}
+                                        {% if form.email.errors %}<div class="text-danger small">{{ form.email.errors }}</div>{% endif %}
+                                    </div>
+                                    {% endif %}
+                                    {% if form.designation and not editing_admin %}
+                                    <div class="form-group">
+                                        <label for="{{ form.designation.id_for_label }}">Designation</label>
+                                        {{ form.designation }}
+                                        {% if form.designation.errors %}<div class="text-danger small">{{ form.designation.errors }}</div>{% endif %}
+                                    </div>
+                                    {% endif %}
+                                    {% if form.user_type %}
+                                    <div class="form-group">
+                                        <label for="{{ form.user_type.id_for_label }}">User Type</label>
+                                        {{ form.user_type }}
+                                        {% if form.user_type.errors %}<div class="text-danger small">{{ form.user_type.errors }}</div>{% endif %}
+                                    </div>
+                                    {% endif %}
+                                    {% if form.under_supervision %}
+                                    <div class="form-group">
+                                        <label for="{{ form.under_supervision.id_for_label }}">Supervisor</label>
+                                        {{ form.under_supervision }}
+                                        {% if form.under_supervision.errors %}<div class="text-danger small">{{ form.under_supervision.errors }}</div>{% endif %}
+                                    </div>
+                                    {% endif %}
+                                    {% if form.is_active %}
+                                    <div class="form-group form-check">
+                                        {{ form.is_active }}
+                                        <label class="form-check-label" for="{{ form.is_active.id_for_label }}">Active account</label>
+                                    </div>
+                                    {% endif %}
+                                    {% if form.avatar %}
+                                    <div class="form-group">
+                                        <label for="{{ form.avatar.id_for_label }}">Profile Picture</label>
+                                        {{ form.avatar }}
+                                        {% if form.avatar.errors %}<div class="text-danger small">{{ form.avatar.errors }}</div>{% endif %}
+                                    </div>
+                                    {% endif %}
+                                    <div class="btn-group flex-wrap" role="group">
+                                        <button type="submit" class="btn btn-primary">{% if editing_admin %}Update Admin{% else %}Update Profile{% endif %}</button>
+                                        <a href="{% url 'core:users' %}" class="btn btn-secondary">Cancel</a>
+                                        {% if user.user_type == 'admin' %}
+                                        <a href="{% url 'core:admin-set-password' target_user.id %}" class="btn btn-warning">Change Password</a>
+                                        {% endif %}
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if profile_updated %}
+<div class="modal fade" id="profileUpdatedModal" tabindex="-1" role="dialog" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" role="document">
+    <div class="modal-content">
+      <div class="modal-header bg-success text-white">
+        <h5 class="modal-title">{% if editing_admin %}Admin Updated{% else %}Profile Updated{% endif %}</h5>
+        <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+      </div>
+      <div class="modal-body text-center">
+        <i class="fa fa-check-circle fa-3x text-success mb-3"></i>
+        <p class="lead mb-0">Changes saved successfully.</p>
+      </div>
+      <div class="modal-footer justify-content-center">
+        <a href="{% url 'core:users' %}" class="btn btn-success">Back to Admin List</a>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    $('#profileUpdatedModal').modal('show');
+  });
+</script>
+{% endif %}
+
+{% endblock %}

@@ -1,0 +1,22 @@
+{% extends 'core/base.html' %}
+{% block content %}
+<div class="container-fluid">
+  <div class="card">
+    <div class="card-body">
+      {% include 'core/includes/form_grey_header.html' with form_def=form_def project=project record=record %}
+      <form method="post">{% csrf_token %}
+        <div class="form-group"><label>Your Name</label>{{ form.created_by_name }}</div>
+        <div class="form-group"><label>Company Name</label><input type="text" name="field_company" class="form-control" value="{{ record.data.company }}"></div>
+        <div class="form-group"><label>Contact Person</label><input type="text" name="field_contact" class="form-control" value="{{ record.data.contact }}"></div>
+        <div class="form-group"><label>Quantity (feeds F-03-PEB)</label><input type="number" name="field_quantity" class="form-control" value="{{ record.data.quantity }}"></div>
+        <div class="form-group"><label>Details</label><textarea name="notes" class="form-control" rows="3">{% if record %}{{ record.data.notes }}{% endif %}</textarea></div>
+        <button type="submit" class="btn btn-primary">Save</button>
+        {% if record and form_def.is_public %}
+        <a href="{% url 'core:public-form' record.pk %}" class="btn btn-info" target="_blank">Customer Public Link</a>
+        {% endif %}
+        <a href="{% url 'core:project-detail' project.pk %}" class="btn btn-secondary">Back</a>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,281 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script async src="https://www.googletagmanager.com/gtag/js?id=UA-147225311-2"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'UA-147225311-2');
+    </script>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <meta name="description" content="CoreUI - Open Source Bootstrap Admin Template">
+  <meta name="author" content="Łukasz Holeczek">
+  <meta name="keyword" content="Bootstrap,Admin,Template,Open,Source,AngularJS,Angular,Angular2,Angular 2,Angular4,Angular 4,jQuery,CSS,HTML,RWD,Dashboard,React,React.js,Vue,Vue.js">
+  <meta name="google-site-verification" content="83fcqoPn-YTkXathQiicW-x3U2RWZh4PaPUzk91wtjY" />
+  <title>Validation Verification Assessment Manager</title>
+
+  <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.0.9/css/all.css" integrity="sha384-5SOiIsAziJl6AWe0HWRKTXlfcSHKmYV4RBF18PPJ173Kzn7jzMyFuTtk8JA7QQG1" crossorigin="anonymous">
+  <link href="{% static 'core/css/simple-line-icons.min.css' %}" rel="stylesheet">
+  <link href="{% static 'core/css/style.css' %}" rel="stylesheet">
+  <link href="{% static 'core/css/estilo.css' %}" rel="stylesheet">
+
+</head>
+{% block body %}
+<body class="app header-fixed sidebar-fixed aside-menu-fixed aside-menu-hidden">
+  <header class="app-header navbar">
+    <button class="navbar-toggler mobile-sidebar-toggler d-lg-none mr-auto" type="button">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    
+    <button class="navbar-toggler sidebar-toggler d-md-down-none" type="button">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <ul class="nav navbar-nav d-md-down-none">
+      <li class="nav-item px-3">
+        <a class="nav-link" href="{% url 'core:dashboard' %}">
+          {% if user.user_type == 'admin' %}Admin Dashboard
+          {% elif user.user_type == 'manager' %}Manager Dashboard
+          {% else %}Employee Dashboard{% endif %}
+        </a>
+      </li>
+    </ul>
+    <img src="{% static 'core/img/logos/logo.png' %}" alt="" class="brand-gui d-none d-md-inline">
+    <ul class="nav navbar-nav ml-auto">
+      {% if user.is_authenticated %}
+      <li class="text-white">Hello, {{ user.username }}</li>
+      {% else %}
+      <li class="text-muted">
+        <a href="{% url 'core:login' %}">sign in</a>
+      </li>
+      {% endif %}
+      <li class="nav-item dropdown">
+        <a class="nav-link" data-toggle="dropdown" href="#" role="button" aria-haspopup="true" aria-expanded="false">
+          <i class="fa fa-bell"></i>
+          {% if unread_notifications and unread_notifications|length > 0 %}
+            <span class="badge badge-danger">{{ unread_notifications|length }}</span>
+          {% endif %}
+        </a>
+        <div class="dropdown-menu dropdown-menu-right">
+          <div class="dropdown-header text-center">
+            <strong>Notifications</strong>
+          </div>
+          {% if unread_notifications and unread_notifications|length > 0 %}
+            {% for notification in unread_notifications %}
+              <a class="dropdown-item" href="{{ notification.link|default:'#' }}">
+                <i class="fa fa-info-circle"></i> {{ notification.message|truncatechars:60 }}
+                <br>
+                <small class="text-muted">{{ notification.created_at|date:'M d, H:i' }}</small>
+              </a>
+            {% endfor %}
+            <div class="dropdown-divider"></div>
+          {% else %}
+            <span class="dropdown-item text-muted">No new notifications</span>
+            <div class="dropdown-divider"></div>
+          {% endif %}
+          <a class="dropdown-item" href="{% url 'core:notifications-list' %}">
+            <i class="fa fa-list"></i> View All Notifications
+          </a>
+        </div>
+      </li>
+      <li class="nav-item dropdown">
+        <a class="nav-link" data-toggle="dropdown" href="#" role="button" aria-haspopup="true" aria-expanded="false">
+          {% if user.is_authenticated and logged_user %}
+            <img src="{{ logged_user.avatar_url }}" class="img-avatar" alt="img">
+          {% else %}
+            <img src="{% static 'core/img/avatar/blank_profile.png' %}" class="img-avatar" alt="img">
+          {% endif %}
+        </a>
+        <div class="dropdown-menu dropdown-menu-right">
+          
+          {% if user.is_authenticated %}
+          {% if user.is_authenticated and user.user_type != 'admin' %}
+          <div class="dropdown-header text-center">
+            <strong>Account</strong>
+          </div>
+          <a class="dropdown-item" href="{% url 'core:project-list' %}"><i class="fa fa-folder"></i> Projects</a>
+          {% endif %}
+          <div class="dropdown-header text-center">
+            <strong>Settings</strong>
+          </div>
+          <a class="dropdown-item" href="{% url 'core:profile' %}"><i class="fa fa-user"></i> Profile</a>
+          <div class="divider"></div>
+          <a class="dropdown-item" href="{% url 'core:logout' %}"><i class="fa fa-lock"></i> Logout</a>
+          {% else %}
+          <a class="dropdown-item" href="{% url 'core:login' %}"><i class="fa fa-user"></i> Login</a>
+          {% endif %}
+        </div>
+      </li>
+    </ul>
+   
+
+  </header>
+
+  <div class="app-body">
+    <div class="sidebar">
+      <nav class="sidebar-nav">
+        <ul class="nav">
+          <li class="nav-item">
+            <a class="nav-link" href="{% url 'core:dashboard' %}"><i class="fa fa-tachometer-alt"></i> Dashboard</a>
+          </li>
+          
+          <li class="nav-item nav-dropdown">
+            <a class="nav-link nav-dropdown-toggle" href="#"><i class="fa fa-eye"></i> Views</a>
+            <ul class="nav-dropdown-items">
+              <li class="nav-item">
+                <a class="nav-link" href="{% url 'core:notifications-list' %}">
+                  <i class="fa fa-bell"></i> View Notifications
+                  {% if unread_notifications and unread_notifications|length > 0 %}
+                    <span class="badge badge-danger ml-2">{{ unread_notifications|length }}</span>
+                  {% endif %}
+                </a>
+              </li>
+              {% if user.user_type == 'admin' %}
+              <li class="nav-item">
+                <a class="nav-link" href="{% url 'core:users' %}?user_type=admin"><i class="fa fa-user"></i> View Admins</a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link" href="{% url 'core:company-list' %}"><i class="fa fa-building ml-2"></i> View Companies</a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link" href="{% url 'core:package-template-list' %}"><i class="fa fa-box ml-2"></i> View Packages</a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link" href="{% url 'core:library-list' %}"><i class="fa fa-book ml-2"></i> View Informations</a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link" href="{% url 'core:dropdown-list' %}"><i class="fa fa-list ml-2"></i> View Drop-Down List</a>
+              </li>
+              {% elif user.user_type == 'manager' %}
+              <li class="nav-item">
+                <a class="nav-link" href="{% url 'core:project-list'%}"><i class="fa fa-folder ml-2"></i> View Projects</a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link" href="{% url 'core:users'%}"><i class="fa fa-user"></i> View Users</a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link" href="{% url 'core:team-member-list' %}"><i class="fa fa-users ml-2"></i> Authorized Team</a>
+              </li>
+              {% else %}
+              <li class="nav-item">
+                <a class="nav-link" href="{% url 'core:project-list'%}"><i class="fa fa-folder ml-2"></i> View Projects</a>
+              </li>
+              {% endif %}
+            </ul>
+          </li>
+
+          {% if user.user_type == 'admin' %}
+          <li class="nav-item nav-dropdown">
+            <a class="nav-link nav-dropdown-toggle" href="#"><i class="fa fa-shield-alt"></i> Administration</a>
+            <ul class="nav-dropdown-items">
+              <li class="nav-item">
+                <a class="nav-link" href="{% url 'core:new-user' %}"><i class="fa fa-user-plus ml-2"></i> Create Admin</a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link" href="{% url 'core:company-create' %}"><i class="fa fa-building ml-2"></i> Create Company</a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link" href="{% url 'core:package-template-create' %}"><i class="fa fa-box ml-2"></i> Create Package</a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link" href="{% url 'core:package-authorization-create' %}"><i class="fa fa-key"></i> Authorize Packages</a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link" href="{% url 'core:dropdown-create' %}"><i class="fa fa-list ml-2"></i> Create Drop-Down List</a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link" href="{% url 'core:library-upload' %}"><i class="fa fa-upload"></i> Upload Information</a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link" href="{% url 'core:library-list' %}"><i class="fa fa-book ml-2"></i> Library</a>
+              </li>
+            </ul>
+          </li>
+          {% elif user.user_type == 'manager' %}
+          <li class="nav-item nav-dropdown">
+            <a class="nav-link nav-dropdown-toggle" href="#"><i class="fa fa-briefcase"></i> Management</a>
+            <ul class="nav-dropdown-items">
+              <li class="nav-item">
+                <a class="nav-link" href="{% url 'core:project-list' %}"><i class="fa fa-folder ml-2"></i> Projects</a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link" href="{% url 'core:project-create' %}"><i class="fa fa-plus"></i> New Project</a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link" href="{% url 'core:users' %}"><i class="fa fa-users ml-2"></i> Manage Users</a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link" href="{% url 'core:new-user' %}"><i class="fa fa-user-plus ml-2"></i> Create User</a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link" href="{% url 'core:library-list' %}"><i class="fa fa-book ml-2"></i> Information Library</a>
+              </li>
+            </ul>
+          </li>
+          {% elif user.user_type == 'employee' %}
+          <li class="nav-item">
+            <a class="nav-link" href="{% url 'core:project-list' %}"><i class="fa fa-folder"></i> My Projects</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="{% url 'core:library-list' %}"><i class="fa fa-book"></i> Information Library</a>
+          </li>
+          {% endif %}
+          
+          <li class="nav-title">
+            Extras
+          </li>
+          <li class="nav-item nav-dropdown">
+            <a class="nav-link nav-dropdown-toggle" href="#"><i class="fa fa-star"></i> Pages</a>
+            <ul class="nav-dropdown-items">
+              <li class="nav-item">
+                <a class="nav-link" href="{% url 'core:login' %}" target="_top"><i class="fa fa-sign-in"></i> Login</a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link" href="{% url 'core:logout' %}" target="_top"><i class="fa fa-sign-out"></i> Logout</a>
+              </li>
+            </ul>
+          </li>
+        </ul>
+      </nav>
+      
+      <!-- <button class="sidebar-minimizer brand-minimizer" type="button"></button> -->
+    </div>
+
+    <main class="main">
+      <ol class="breadcrumb">
+        {% block breadcrumb %}
+        <li class="breadcrumb-item active">Home</li>
+        <li class="breadcrumb-item">Dashboard</li>
+        {% endblock breadcrumb%}
+
+        <li class="breadcrumb-menu d-md-down-none">
+          <div class="btn-group" role="group" aria-label="Button group">
+            <a class="btn" href="./"><i class="fa fa-tachometer-alt"></i> &nbsp;Dashboard</a>
+          </div>
+        </li>
+      </ol>
+{% block content %}
+{% endblock %}
+    </main>
+  </div>
+
+  <footer class="app-footer text-center justify-content-center fixed-bottom py-2">
+    <span><a href="#">Copyright</a> © EHSS & Carbon Management And Consultancy Inc.</span>
+  </footer>
+
+    <script src="{% static 'core/vendors/js/jquery.min.js'%}"></script>
+    <script src="{% static 'core/vendors/js/popper.min.js'%}"></script>
+    <script src="{% static 'core/vendors/js/bootstrap.min.js'%}"></script>
+    <script src="{% static 'core/vendors/js/pace.min.js'%}"></script>
+    <script src="{% static 'core/vendors/js/Chart.min.js'%}"></script>
+    <script src="{% static 'core/js/app.js'%}"></script>
+    <script src="{% static 'core/js/main.js'%}"></script>
+    <script src="{% static 'core/js/notifications.js'%}"></script>
+
+</body>
+{% endblock body %}
+</html>

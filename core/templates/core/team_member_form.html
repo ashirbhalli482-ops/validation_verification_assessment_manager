@@ -1,0 +1,18 @@
+{% extends 'core/base.html' %}
+{% block content %}
+<div class="container-fluid">
+  <div class="card">
+    <div class="card-header"><strong>Authorize Team Member — {{ project.project_number }}</strong></div>
+    <div class="card-body">
+      <p><strong>VVB Password (shared):</strong> <code>{{ project.vvb_password }}</code> — all authorized users use this password with their email.</p>
+      <form method="post">{% csrf_token %}
+        {% for field in form %}
+        <div class="form-group">{{ field.label_tag }}{{ field }}{% if field.help_text %}<small class="form-text text-muted">{{ field.help_text }}</small>{% endif %}</div>
+        {% endfor %}
+        <button type="submit" class="btn btn-primary">Authorize &amp; Send Notification</button>
+        <a href="{% url 'core:project-detail' project.pk %}" class="btn btn-secondary">Cancel</a>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

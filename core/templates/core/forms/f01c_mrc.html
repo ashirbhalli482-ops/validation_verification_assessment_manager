@@ -1,0 +1,36 @@
+{% extends 'core/base.html' %}
+{% block content %}
+<div class="container-fluid">
+  <div class="card">
+    <div class="card-header"><strong>F-01C-MRC — Competency Review (CV Approval)</strong></div>
+    <div class="card-body">
+      {% include 'core/includes/form_grey_header.html' with form_def=form_def project=project record=record %}
+      <p class="text-muted">Review employee competency records and approve CVs. Data is stored in F-01C-MRC.</p>
+      <form method="post">{% csrf_token %}
+        {{ form.created_by_name }}
+        <table class="table table-bordered table-sm">
+          <thead>
+            <tr><th>Employee Name</th><th>Role</th><th>Position</th><th>CV Status</th></tr>
+          </thead>
+          <tbody>
+            {% for emp in employees %}
+            <tr>
+              <td>{{ emp.name }}</td>
+              <td>{{ emp.role }}</td>
+              <td>{{ emp.position }}</td>
+              <td>{{ emp.get_cv_approval_status_display }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="4" class="text-muted">No employee records. Create them under Employee Records.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        <div class="form-group"><label>Review Notes</label><textarea name="notes" class="form-control" rows="3">{% if record %}{{ record.data.notes }}{% endif %}</textarea></div>
+        <button type="submit" class="btn btn-primary">Save F-01C-MRC</button>
+        <a href="{% url 'core:cv-review' %}" class="btn btn-info">Open CV Review Panel</a>
+        <a href="{% url 'core:project-detail' project.pk %}" class="btn btn-secondary">Back</a>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

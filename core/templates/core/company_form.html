@@ -1,0 +1,145 @@
+{% extends 'core/base.html' %}
+{% block breadcrumb %}
+<li class="breadcrumb-item">Admin</li>
+<li class="breadcrumb-item"><a href="{% url 'core:company-list' %}">Companies</a></li>
+<li class="breadcrumb-item active">{{ title }}</li>
+{% endblock %}
+{% block content %}
+<div class="container-fluid">
+  <div class="card company-form-card">
+    <div class="card-header"><strong>{{ title }}</strong></div>
+    <div class="card-body">
+      <form method="post">{% csrf_token %}
+        {% if form.non_field_errors %}
+        <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+        {% endif %}
+
+        <div class="company-info-grid mb-4">
+          <div class="company-field-row">
+            <label class="company-field-label">{{ form.name.label }}</label>
+            <div class="company-field-value">{{ form.name }}{% if form.name.errors %}<div class="text-danger small">{{ form.name.errors }}</div>{% endif %}</div>
+          </div>
+          <div class="company-field-row">
+            <label class="company-field-label">{{ form.abbreviation.label }}</label>
+            <div class="company-field-value">{{ form.abbreviation }}{% if form.abbreviation.errors %}<div class="text-danger small">{{ form.abbreviation.errors }}</div>{% endif %}</div>
+          </div>
+          <div class="company-field-row">
+            <label class="company-field-label">{{ form.issue_date.label }}</label>
+            <div class="company-field-value">{{ form.issue_date }}{% if form.issue_date.errors %}<div class="text-danger small">{{ form.issue_date.errors }}</div>{% endif %}</div>
+          </div>
+          <div class="company-field-row">
+            <label class="company-field-label">{{ form.version.label }}</label>
+            <div class="company-field-value">{{ form.version }}{% if form.version.errors %}<div class="text-danger small">{{ form.version.errors }}</div>{% endif %}</div>
+          </div>
+          <div class="company-field-row">
+            <label class="company-field-label">{{ form.start_date.label }}</label>
+            <div class="company-field-value">{{ form.start_date }}{% if form.start_date.errors %}<div class="text-danger small">{{ form.start_date.errors }}</div>{% endif %}</div>
+          </div>
+          <div class="company-field-row">
+            <label class="company-field-label">{{ form.end_date.label }}</label>
+            <div class="company-field-value">{{ form.end_date }}{% if form.end_date.errors %}<div class="text-danger small">{{ form.end_date.errors }}</div>{% endif %}</div>
+          </div>
+          <div class="company-field-row">
+            <label class="company-field-label">{{ form.package_count.label }}</label>
+            <div class="company-field-value">{{ form.package_count }}{% if form.package_count.errors %}<div class="text-danger small">{{ form.package_count.errors }}</div>{% endif %}</div>
+          </div>
+          <div class="company-field-row">
+            <label class="company-field-label">{{ form.project_manager_name.label }}</label>
+            <div class="company-field-value">{{ form.project_manager_name }}{% if form.project_manager_name.errors %}<div class="text-danger small">{{ form.project_manager_name.errors }}</div>{% endif %}</div>
+          </div>
+          <div class="company-field-row">
+            <label class="company-field-label">{{ form.designated_person.label }}</label>
+            <div class="company-field-value">{{ form.designated_person }}{% if form.designated_person.errors %}<div class="text-danger small">{{ form.designated_person.errors }}</div>{% endif %}</div>
+          </div>
+          <div class="company-field-row">
+            <label class="company-field-label">{{ form.manager_username.label }}</label>
+            <div class="company-field-value">{{ form.manager_username }}{% if form.manager_username.errors %}<div class="text-danger small">{{ form.manager_username.errors }}</div>{% endif %}</div>
+          </div>
+          <div class="company-field-row">
+            <label class="company-field-label">{{ form.access_password.label }}</label>
+            <div class="company-field-value">{{ form.access_password }}{% if form.access_password.errors %}<div class="text-danger small">{{ form.access_password.errors }}</div>{% endif %}</div>
+          </div>
+          <div class="company-field-row">
+            <label class="company-field-label">{{ form.client_email.label }}</label>
+            <div class="company-field-value">{{ form.client_email }}{% if form.client_email.errors %}<div class="text-danger small">{{ form.client_email.errors }}</div>{% endif %}</div>
+          </div>
+        </div>
+
+        {% if is_edit %}
+        <p class="text-muted small mb-3">Leave password blank to keep the current manager and package access password.</p>
+        {% endif %}
+
+        {% if package_rows %}
+        <h5 class="mb-3">Package Selection</h5>
+        <p class="text-muted small mb-2">Check forms under <strong>Option for Deactivation</strong> to deactivate them for this company.</p>
+        <div class="table-responsive package-selection-table-wrap mb-4">
+          <table class="table table-bordered package-selection-table mb-0">
+            <thead>
+              <tr>
+                <th class="pkg-check-col">Option for Deactivation</th>
+                <th class="pkg-code-col">Master Records</th>
+                <th class="pkg-check-col">Option for Deactivation</th>
+                <th class="pkg-code-col">Limited Use FORMs</th>
+                <th class="pkg-check-col">Option for Deactivation</th>
+                <th class="pkg-code-col">Limited Use FORMs</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in package_rows %}
+              <tr>
+                <td class="text-center pkg-check-col">
+                  {% if row.master and row.master.type == 'form' %}
+                  <input type="checkbox" name="deactivated_forms" value="{{ row.master.form.id }}" class="pkg-deactivate-check"{% if row.master.form.id in deactivated_form_ids %} checked{% endif %}>
+                  {% endif %}
+                </td>
+                <td class="pkg-code-col">
+                  {% if row.master %}
+                    {% if row.master.type == 'header' %}
+                    <div class="pkg-section-header">{{ row.master.text }}</div>
+                    {% else %}
+                    {{ row.master.form.code }}
+                    {% endif %}
+                  {% endif %}
+                </td>
+                <td class="text-center pkg-check-col">
+                  {% if row.limited1 and row.limited1.type == 'form' %}
+                  <input type="checkbox" name="deactivated_forms" value="{{ row.limited1.form.id }}" class="pkg-deactivate-check"{% if row.limited1.form.id in deactivated_form_ids %} checked{% endif %}>
+                  {% endif %}
+                </td>
+                <td class="pkg-code-col">
+                  {% if row.limited1 and row.limited1.type == 'form' %}{{ row.limited1.form.code }}{% endif %}
+                </td>
+                <td class="text-center pkg-check-col">
+                  {% if row.limited2 and row.limited2.type == 'form' %}
+                  <input type="checkbox" name="deactivated_forms" value="{{ row.limited2.form.id }}" class="pkg-deactivate-check"{% if row.limited2.form.id in deactivated_form_ids %} checked{% endif %}>
+                  {% endif %}
+                </td>
+                <td class="pkg-code-col">
+                  {% if row.limited2 %}
+                    {% if row.limited2.type == 'header' %}
+                    <div class="pkg-section-header">{{ row.limited2.text }}</div>
+                    {% else %}
+                    {{ row.limited2.form.code }}
+                    {% endif %}
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="alert alert-warning">
+          No package forms found. Run <code>python manage.py seed_forms</code> and ensure an active package template exists.
+        </div>
+        {% endif %}
+
+        <button type="submit" class="btn btn-primary">
+          {% if is_create %}Create Company &amp; Authorize Packages{% elif is_edit %}Update Company &amp; Packages{% else %}Save{% endif %}
+        </button>
+        <a href="{% url 'core:company-list' %}" class="btn btn-secondary">Cancel</a>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

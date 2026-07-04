@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>{{ form_def.code }} — Customer Inquiry</title>
+  <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+<div class="container py-4">
+  <div class="card">
+    <div class="card-header bg-secondary text-white"><strong>F-02-IRR — Customer Inquiry (No login required)</strong></div>
+    <div class="card-body">
+      <form method="post">{% csrf_token %}
+        <div class="form-group"><label>Company Name</label><input type="text" name="field_company" class="form-control"></div>
+        <div class="form-group"><label>Contact Person</label><input type="text" name="field_contact" class="form-control"></div>
+        <div class="form-group"><label>Email</label><input type="email" name="field_email" class="form-control"></div>
+        <div class="form-group"><label>Quantity / Number Input (used in F-03-PEB)</label><input type="number" name="field_quantity" class="form-control" min="0"></div>
+        <div class="form-group"><label>Inquiry Details</label><textarea name="notes" class="form-control" rows="4"></textarea></div>
+        <button type="submit" class="btn btn-primary">Submit Inquiry</button>
+      </form>
+    </div>
+  </div>
+</div>
+</body>
+</html>

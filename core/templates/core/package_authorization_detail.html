@@ -1,0 +1,66 @@
+{% extends 'core/base.html' %}
+{% block breadcrumb %}
+<li class="breadcrumb-item">Admin</li>
+<li class="breadcrumb-item"><a href="{% url 'core:package-authorization-list' %}">Authorized Packages</a></li>
+<li class="breadcrumb-item active">{{ authorization.vvb_name }}</li>
+{% endblock %}
+{% block content %}
+<div class="container-fluid">
+  <div class="card mb-3">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <strong>Authorization: {{ authorization.vvb_name }}</strong>
+      <div>
+        <a href="{% url 'core:package-authorization-edit' authorization.pk %}" class="btn btn-warning btn-sm">Update Package</a>
+        <a href="{% url 'core:package-authorization-list' %}" class="btn btn-secondary btn-sm">Back</a>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="row">
+        <div class="col-md-3"><strong>Manager:</strong> {{ authorization.manager.get_full_name }}</div>
+        <div class="col-md-3"><strong>Template:</strong> {{ authorization.package_template.name }}</div>
+        <div class="col-md-2"><strong>Year:</strong> {{ authorization.year }}</div>
+        <div class="col-md-2"><strong>Packages:</strong> {{ authorization.package_count }}</div>
+        <div class="col-md-2"><strong>Period:</strong> {{ authorization.start_date }} – {{ authorization.end_date }}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card mb-3">
+    <div class="card-header"><strong>Generated Package Instances (P1–P{{ authorization.package_count }})</strong></div>
+    <div class="card-body">
+      <div class="d-flex flex-wrap">
+        {% for inst in instances %}
+        <span class="badge badge-primary m-1 p-2">{{ inst.name }}</span>
+        {% empty %}
+        <p class="text-muted">No instances generated yet.</p>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header"><strong>Form Activation (activate/deactivate forms for this authorization)</strong></div>
+    <div class="card-body table-responsive">
+      <table class="table table-sm table-bordered">
+        <thead><tr><th>Form Code</th><th>Form Name</th><th>Status</th><th>Action</th></tr></thead>
+        <tbody>
+          {% for af in authorized_forms %}
+          <tr>
+            <td>{{ af.form_definition.code }}</td>
+            <td>{{ af.form_definition.name }}</td>
+            <td>{% if af.is_active %}<span class="badge badge-success">Active</span>{% else %}<span class="badge badge-secondary">Inactive</span>{% endif %}</td>
+            <td>
+              <form method="post" action="{% url 'core:toggle-authorized-form' af.pk %}" class="d-inline">{% csrf_token %}
+                <button type="submit" class="btn btn-sm btn-outline-primary">{% if af.is_active %}Deactivate{% else %}Activate{% endif %}</button>
+              </form>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="4" class="text-muted text-center">No forms defined for this package template. Run seed_forms command.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

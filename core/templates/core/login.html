@@ -1,0 +1,118 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <title>VVAM — Sign In</title>
+    <meta name="description" content="Sign in to the Validation Verification Assessment Manager">
+
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.0.9/css/all.css" integrity="sha384-5SOiIsAziJl6AWe0HWRKTXlfcSHKmYV4RBF18PPJ173Kzn7jzMyFuTtk8JA7QQG1" crossorigin="anonymous">
+
+    <!-- Bootstrap CSS -->
+    <link href="{% static 'core/css/bootstrap.css' %}" rel="stylesheet">
+
+    <!-- Custom CSS -->
+    <link href="{% static 'core/css/style.css' %}" rel="stylesheet">
+    <link href="{% static 'core/css/estilo.css' %}" rel="stylesheet">
+</head>
+<body class="login-page">
+    <div class="login-container">
+        <div class="login-card">
+
+            <!-- Sign-in form -->
+            <div class="login-right">
+                <div class="login-header">
+                    <h2 class="login-title">Sign In</h2>
+                    <p class="login-subtitle">Enter your credentials to access VVAM</p>
+                </div>
+
+                <form method="post" action="{% url 'core:login' %}">
+                    {% csrf_token %}
+                    
+                    <!-- Messages Display -->
+                    {% if messages %}
+                        {% for message in messages %}
+                            {% if message.tags == 'error' %}
+                                <div class="login-alert login-alert-{{ message.tags }}" role="alert">
+                                    <i class="fas fa-exclamation-circle"></i>
+                                    {{ message }}
+                                </div>
+                            {% endif %}
+                        {% endfor %}
+                    {% endif %}
+
+                    <!-- Form Errors Display -->
+                    {% if login_form.errors %}
+                        <div class="login-alert login-alert-danger" role="alert">
+                            <i class="fas fa-exclamation-circle"></i>
+                            {% for field, errors in login_form.errors.items %}
+                                {% for error in errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+
+                    <!-- Email Field -->
+                    <div class="login-form-group">
+                        <input type="email"
+                               class="login-form-control"
+                               name="email"
+                               placeholder="Enter your email address"
+                               id="id_email"
+                               required>
+                        <i class="fas fa-envelope input-icon"></i>
+                    </div>
+
+                    <!-- Password Field -->
+                    <div class="login-form-group">
+                        <input type="password"
+                               class="login-form-control"
+                               name="password"
+                               placeholder="Enter your password"
+                               id="id_password"
+                               required>
+                        <i class="fas fa-lock input-icon"></i>
+                    </div>
+
+                    <!-- Login Button -->
+                    <button type="submit" class="btn-login">
+                        <i class="fas fa-sign-in-alt"></i> Sign In
+                    </button>
+                </form>
+
+
+            </div>
+
+            <!-- Welcome panel -->
+            <div class="login-left">
+                <div class="login-left-content">
+                    <div class="brand-logo" aria-hidden="true">
+                        <img src="{% static 'core/img/logos/logo.png' %}" alt="Logo">
+                    </div>
+                    <h1 class="welcome-title">Validation Verification Assessment Manager</h1>
+                    <p class="welcome-subtitle">
+                        Manage validation packages, authorizations, and compliance records in one secure workspace.
+                    </p>
+                    <ul class="feature-list">
+                        <li><i class="fas fa-box"></i> Validation &amp; Verification Packages</li>
+                        <li><i class="fas fa-key"></i> Package Authorizations</li>
+                        <li><i class="fas fa-book"></i> Information Library</li>
+                        <li><i class="fas fa-shield-alt"></i> Secure Role-Based Access</li>
+                    </ul>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="{% static 'core/vendors/js/jquery.min.js' %}"></script>
+    <script src="{% static 'core/vendors/js/bootstrap.min.js' %}"></script>
+    <script src="{% static 'core/js/index.js' %}"></script>
+</body>
+</html>

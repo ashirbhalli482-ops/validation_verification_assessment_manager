@@ -1,0 +1,73 @@
+{% extends 'core/base.html' %}
+{% block breadcrumb %}
+<li class="breadcrumb-item">Admin</li>
+<li class="breadcrumb-item"><a href="{% url 'core:dropdown-list' %}">DDL</a></li>
+<li class="breadcrumb-item active">{{ dropdown.name }}</li>
+{% endblock %}
+{% block content %}
+<div class="container-fluid">
+  <div class="card mb-3">
+    <div class="card-header"><strong>Edit List Metadata</strong></div>
+    <div class="card-body">
+      <form method="post">{% csrf_token %}
+        <input type="hidden" name="action" value="update_list">
+        <div class="form-row">
+          <div class="col-md-4">{{ list_form.name.label_tag }}{{ list_form.name }}</div>
+          <div class="col-md-3">{{ list_form.slug.label_tag }}{{ list_form.slug }}</div>
+          <div class="col-md-4">{{ list_form.description.label_tag }}{{ list_form.description }}</div>
+          <div class="col-md-1 pt-4"><button type="submit" class="btn btn-primary btn-sm">Save</button></div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="card mb-3">
+    <div class="card-header"><strong>{{ dropdown.name }}</strong> <small class="text-muted">({{ dropdown.slug }})</small></div>
+    <div class="card-body">
+      <form method="post">{% csrf_token %}
+        <input type="hidden" name="action" value="add_option">
+        <div class="form-row">
+          <div class="col-md-5">{{ option_form.value.label_tag }}{{ option_form.value }}</div>
+          <div class="col-md-2">{{ option_form.order.label_tag }}{{ option_form.order }}</div>
+          <div class="col-md-2 pt-4">{{ option_form.is_active }} {{ option_form.is_active.label }}</div>
+          <div class="col-md-3 pt-3"><button type="submit" class="btn btn-primary btn-sm">Add Option</button></div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header"><strong>Options</strong></div>
+    <div class="card-body">
+      <table class="table table-sm">
+        <thead><tr><th>Value</th><th>Order</th><th>Active</th><th>Actions</th></tr></thead>
+        <tbody>
+          {% for opt in options %}
+          <tr>
+            <td colspan="4" class="p-0">
+              <form method="post" class="p-2 border-bottom">{% csrf_token %}
+                <input type="hidden" name="action" value="update_option">
+                <input type="hidden" name="option_id" value="{{ opt.pk }}">
+                <div class="form-row align-items-center">
+                  <div class="col-md-5"><input type="text" name="value" class="form-control form-control-sm" value="{{ opt.value }}"></div>
+                  <div class="col-md-2"><input type="number" name="order" class="form-control form-control-sm" value="{{ opt.order }}"></div>
+                  <div class="col-md-2"><label class="mb-0"><input type="checkbox" name="is_active" {% if opt.is_active %}checked{% endif %}> Active</label></div>
+                  <div class="col-md-3">
+                    <button type="submit" class="btn btn-sm btn-primary">Update</button>
+                    <button type="submit" name="action" value="delete_option" class="btn btn-sm btn-danger" onclick="return confirm('Remove this option?');">Remove</button>
+                  </div>
+                </div>
+              </form>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="4" class="text-muted">No options yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <a href="{% url 'core:dropdown-list' %}" class="btn btn-secondary">Back to Lists</a>
+      <a href="{% url 'core:dropdown-delete' dropdown.pk %}" class="btn btn-danger float-right" onclick="return confirm('Delete this entire drop-down list?');">Delete List</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,113 @@
+{% extends 'core/base.html' %}
+{% load static %}
+{% load form_permissions %}
+
+{% block breadcrumb %}
+        <li class="breadcrumb-item">Home</li>
+        <li class="breadcrumb-item">Users</li>
+        <li class="breadcrumb-item active">User Profile</li>
+{% endblock breadcrumb%}
+
+{% block content %}
+<div class="container-fluid">
+  <div id="ui-view" style="opacity: 1;"><div class="animated fadeIn">
+            <div class="row">
+                <div class="col-12">
+                            <div class="row">
+                                <div class="col-12 col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <strong>{{ user_view.get_full_name }}</strong>
+                    </div>
+                                <div class="card-body">
+                                    <div class="tab-pane p-3 active show">
+                                      <div class="message">
+                                        <div class="py-3 pb-5 mr-3 float-left">
+                                          <div class="avatar">
+                                <img src="{{ user_view.avatar_url }}" class="img-avatar" alt="img">
+                                            <span class="avatar-status badge-success"></span>
+                                          </div>
+                                        </div>
+                                        <div>
+                                          <small class="text-muted">{{ user_view.get_full_name }}</small>
+                                            {% if user_view.last_login %}
+                                          <small class="text-muted float-right mt-1">Last login: {{ user_view.last_login|date:"H:i" }} in {{ user_view.last_login|date:"d/m" }}</small>
+                                            {% endif %}
+                                        </div>
+                                        <div class="mt-2">
+                                            <strong>User Type:</strong> {{ user_view.get_user_type_display }}<br>
+                                            <strong>Designation:</strong> {{ user_view.designation }}<br>
+                                            <strong>Supervisor:</strong> {{ user_view.under_supervision.get_full_name|default:'-' }}<br>
+                                        </div>
+                          </div>
+                                      </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-12 col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <strong>User Information</strong>
+                    </div>
+                                <div class="card-body">
+                                    <div class="tab-pane p-3 active show">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <strong>Username:</strong>
+                                    <p>{{ user_view.username }}</p>
+                                </div>
+                                <div class="col-md-6">
+                                    <strong>Email:</strong>
+                                    <p>{{ user_view.email }}</p>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <strong>First Name:</strong>
+                                    <p>{{ user_view.first_name }}</p>
+                                </div>
+                                <div class="col-md-6">
+                                    <strong>Last Name:</strong>
+                                    <p>{{ user_view.last_name }}</p>
+                                </div>
+                            </div>
+                                        <div class="row">
+                                <div class="col-md-6">
+                                    <strong>Date Joined:</strong>
+                                    <p>{{ user_view.date_joined|date:"F d, Y" }}</p>
+                                        </div>
+                                <div class="col-md-6">
+                                    <strong>Last Login:</strong>
+                                    <p>{{ user_view.last_login|date:"F d, Y H:i" }}</p>
+                                        </div>
+                                    </div>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <strong>Active Status:</strong>
+                                    <p>{% if user_view.is_active %}Active{% else %}Inactive{% endif %}</p>
+                                </div>
+                                <div class="col-md-6">
+                                    <strong>Staff Status:</strong>
+                                    <p>{% if user_view.is_staff %}Staff{% else %}Regular User{% endif %}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="row mt-3">
+                    <div class="col-12">
+                        <a href="{% url 'core:users' %}" class="btn btn-secondary">Back to Users</a>
+                        {% if user|can_manage_user:user_view and user_view != user %}
+                        <a href="{% url 'core:edit-user-profile' user_view.id %}" class="btn btn-warning">Edit</a>
+                        <a href="{% url 'core:admin-set-password' user_view.id %}" class="btn btn-info">Set Password</a>
+                        <a href="{% url 'core:delete-user' user_view.id %}" class="btn btn-danger" onclick="return confirm('Delete this user?');">Delete</a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+  </div>
+</div>
+{% endblock %}
