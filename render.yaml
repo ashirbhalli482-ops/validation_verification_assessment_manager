@@ -1,0 +1,26 @@
+databases:
+  - name: vvam-db
+    databaseName: vvam
+    user: vvam
+    plan: free
+
+services:
+  - type: web
+    name: validation-verification-assessment-manager
+    runtime: python
+    plan: free
+    buildCommand: "./build.sh"
+    startCommand: "gunicorn validation_verification_assessment_manager.wsgi:application"
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.0
+      - key: DATABASE_URL
+        fromDatabase:
+          name: vvam-db
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: "False"
+      - key: WEB_CONCURRENCY
+        value: "4"
