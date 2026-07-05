@@ -1,6 +1,32 @@
 """Centralized access control for employees and project resources."""
 
-from .models import TeamMember, AuthorizedForm, AuthorizedLibraryDocument
+from .models import TeamMember, AuthorizedForm, AuthorizedLibraryDocument, Company
+
+
+def manager_company_for_user(user):
+    """Return the admin company record linked to a project manager."""
+    if not user.is_authenticated or user.user_type != 'manager':
+        return None
+    try:
+        return user.managed_company
+    except Company.DoesNotExist:
+        return user.company if getattr(user, 'company_id', None) else None
+
+
+def _document_allowed_for_companies(document, company_ids):
+    if document.allowed_companies.exists():
+        return document.allowed_companies.filter(pk__in=company_ids).exists()
+    return None
+
+
+def company_for_project(project):
+    """Resolve the admin company record linked to a project manager."""
+    if not project or not project.manager_id:
+        return None
+    try:
+        return project.manager.managed_company
+    except Company.DoesNotExist:
+        return project.manager.company if getattr(project.manager, 'company_id', None) else None
 
 
 def get_team_member(user, project):
@@ -79,6 +105,11 @@ def can_access_library_document(user, document):
     if user.user_type == 'admin':
         return True
     if user.user_type == 'manager':
+        company = manager_company_for_user(user)
+        if company:
+            allowed = _document_allowed_for_companies(document, [company.pk])
+            if allowed is not None:
+                return allowed
         auth_ids = user.package_authorizations.values_list('id', flat=True)
         return AuthorizedLibraryDocument.objects.filter(
             authorization_id__in=auth_ids,
@@ -87,6 +118,17 @@ def can_access_library_document(user, document):
         ).exists()
     if user.user_type != 'employee':
         return False
+    company_ids = list(
+        Company.objects.filter(
+            authorized_manager_id__in=user.team_assignments.filter(
+                is_active=True,
+            ).values_list('project__manager_id', flat=True),
+        ).values_list('pk', flat=True)
+    )
+    if company_ids:
+        allowed = _document_allowed_for_companies(document, company_ids)
+        if allowed is not None:
+            return allowed
     auth_ids = user.team_assignments.filter(is_active=True).values_list(
         'project__package_instance__authorization_id', flat=True
     )
@@ -98,22 +140,61 @@ def can_access_library_document(user, document):
 
 
 def get_authorized_library_documents(user):
+    from django.db.models import Count
     from .models import LibraryDocument
 
     if user.user_type == 'admin':
-        return LibraryDocument.objects.all()
+        return LibraryDocument.objects.all().prefetch_related('allowed_companies')
+
     if user.user_type == 'manager':
-        auth_ids = user.package_authorizations.values_list('id', flat=True)
-    elif user.user_type == 'employee':
-        auth_ids = user.team_assignments.filter(is_active=True).values_list(
-            'project__package_instance__authorization_id', flat=True
+        company = manager_company_for_user(user)
+        auth_ids = list(user.package_authorizations.values_list('id', flat=True))
+        if company:
+            assigned = LibraryDocument.objects.filter(allowed_companies=company)
+            legacy = LibraryDocument.objects.annotate(
+                company_count=Count('allowed_companies'),
+            ).filter(
+                company_count=0,
+                authorizations__authorization_id__in=auth_ids,
+                authorizations__is_active=True,
+            )
+            return (assigned | legacy).distinct().prefetch_related('allowed_companies')
+        if not auth_ids:
+            return LibraryDocument.objects.none()
+        doc_ids = AuthorizedLibraryDocument.objects.filter(
+            authorization_id__in=auth_ids, is_active=True,
+        ).values_list('library_document_id', flat=True)
+        return LibraryDocument.objects.filter(id__in=doc_ids)
+
+    if user.user_type == 'employee':
+        company_ids = list(
+            Company.objects.filter(
+                authorized_manager_id__in=user.team_assignments.filter(
+                    is_active=True,
+                ).values_list('project__manager_id', flat=True),
+            ).values_list('pk', flat=True)
         )
-    else:
-        return LibraryDocument.objects.none()
-    doc_ids = AuthorizedLibraryDocument.objects.filter(
-        authorization_id__in=auth_ids, is_active=True
-    ).values_list('library_document_id', flat=True)
-    return LibraryDocument.objects.filter(id__in=doc_ids)
+        auth_ids = list(user.team_assignments.filter(is_active=True).values_list(
+            'project__package_instance__authorization_id', flat=True
+        ))
+        if company_ids:
+            assigned = LibraryDocument.objects.filter(allowed_companies__in=company_ids).distinct()
+            legacy = LibraryDocument.objects.annotate(
+                company_count=Count('allowed_companies'),
+            ).filter(
+                company_count=0,
+                authorizations__authorization_id__in=auth_ids,
+                authorizations__is_active=True,
+            )
+            return (assigned | legacy).distinct().prefetch_related('allowed_companies')
+        if not auth_ids:
+            return LibraryDocument.objects.none()
+        doc_ids = AuthorizedLibraryDocument.objects.filter(
+            authorization_id__in=auth_ids, is_active=True,
+        ).values_list('library_document_id', flat=True)
+        return LibraryDocument.objects.filter(id__in=doc_ids)
+
+    return LibraryDocument.objects.none()
 
 
 def is_report_form(form_definition):

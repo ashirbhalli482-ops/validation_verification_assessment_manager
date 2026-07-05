@@ -1,7 +1,7 @@
 {% extends 'core/base.html' %}
 {% block breadcrumb %}
 <li class="breadcrumb-item">Admin</li>
-<li class="breadcrumb-item"><a href="{% url 'core:library-list' %}">Library</a></li>
+<li class="breadcrumb-item"><a href="{% url 'core:library-list' %}">Documents Library</a></li>
 <li class="breadcrumb-item active">{{ title }}</li>
 {% endblock %}
 {% block content %}
@@ -9,12 +9,38 @@
   <div class="card">
     <div class="card-header"><strong>{{ title }}</strong></div>
     <div class="card-body">
-      <p class="text-muted">Upload PDF, PowerPoint, Word, or other documents. Categories: Standards Info, Procedure, Regulation Info, General Info.</p>
+      <p class="text-muted">Upload PDF, PowerPoint, Word, or Excel documents. The file is saved to the <strong>Documents Library</strong>. Choose which client companies may view it.</p>
       <form method="post" enctype="multipart/form-data">{% csrf_token %}
-        {% for field in form %}
-        <div class="form-group">{{ field.label_tag }}{{ field }}{% if field.errors %}<div class="text-danger">{{ field.errors }}</div>{% endif %}</div>
-        {% endfor %}
-        <button type="submit" class="btn btn-primary">Upload</button>
+        {% if form.non_field_errors %}
+        <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+        {% endif %}
+        <div class="form-group">
+          <label for="{{ form.title.id_for_label }}">{{ form.title.label }}</label>
+          {{ form.title }}
+          {% if form.title.errors %}<div class="text-danger small">{{ form.title.errors }}</div>{% endif %}
+        </div>
+        <div class="form-group">
+          <label for="{{ form.category.id_for_label }}">{{ form.category.label }}</label>
+          {{ form.category }}
+          {% if form.category.errors %}<div class="text-danger small">{{ form.category.errors }}</div>{% endif %}
+        </div>
+        <div class="form-group">
+          <label for="{{ form.allowed_client.id_for_label }}">{{ form.allowed_client.label }}</label>
+          {{ form.allowed_client }}
+          {% if form.allowed_client.errors %}<div class="text-danger small">{{ form.allowed_client.errors }}</div>{% endif %}
+          {% if form.allowed_client.help_text %}<small class="text-muted d-block mt-1">{{ form.allowed_client.help_text }}</small>{% endif %}
+        </div>
+        <div class="form-group">
+          <label for="{{ form.file.id_for_label }}">{{ form.file.label }}</label>
+          {{ form.file }}
+          {% if form.file.errors %}<div class="text-danger small">{{ form.file.errors }}</div>{% endif %}
+        </div>
+        <div class="form-group">
+          <label for="{{ form.description.id_for_label }}">{{ form.description.label }}</label>
+          {{ form.description }}
+          {% if form.description.errors %}<div class="text-danger small">{{ form.description.errors }}</div>{% endif %}
+        </div>
+        <button type="submit" class="btn btn-primary">Upload to Documents Library</button>
         <a href="{% url 'core:library-list' %}" class="btn btn-secondary">Cancel</a>
       </form>
     </div>

@@ -1,11 +1,12 @@
 from django import forms
 from django.contrib.auth.forms import UserCreationForm
 from django.db.models import Q
+from django.utils import timezone
 from .models import (
     CustomUser, Company, PackageTemplate, PackageAuthorization, AuthorizedForm,
     LibraryDocument, DropdownList, DropdownOption, Project, TeamMember,
     EmployeeRecord, FormRecord, USER_TYPE_CHOICES, TEAM_ROLE_CHOICES,
-    LIBRARY_CATEGORY_CHOICES,
+    LIBRARY_CATEGORY_CHOICES, PROJECT_PHASE_CHOICES, PROJECT_DOCUMENT_TYPE_CHOICES,
 )
 import os
 import re
@@ -82,6 +83,26 @@ class AdminUserEditForm(forms.ModelForm):
             'username': forms.TextInput(attrs={'class': 'form-control'}),
             'email': forms.EmailInput(attrs={'class': 'form-control'}),
             'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        }
+
+    def clean_email(self):
+        email = self.cleaned_data['email']
+        qs = CustomUser.objects.filter(email=email)
+        if self.instance.pk:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise forms.ValidationError('A user with this email already exists.')
+        return email
+
+
+class AdminSelfProfileForm(forms.ModelForm):
+    """Admin editing their own profile."""
+    class Meta:
+        model = CustomUser
+        fields = ['username', 'email']
+        widgets = {
+            'username': forms.TextInput(attrs={'class': 'form-control'}),
+            'email': forms.EmailInput(attrs={'class': 'form-control'}),
         }
 
     def clean_email(self):
@@ -305,13 +326,12 @@ class ManagerUserEditForm(forms.ModelForm):
 class UserProfileEditForm(forms.ModelForm):
     class Meta:
         model = CustomUser
-        fields = ['first_name', 'last_name', 'designation', 'contact_number', 'avatar']
+        fields = ['first_name', 'last_name', 'designation', 'contact_number']
         widgets = {
             'first_name': forms.TextInput(attrs={'class': 'form-control'}),
             'last_name': forms.TextInput(attrs={'class': 'form-control'}),
             'designation': forms.TextInput(attrs={'class': 'form-control'}),
             'contact_number': forms.TextInput(attrs={'class': 'form-control'}),
-            'avatar': forms.FileInput(attrs={'class': 'form-control'}),
         }
 
 
@@ -426,8 +446,8 @@ class CompanyCreateForm(forms.Form):
         label='End Date',
         widget=forms.DateInput(attrs=DATE_CONTROL),
     )
-    package_count = forms.IntegerField(
-        label='Number of Package', min_value=1, initial=1,
+    project_limit = forms.IntegerField(
+        label='Number of Project', min_value=1, initial=1,
         widget=forms.NumberInput(attrs={**FORM_CONTROL, 'min': 1}),
     )
     designated_person = forms.CharField(
@@ -518,6 +538,17 @@ class CompanyEditForm(CompanyCreateForm):
                 raise forms.ValidationError({
                     'client_email': 'A user with this email already exists.',
                 })
+
+        project_limit = cleaned.get('project_limit')
+        if self.company and project_limit is not None:
+            existing = self.company.manager_project_count()
+            if project_limit < existing:
+                raise forms.ValidationError({
+                    'project_limit': (
+                        f'Cannot set below {existing} — the manager has already created '
+                        f'{existing} project(s).'
+                    ),
+                })
         return cleaned
 
 
@@ -535,12 +566,12 @@ def company_edit_initial(company, authorization):
         'client_email': company.client_email or (mgr.email if mgr else ''),
         'manager_username': mgr.username if mgr else '',
         'project_manager_name': pm_name,
+        'project_limit': company.project_limit,
     }
     if authorization:
         initial.update({
             'start_date': authorization.start_date,
             'end_date': authorization.end_date,
-            'package_count': authorization.package_count,
         })
     return initial
 
@@ -618,6 +649,13 @@ class AuthorizedFormToggleForm(forms.ModelForm):
 
 class LibraryDocumentForm(forms.ModelForm):
     ALLOWED_EXTENSIONS = {'.pdf', '.doc', '.docx', '.ppt', '.pptx', '.xls', '.xlsx'}
+    allowed_client = forms.ModelChoiceField(
+        queryset=Company.objects.none(),
+        label='Client (who can view)',
+        widget=forms.Select(attrs={'class': 'form-control'}),
+        required=True,
+        empty_label='---------',
+    )
 
     class Meta:
         model = LibraryDocument
@@ -628,6 +666,21 @@ class LibraryDocumentForm(forms.ModelForm):
             'file': forms.FileInput(attrs={'class': 'form-control', 'accept': '.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx'}),
             'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['allowed_client'].queryset = Company.objects.order_by('name')
+        
+        if self.instance.pk:
+            company = self.instance.allowed_companies.first()
+            if company:
+                self.fields['allowed_client'].initial = company.pk
+
+    def clean_allowed_client(self):
+        client = self.cleaned_data.get('allowed_client')
+        if not client:
+            raise forms.ValidationError('Select a client who may view this document.')
+        return client
 
     def clean_file(self):
         uploaded = self.cleaned_data.get('file')
@@ -666,22 +719,57 @@ class DropdownOptionForm(forms.ModelForm):
 class ProjectForm(forms.ModelForm):
     class Meta:
         model = Project
-        fields = ['package_instance', 'company_name', 'factory_name', 'location',
-                  'factory_address', 'contact_person', 'contact_email', 'contact_mobile',
-                  'report_type', 'year', 'project_number']
+        fields = [
+            'project_number', 'company_name', 'location', 'report_type',
+            'engagement_year', 'phase', 'document_type',
+        ]
         widgets = {
-            'package_instance': forms.Select(attrs={'class': 'form-control'}),
-            'company_name': forms.TextInput(attrs={'class': 'form-control'}),
-            'factory_name': forms.TextInput(attrs={'class': 'form-control'}),
-            'location': forms.TextInput(attrs={'class': 'form-control'}),
-            'factory_address': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
-            'contact_person': forms.TextInput(attrs={'class': 'form-control'}),
-            'contact_email': forms.EmailInput(attrs={'class': 'form-control'}),
-            'contact_mobile': forms.TextInput(attrs={'class': 'form-control'}),
-            'report_type': forms.TextInput(attrs={'class': 'form-control'}),
-            'year': forms.NumberInput(attrs={'class': 'form-control'}),
             'project_number': forms.TextInput(attrs={'class': 'form-control'}),
+            'company_name': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': "Enter your client's name",
+            }),
+            'location': forms.TextInput(attrs={'class': 'form-control'}),
+            'report_type': forms.TextInput(attrs={'class': 'form-control'}),
+            'engagement_year': forms.TextInput(attrs={'class': 'form-control'}),
+            'phase': forms.Select(attrs={'class': 'form-control'}),
+            'document_type': forms.Select(attrs={'class': 'form-control'}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['project_number'].label = 'Project Number'
+        self.fields['company_name'].label = 'Client Name'
+        self.fields['location'].label = 'Facility & Jurisdiction'
+        self.fields['report_type'].label = 'Report Type'
+        self.fields['engagement_year'].label = 'Engagement & Year'
+        self.fields['phase'].label = 'Phase'
+        self.fields['document_type'].label = 'Document Type'
+        self.fields['phase'].choices = [('', '---------')] + list(PROJECT_PHASE_CHOICES)
+        self.fields['document_type'].choices = [('', '---------')] + list(PROJECT_DOCUMENT_TYPE_CHOICES)
+        if self.instance.pk and not self.instance.engagement_year and self.instance.year:
+            self.initial.setdefault('engagement_year', str(self.instance.year))
+
+    def clean(self):
+        cleaned = super().clean()
+        engagement = (cleaned.get('engagement_year') or '').strip()
+        self._parsed_year = None
+        if engagement:
+            match = re.search(r'(19|20)\d{2}', engagement)
+            if match:
+                self._parsed_year = int(match.group())
+        return cleaned
+
+    def save(self, commit=True):
+        project = super().save(commit=False)
+        parsed_year = getattr(self, '_parsed_year', None)
+        if parsed_year:
+            project.year = parsed_year
+        elif not project.year:
+            project.year = timezone.now().year
+        if commit:
+            project.save()
+        return project
 
 
 class TeamMemberForm(forms.ModelForm):

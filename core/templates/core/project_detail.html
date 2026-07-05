@@ -8,54 +8,28 @@
       <div>
         <a href="{% url 'core:team-member-create' project.pk %}" class="btn btn-sm btn-primary">Authorize Team</a>
         <a href="{% url 'core:project-edit' project.pk %}" class="btn btn-sm btn-warning">Edit Project</a>
-        <a href="{% url 'core:project-delete' project.pk %}" class="btn btn-sm btn-danger">Delete</a>
       </div>
       {% endif %}
     </div>
     <div class="card-body">
       <div class="row">
         <div class="col-md-6">
-          <p><strong>Company:</strong> {{ project.company_name }} | <strong>Location:</strong> {{ project.location }}</p>
-          <p><strong>Factory:</strong> {{ project.factory_name }} | <strong>Report Type:</strong> {{ project.report_type }} | <strong>Year:</strong> {{ project.year }}</p>
+          <p><strong>Client:</strong> {{ project.company_name }} | <strong>Facility & Jurisdiction:</strong> {{ project.location }}</p>
+          <p><strong>Report Type:</strong> {{ project.report_type }} | <strong>Engagement & Year:</strong> {{ project.engagement_year|default:project.year }}</p>
+          <p><strong>Phase:</strong> {{ project.get_phase_display|default:"—" }} | <strong>Document Type:</strong> {{ project.get_document_type_display|default:"—" }}</p>
           <p><strong>Package:</strong> {{ project.package_instance.name }}</p>
         </div>
         <div class="col-md-6">
-          {% if user.user_type == 'manager' %}
+          <!-- {% if user.user_type == 'manager' %}
           <p><strong>VVB Access Password:</strong> <code>{{ vvb_password }}</code> <small class="text-muted">(shared for all authorized users on this VVB)</small></p>
           {% endif %}
-          <p><a href="{% url 'core:project-access' project.pk %}" class="btn btn-sm btn-outline-secondary">Team Member Email Login</a></p>
+          <p><a href="{% url 'core:project-access' project.pk %}" class="btn btn-sm btn-outline-secondary">Team Member Email Login</a></p> -->
         </div>
       </div>
     </div>
   </div>
 
-  {% if user.user_type == 'manager' %}
-  <div class="card mb-3">
-    <div class="card-header"><strong>Authorized Team Members</strong></div>
-    <div class="card-body">
-      <table class="table table-sm">
-        <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Authorized</th><th></th></tr></thead>
-        <tbody>
-          {% for m in team_members %}
-          <tr>
-            <td>{{ m.name }}</td>
-            <td>{{ m.email }}</td>
-            <td>{{ m.get_role_display }}</td>
-            <td>{{ m.authorized_at|date:"M d, Y" }}</td>
-            <td>
-              <form method="post" action="{% url 'core:team-member-remove' m.pk %}" class="d-inline">{% csrf_token %}
-                <button class="btn btn-sm btn-danger">Remove</button>
-              </form>
-            </td>
-          </tr>
-          {% empty %}
-          <tr><td colspan="5" class="text-muted">No team members authorized yet.</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </div>
-  {% endif %}
+ 
 
   {% for group in sub_packages %}
   <div class="card mb-3">
@@ -101,6 +75,34 @@
   {% empty %}
   <p class="text-muted">No active forms in this package.</p>
   {% endfor %}
+
+  {% if user.user_type == 'manager' %}
+  <div class="card mb-3">
+    <div class="card-header"><strong>Authorized Team Members</strong></div>
+    <div class="card-body">
+      <table class="table table-sm">
+        <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Authorized</th><th></th></tr></thead>
+        <tbody>
+          {% for m in team_members %}
+          <tr>
+            <td>{{ m.name }}</td>
+            <td>{{ m.email }}</td>
+            <td>{{ m.get_role_display }}</td>
+            <td>{{ m.authorized_at|date:"M d, Y" }}</td>
+            <td>
+              <form method="post" action="{% url 'core:team-member-remove' m.pk %}" class="d-inline">{% csrf_token %}
+                <button class="btn btn-sm btn-danger">Remove</button>
+              </form>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="5" class="text-muted">No team members authorized yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
 
   {% if report_records %}
   <div class="card mb-3">

@@ -40,8 +40,12 @@
             <div class="company-field-value">{{ form.end_date }}{% if form.end_date.errors %}<div class="text-danger small">{{ form.end_date.errors }}</div>{% endif %}</div>
           </div>
           <div class="company-field-row">
-            <label class="company-field-label">{{ form.package_count.label }}</label>
-            <div class="company-field-value">{{ form.package_count }}{% if form.package_count.errors %}<div class="text-danger small">{{ form.package_count.errors }}</div>{% endif %}</div>
+            <label class="company-field-label">{{ form.project_limit.label }}</label>
+            <div class="company-field-value">
+              {{ form.project_limit }}
+              {% if form.project_limit.errors %}<div class="text-danger small">{{ form.project_limit.errors }}</div>{% endif %}
+              {% if form.project_limit.help_text %}<small class="text-muted d-block mt-1">{{ form.project_limit.help_text }}</small>{% endif %}
+            </div>
           </div>
           <div class="company-field-row">
             <label class="company-field-label">{{ form.project_manager_name.label }}</label>
@@ -69,73 +73,16 @@
         <p class="text-muted small mb-3">Leave password blank to keep the current manager and package access password.</p>
         {% endif %}
 
-        {% if package_rows %}
-        <h5 class="mb-3">Package Selection</h5>
-        <p class="text-muted small mb-2">Check forms under <strong>Option for Deactivation</strong> to deactivate them for this company.</p>
-        <div class="table-responsive package-selection-table-wrap mb-4">
-          <table class="table table-bordered package-selection-table mb-0">
-            <thead>
-              <tr>
-                <th class="pkg-check-col">Option for Deactivation</th>
-                <th class="pkg-code-col">Master Records</th>
-                <th class="pkg-check-col">Option for Deactivation</th>
-                <th class="pkg-code-col">Limited Use FORMs</th>
-                <th class="pkg-check-col">Option for Deactivation</th>
-                <th class="pkg-code-col">Limited Use FORMs</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for row in package_rows %}
-              <tr>
-                <td class="text-center pkg-check-col">
-                  {% if row.master and row.master.type == 'form' %}
-                  <input type="checkbox" name="deactivated_forms" value="{{ row.master.form.id }}" class="pkg-deactivate-check"{% if row.master.form.id in deactivated_form_ids %} checked{% endif %}>
-                  {% endif %}
-                </td>
-                <td class="pkg-code-col">
-                  {% if row.master %}
-                    {% if row.master.type == 'header' %}
-                    <div class="pkg-section-header">{{ row.master.text }}</div>
-                    {% else %}
-                    {{ row.master.form.code }}
-                    {% endif %}
-                  {% endif %}
-                </td>
-                <td class="text-center pkg-check-col">
-                  {% if row.limited1 and row.limited1.type == 'form' %}
-                  <input type="checkbox" name="deactivated_forms" value="{{ row.limited1.form.id }}" class="pkg-deactivate-check"{% if row.limited1.form.id in deactivated_form_ids %} checked{% endif %}>
-                  {% endif %}
-                </td>
-                <td class="pkg-code-col">
-                  {% if row.limited1 and row.limited1.type == 'form' %}{{ row.limited1.form.code }}{% endif %}
-                </td>
-                <td class="text-center pkg-check-col">
-                  {% if row.limited2 and row.limited2.type == 'form' %}
-                  <input type="checkbox" name="deactivated_forms" value="{{ row.limited2.form.id }}" class="pkg-deactivate-check"{% if row.limited2.form.id in deactivated_form_ids %} checked{% endif %}>
-                  {% endif %}
-                </td>
-                <td class="pkg-code-col">
-                  {% if row.limited2 %}
-                    {% if row.limited2.type == 'header' %}
-                    <div class="pkg-section-header">{{ row.limited2.text }}</div>
-                    {% else %}
-                    {{ row.limited2.form.code }}
-                    {% endif %}
-                  {% endif %}
-                </td>
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-        {% else %}
-        <div class="alert alert-warning">
+        {% if is_edit and package_rows %}
+        {% include 'core/includes/forms_selection_table.html' with title="Forms Selection" help_text="Check forms under Option for Activation to allocate them to this company." %}
+        {% elif is_edit %}
+        <!-- <div class="alert alert-warning">
           No package forms found. Run <code>python manage.py seed_forms</code> and ensure an active package template exists.
-        </div>
+        </div> -->
         {% endif %}
 
         <button type="submit" class="btn btn-primary">
-          {% if is_create %}Create Company &amp; Authorize Packages{% elif is_edit %}Update Company &amp; Packages{% else %}Save{% endif %}
+          {% if is_create %}Create Company{% elif is_edit %}Update Company &amp; Packages{% else %}Save{% endif %}
         </button>
         <a href="{% url 'core:company-list' %}" class="btn btn-secondary">Cancel</a>
       </form>

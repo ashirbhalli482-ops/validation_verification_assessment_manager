@@ -7,7 +7,11 @@
       <p>Are you sure you want to delete <strong>{{ object }}</strong>?</p>
       <form method="post">{% csrf_token %}
         <button type="submit" class="btn btn-danger">Delete</button>
+        {% if cancel_url %}
+        <a href="{{ cancel_url }}" class="btn btn-secondary">Cancel</a>
+        {% else %}
         <a href="javascript:history.back()" class="btn btn-secondary">Cancel</a>
+        {% endif %}
       </form>
     </div>
   </div>

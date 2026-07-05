@@ -90,29 +90,16 @@
 
 {% elif user.user_type == 'manager' %}
 <div class="row g-4 mb-4 dashboard-cards">
-  <div class="col-md-3"><div class="dashboard-card"><div class="dashboard-card-title">PROJECTS</div><div class="dashboard-card-value">{{ project_count|default:0 }}</div></div></div>
-  <div class="col-md-3"><div class="dashboard-card"><div class="dashboard-card-title">PENDING REVIEWS</div><div class="dashboard-card-value">{{ pending_reviews|default:0 }}</div></div></div>
-  <div class="col-md-3"><div class="dashboard-card"><div class="dashboard-card-title">TEAM MEMBERS</div><div class="dashboard-card-value">{{ team_member_count|default:0 }}</div></div></div>
-  <div class="col-md-3"><div class="dashboard-card"><div class="dashboard-card-title">VVB PACKAGES</div><div class="dashboard-card-value">{{ authorizations|length }}</div></div></div>
+  <div class="col-md-4"><div class="dashboard-card"><div class="dashboard-card-title">TOTAL PROJECTS</div><div class="dashboard-card-value">{{ total_projects_allocated|default:0 }}</div><small class="text-muted">Allocated by admin</small></div></div>
+  <div class="col-md-4"><div class="dashboard-card"><div class="dashboard-card-title">REMAINING PROJECTS</div><div class="dashboard-card-value">{{ remaining_projects|default:0 }}</div><small class="text-muted">You can still create</small></div></div>
+  <div class="col-md-4"><div class="dashboard-card"><div class="dashboard-card-title">FORMS</div><div class="dashboard-card-value">{{ allocated_forms_count|default:0 }}</div><small class="text-muted">Activated for your company</small></div></div>
 </div>
 <div class="row">
-  <div class="col-md-6">
+  <div class="col-md-12 col-lg-6">
     <div class="card"><div class="card-header"><strong>Manager Processes</strong></div>
       <div class="card-body">
         <a href="{% url 'core:project-create' %}" class="btn btn-primary btn-block mb-2">Create Project</a>
         <a href="{% url 'core:library-list' %}" class="btn btn-outline-secondary btn-block">Information Library</a>
-      </div>
-    </div>
-  </div>
-  <div class="col-md-6">
-    <div class="card"><div class="card-header"><strong>Authorized VVB Packages</strong></div>
-      <div class="card-body list-group list-group-flush">
-        {% for auth in authorizations %}
-        <div class="list-group-item d-flex justify-content-between">
-          <span>{{ auth.vvb_name }} — {{ auth.package_count }} packages</span>
-          <small class="text-muted">Pwd: {{ auth.access_password }}</small>
-        </div>
-        {% empty %}<p class="text-muted">No authorizations from admin yet.</p>{% endfor %}
       </div>
     </div>
   </div>

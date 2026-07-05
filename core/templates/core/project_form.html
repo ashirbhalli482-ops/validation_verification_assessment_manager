@@ -1,14 +1,70 @@
 {% extends 'core/base.html' %}
 {% block content %}
 <div class="container-fluid">
-  <div class="card">
+  <div class="card company-form-card">
     <div class="card-header"><strong>{{ title }}</strong></div>
     <div class="card-body">
       <form method="post">{% csrf_token %}
-        {% for field in form %}
-        <div class="form-group">{{ field.label_tag }}{{ field }}</div>
-        {% endfor %}
-        <button type="submit" class="btn btn-primary">Save</button>
+        {% if form.non_field_errors %}
+        <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+        {% endif %}
+
+        <div class="company-info-grid mb-4">
+          <div class="company-field-row">
+            <label class="company-field-label" for="{{ form.project_number.id_for_label }}">{{ form.project_number.label }}</label>
+            <div class="company-field-value">
+              {{ form.project_number }}
+              {% if form.project_number.errors %}<div class="text-danger small">{{ form.project_number.errors }}</div>{% endif %}
+            </div>
+          </div>
+          <div class="company-field-row">
+            <label class="company-field-label" for="{{ form.company_name.id_for_label }}">{{ form.company_name.label }}</label>
+            <div class="company-field-value">
+              {{ form.company_name }}
+              {% if form.company_name.errors %}<div class="text-danger small">{{ form.company_name.errors }}</div>{% endif %}
+              {% if form.company_name.help_text %}<small class="text-muted d-block mt-1">{{ form.company_name.help_text }}</small>{% endif %}
+            </div>
+          </div>
+          <div class="company-field-row">
+            <label class="company-field-label" for="{{ form.location.id_for_label }}">{{ form.location.label }}</label>
+            <div class="company-field-value">
+              {{ form.location }}
+              {% if form.location.errors %}<div class="text-danger small">{{ form.location.errors }}</div>{% endif %}
+            </div>
+          </div>
+          <div class="company-field-row">
+            <label class="company-field-label" for="{{ form.report_type.id_for_label }}">{{ form.report_type.label }}</label>
+            <div class="company-field-value">
+              {{ form.report_type }}
+              {% if form.report_type.errors %}<div class="text-danger small">{{ form.report_type.errors }}</div>{% endif %}
+            </div>
+          </div>
+          <div class="company-field-row">
+            <label class="company-field-label" for="{{ form.engagement_year.id_for_label }}">{{ form.engagement_year.label }}</label>
+            <div class="company-field-value">
+              {{ form.engagement_year }}
+              {% if form.engagement_year.errors %}<div class="text-danger small">{{ form.engagement_year.errors }}</div>{% endif %}
+            </div>
+          </div>
+          <div class="company-field-row">
+            <label class="company-field-label" for="{{ form.phase.id_for_label }}">{{ form.phase.label }}</label>
+            <div class="company-field-value">
+              {{ form.phase }}
+              {% if form.phase.errors %}<div class="text-danger small">{{ form.phase.errors }}</div>{% endif %}
+            </div>
+          </div>
+          <div class="company-field-row">
+            <label class="company-field-label" for="{{ form.document_type.id_for_label }}">{{ form.document_type.label }}</label>
+            <div class="company-field-value">
+              {{ form.document_type }}
+              {% if form.document_type.errors %}<div class="text-danger small">{{ form.document_type.errors }}</div>{% endif %}
+            </div>
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary">
+          {% if title == 'Create Project' %}Create Project{% else %}Save Changes{% endif %}
+        </button>
         <a href="{% url 'core:project-list' %}" class="btn btn-secondary">Cancel</a>
       </form>
     </div>

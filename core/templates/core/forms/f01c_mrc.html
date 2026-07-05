@@ -4,7 +4,7 @@
   <div class="card">
     <div class="card-header"><strong>F-01C-MRC — Competency Review (CV Approval)</strong></div>
     <div class="card-body">
-      {% include 'core/includes/form_grey_header.html' with form_def=form_def project=project record=record %}
+      {% include 'core/includes/form_grey_header.html' with form_def=form_def project=project record=record company=company form_owner=form_owner %}
       <p class="text-muted">Review employee competency records and approve CVs. Data is stored in F-01C-MRC.</p>
       <form method="post">{% csrf_token %}
         {{ form.created_by_name }}

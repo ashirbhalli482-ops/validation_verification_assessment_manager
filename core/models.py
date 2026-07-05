@@ -41,6 +41,17 @@ CV_APPROVAL_CHOICES = [
     ('in_training', 'In Training'),
 ]
 
+PROJECT_PHASE_CHOICES = [
+    ('pre_engagement', 'Pre-engagement'),
+    ('execution', 'Execution'),
+    ('review', 'Review'),
+]
+
+PROJECT_DOCUMENT_TYPE_CHOICES = [
+    ('internal', 'Internal'),
+    ('external', 'External'),
+]
+
 
 class CustomUser(AbstractUser):
     """Admin, Manager (VVB/Project Manager), or Employee."""
@@ -111,6 +122,10 @@ class Company(models.Model):
     version = models.CharField(max_length=50, blank=True)
     designated_person = models.CharField(max_length=200, blank=True)
     client_email = models.EmailField(blank=True)
+    project_limit = models.PositiveIntegerField(
+        default=1, validators=[MinValueValidator(1)],
+        help_text='Maximum number of projects the authorized manager can create',
+    )
     authorized_manager = models.OneToOneField(
         CustomUser, on_delete=models.SET_NULL, null=True, blank=True,
         related_name='managed_company', limit_choices_to={'user_type': 'manager'}
@@ -128,6 +143,14 @@ class Company(models.Model):
 
     def __str__(self):
         return self.name
+
+    def manager_project_count(self):
+        if not self.authorized_manager_id:
+            return 0
+        return Project.objects.filter(manager_id=self.authorized_manager_id).count()
+
+    def projects_remaining(self):
+        return max(0, self.project_limit - self.manager_project_count())
 
 
 class PackageTemplate(models.Model):
@@ -244,7 +267,7 @@ class PackageAuthorization(models.Model):
             AuthorizedForm.objects.get_or_create(
                 authorization=self,
                 form_definition=form_def,
-                defaults={'is_active': True},
+                defaults={'is_active': False},
             )
         for doc in LibraryDocument.objects.all():
             AuthorizedLibraryDocument.objects.get_or_create(
@@ -292,7 +315,7 @@ class AuthorizedForm(models.Model):
     form_definition = models.ForeignKey(
         FormDefinition, on_delete=models.CASCADE, related_name='authorizations'
     )
-    is_active = models.BooleanField(default=True)
+    is_active = models.BooleanField(default=False)
 
     class Meta:
         unique_together = ['authorization', 'form_definition']
@@ -326,6 +349,10 @@ class LibraryDocument(models.Model):
     category = models.CharField(max_length=20, choices=LIBRARY_CATEGORY_CHOICES)
     file = models.FileField(upload_to='core/library/')
     description = models.TextField(blank=True)
+    allowed_companies = models.ManyToManyField(
+        'Company', blank=True, related_name='library_documents',
+        help_text='Client companies that may view this document in the library',
+    )
     uploaded_by = models.ForeignKey(
         CustomUser, on_delete=models.SET_NULL, null=True, blank=True
     )
@@ -383,6 +410,9 @@ class Project(models.Model):
     contact_email = models.EmailField(blank=True)
     contact_mobile = models.CharField(max_length=20, blank=True)
     report_type = models.CharField(max_length=100, blank=True)
+    engagement_year = models.CharField(max_length=100, blank=True)
+    phase = models.CharField(max_length=20, choices=PROJECT_PHASE_CHOICES, blank=True)
+    document_type = models.CharField(max_length=20, choices=PROJECT_DOCUMENT_TYPE_CHOICES, blank=True)
     year = models.PositiveIntegerField()
     project_number = models.CharField(max_length=50, unique=True)
     access_password = models.CharField(max_length=128)

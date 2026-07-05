@@ -1,0 +1,61 @@
+{% load static %}
+<h5 class="mb-3">{{ title|default:"Forms Selection" }}</h5>
+{% if help_text %}
+<p class="text-muted small mb-2">{{ help_text }}</p>
+{% endif %}
+<div class="table-responsive package-selection-table-wrap mb-4">
+  <table class="table table-bordered package-selection-table mb-0">
+    <thead>
+      <tr>
+        <th class="pkg-check-col">Option for Activation</th>
+        <th class="pkg-code-col">Master Records</th>
+        <th class="pkg-check-col">Option for Activation</th>
+        <th class="pkg-code-col">Limited Use FORMs</th>
+        <th class="pkg-check-col">Option for Activation</th>
+        <th class="pkg-code-col">Limited Use FORMs</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in package_rows %}
+      <tr>
+        <td class="text-center pkg-check-col">
+          {% if row.master and row.master.type == 'form' %}
+          <input type="checkbox" name="activated_forms" value="{{ row.master.form.id }}" class="pkg-activate-check"{% if row.master.form.id in activated_form_ids %} checked{% endif %}{% if readonly %} disabled{% endif %}>
+          {% endif %}
+        </td>
+        <td class="pkg-code-col">
+          {% if row.master %}
+            {% if row.master.type == 'header' %}
+            <div class="pkg-section-header">{{ row.master.text }}</div>
+            {% else %}
+            {{ row.master.form.code }}
+            {% endif %}
+          {% endif %}
+        </td>
+        <td class="text-center pkg-check-col">
+          {% if row.limited1 and row.limited1.type == 'form' %}
+          <input type="checkbox" name="activated_forms" value="{{ row.limited1.form.id }}" class="pkg-activate-check"{% if row.limited1.form.id in activated_form_ids %} checked{% endif %}{% if readonly %} disabled{% endif %}>
+          {% endif %}
+        </td>
+        <td class="pkg-code-col">
+          {% if row.limited1 and row.limited1.type == 'form' %}{{ row.limited1.form.code }}{% endif %}
+        </td>
+        <td class="text-center pkg-check-col">
+          {% if row.limited2 and row.limited2.type == 'form' %}
+          <input type="checkbox" name="activated_forms" value="{{ row.limited2.form.id }}" class="pkg-activate-check"{% if row.limited2.form.id in activated_form_ids %} checked{% endif %}{% if readonly %} disabled{% endif %}>
+          {% endif %}
+        </td>
+        <td class="pkg-code-col">
+          {% if row.limited2 %}
+            {% if row.limited2.type == 'header' %}
+            <div class="pkg-section-header">{{ row.limited2.text }}</div>
+            {% else %}
+            {{ row.limited2.form.code }}
+            {% endif %}
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>

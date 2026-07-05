@@ -1,32 +1,83 @@
-<div class="form-grey-header mb-3 p-3" style="background:#6c757d;color:#fff;border-radius:4px;">
-  <div class="row align-items-start">
-    <div class="col-md-8">
-      <strong>{{ form_def.code }}</strong> — {{ form_def.name }}<br>
-      <small>Project: {{ project.project_number }} | {{ project.company_name }} | {{ project.location }}</small>
+{% load static %}
+<div class="form-document-header mb-4">
+  <div class="row align-items-start form-document-header-top">
+    <div class="col-md-7">
+      <h4 class="form-doc-company-name mb-1">{% if company %}{{ company.name }}{% else %}{{ project.company_name }}{% endif %}</h4>
+      <div class="form-doc-subtitle">Document Control</div>
     </div>
-    <div class="col-md-4 text-md-right">
-      {% if record %}
-      <small><strong>Created by:</strong> {{ record.created_by_name }}<br>{{ record.created_date }}</small>
-      {% endif %}
+    <div class="col-md-5 text-md-right form-doc-branding">
+      <img src="{% static 'core/img/logos/logo.png' %}" alt="Assessment Manager" class="form-doc-logo mb-1">
+      <div class="form-doc-product-title">Assessment Manager</div>
+      <div class="form-doc-product-subtitle">Product of EHSS &amp; C MAC</div>
     </div>
   </div>
-  {% if reviews %}
-  <div class="row mt-2 pt-2 border-top border-light">
-    {% for rev in reviews %}
-    <div class="col-md-4 mb-1">
-      <small>
-        <strong>Review {{ rev.review_order }}:</strong> {{ rev.reviewer_name }}<br>
-        {{ rev.reviewer_role }} — {{ rev.reviewed_at|date:"M d, Y H:i" }}
-      </small>
+  <div class="form-doc-meta-bar">
+    <div class="form-doc-meta-item">
+      <span class="form-doc-meta-label">Issue Date</span>
+      <span class="form-doc-meta-value">{% if company and company.issue_date %}{{ company.issue_date|date:"Y-m-d" }}{% else %}-{% endif %}</span>
     </div>
+    <div class="form-doc-meta-item">
+      <span class="form-doc-meta-label">Document Name</span>
+      <span class="form-doc-meta-value"><strong>{{ form_def.code }}</strong> ({{ form_def.name }})</span>
+    </div>
+    <div class="form-doc-meta-item">
+      <span class="form-doc-meta-label">Owner</span>
+      <span class="form-doc-meta-value">{{ form_owner|default:"VVB" }}</span>
+    </div>
+    <div class="form-doc-meta-item">
+      <span class="form-doc-meta-label">Version</span>
+      <span class="form-doc-meta-value">{% if company and company.version %}{{ company.version }}{% else %}-{% endif %}</span>
+    </div>
+  </div>
+  {% if project %}
+  <div class="form-doc-project-bar">
+    <div class="form-doc-project-item">
+      <span class="form-doc-meta-label">Project #</span>
+      <span class="form-doc-meta-value">{{ project.project_number|default:"-" }}</span>
+    </div>
+    <div class="form-doc-project-item">
+      <span class="form-doc-meta-label">Client</span>
+      <span class="form-doc-meta-value">{{ project.company_name|default:"-" }}</span>
+    </div>
+    <div class="form-doc-project-item">
+      <span class="form-doc-meta-label">Phase</span>
+      <span class="form-doc-meta-value">{{ project.get_phase_display|default:"-" }}</span>
+    </div>
+    <div class="form-doc-project-item">
+      <span class="form-doc-meta-label">Report Type</span>
+      <span class="form-doc-meta-value">{{ project.report_type|default:"-" }}</span>
+    </div>
+    <div class="form-doc-project-item">
+      <span class="form-doc-meta-label">Facility</span>
+      <span class="form-doc-meta-value">{{ project.location|default:"-" }}</span>
+    </div>
+    <div class="form-doc-project-item">
+      <span class="form-doc-meta-label">Document Type</span>
+      <span class="form-doc-meta-value">{{ project.get_document_type_display|default:"-" }}</span>
+    </div>
+  </div>
+  {% endif %}
+  {% if record %}
+  <div class="form-doc-record-meta">
+    <small>
+      <strong>Project:</strong> {{ project.project_number }} |
+      <strong>Created by:</strong> {{ record.created_by_name }} |
+      {{ record.created_date }}
+    </small>
+  </div>
+  {% endif %}
+  {% if reviews %}
+  <div class="form-doc-reviews mt-2 pt-2 border-top">
+    {% for rev in reviews %}
+    <small class="d-inline-block mr-3">
+      <strong>Review {{ rev.review_order }}:</strong> {{ rev.reviewer_name }} — {{ rev.reviewed_at|date:"M d, Y H:i" }}
+    </small>
     {% endfor %}
   </div>
   {% endif %}
   {% if record and record.status == 'finalized' %}
-  <div class="row mt-2 pt-2 border-top border-light">
-    <div class="col-12 text-md-right">
-      <small><strong>Finalized by:</strong> {{ record.finalized_by_name }} | {{ record.finalized_at|date:"M d, Y H:i" }}</small>
-    </div>
+  <div class="form-doc-finalized mt-2">
+    <small><strong>Finalized by:</strong> {{ record.finalized_by_name }} | {{ record.finalized_at|date:"M d, Y H:i" }}</small>
   </div>
   {% endif %}
 </div>

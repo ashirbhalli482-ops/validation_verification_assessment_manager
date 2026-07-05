@@ -3,7 +3,7 @@
 <div class="container-fluid">
   <div class="card">
     <div class="card-body">
-      {% include 'core/includes/form_grey_header.html' with form_def=form_def project=project record=record %}
+      {% include 'core/includes/form_grey_header.html' with form_def=form_def project=project record=record company=company form_owner=form_owner %}
       <form method="post">{% csrf_token %}
         {{ form.created_by_name }}
         <div class="row">

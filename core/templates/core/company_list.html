@@ -60,7 +60,7 @@
               <th>Issue Date</th>
               <th>Version</th>
               <th>Client Email</th>
-              <th>Packages</th>
+              <th>Projects</th>
               <th>Period</th>
               <th>Actions</th>
             </tr>
@@ -72,13 +72,7 @@
               <td>{% if company.issue_date %}{{ company.issue_date|date:"Y-m-d" }}{% else %}-{% endif %}</td>
               <td>{{ company.version|default:"-" }}</td>
               <td>{{ company.client_email|default:"-" }}</td>
-              <td>
-                {% if company.package_auth %}
-                  {{ company.package_auth.package_count }}
-                {% else %}
-                  -
-                {% endif %}
-              </td>
+              <td>{{ company.project_limit }}</td>
               <td>
                 {% if company.package_auth %}
                   {{ company.package_auth.start_date|date:"Y-m-d" }} – {{ company.package_auth.end_date|date:"Y-m-d" }}
@@ -138,14 +132,14 @@
         <i class="fa fa-check-circle fa-3x text-success mb-3"></i>
         <p class="lead mb-0">
           {% if success_action == 'created' %}
-            Company <strong>{{ success_company }}</strong> was created successfully
-            {% if success_packages %} with <strong>{{ success_packages }}</strong> authorized package{{ success_packages|pluralize }}.{% else %}.{% endif %}
+            Company <strong>{{ success_company }}</strong> has been created successfully
+            {% if success_projects %} with a limit of <strong>{{ success_projects }}</strong> project{{ success_projects|pluralize }}.{% else %}.{% endif %}
           {% elif success_action == 'updated' %}
-            Company <strong>{{ success_company }}</strong> was updated successfully.
+            Company <strong>{{ success_company }}</strong> has been updated successfully.
           {% elif success_action == 'deleted' %}
-            Company <strong>{{ success_company }}</strong> was deleted successfully.
+            Company <strong>{{ success_company }}</strong> has been deleted successfully.
           {% else %}
-            Action completed successfully.
+            Action has been completed successfully.
           {% endif %}
         </p>
       </div>

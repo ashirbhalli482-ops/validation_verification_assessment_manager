@@ -251,15 +251,15 @@ function filterUsers(userType) {
         <i class="fa fa-check-circle fa-3x text-success mb-3"></i>
         <p class="lead mb-0">
           {% if success_action == 'created' %}
-            Admin <strong>{{ success_user }}</strong> was created successfully.
+            Admin <strong>{{ success_user }}</strong> has been created successfully.
           {% elif success_action == 'updated' %}
-            Admin <strong>{{ success_user }}</strong> was updated successfully.
+            Admin <strong>{{ success_user }}</strong> has been updated successfully.
           {% elif success_action == 'password' %}
-            Password for <strong>{{ success_user }}</strong> was updated successfully.
+            Password for <strong>{{ success_user }}</strong> has been updated successfully.
           {% elif success_action == 'deleted' %}
-            Admin <strong>{{ success_user }}</strong> was deleted successfully.
+            Admin <strong>{{ success_user }}</strong> has been deleted successfully.
           {% else %}
-            Action completed successfully.
+            Action has been completed successfully.
           {% endif %}
         </p>
       </div>

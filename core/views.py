@@ -21,7 +21,7 @@ from .models import (
 )
 from .forms import (
     EmailLoginForm, UserRegistrationForm, AdminRegistrationForm, AdminUserEditForm,
-    ManagerRegistrationForm, ManagerUserEditForm, UserProfileEditForm, AdminSetPasswordForm,
+    AdminSelfProfileForm, ManagerRegistrationForm, ManagerUserEditForm, UserProfileEditForm, AdminSetPasswordForm,
     CompanyForm, PackageTemplateForm, PackageAuthorizationForm, LibraryDocumentForm,
     CompanyCreateForm, CompanyEditForm, company_edit_initial, build_package_selection_rows,
     DropdownListForm, DropdownOptionForm, ProjectForm, TeamMemberForm,
@@ -32,6 +32,7 @@ from .access import (
     can_access_project, can_access_form, can_create_form_record,
     can_access_library_document, get_authorized_library_documents,
     get_employee_projects, get_team_member, can_view_report, get_manager_manageable_users,
+    company_for_project,
 )
 from .permissions import AdminRequiredMixin, ManagerRequiredMixin, EmployeeBlockedMixin, ManagerOrAdminMixin
 
@@ -45,14 +46,14 @@ def admin_users_success_redirect(action, username=''):
     return redirect(f'{url}?{query}')
 
 
-def company_list_success_redirect(action, company_name='', packages=''):
+def company_list_success_redirect(action, company_name='', projects=''):
     """Redirect to company list with a popup action flag."""
     url = reverse('core:company-list')
     query = f'success={action}'
     if company_name:
         query += f'&company={quote(company_name)}'
-    if packages:
-        query += f'&packages={quote(str(packages))}'
+    if projects:
+        query += f'&projects={quote(str(projects))}'
     return redirect(f'{url}?{query}')
 
 
@@ -70,7 +71,8 @@ class LoginView(View):
                                 password=form.cleaned_data['password'])
             if user:
                 login(request, user)
-                messages.success(request, f'Welcome back, {user.first_name}!')
+                display_name = user.first_name or user.username or user.email.split('@')[0]
+                messages.success(request, f'Welcome back, {display_name}!')
                 return redirect('core:dashboard')
             messages.error(request, 'Invalid email or password.')
         return render(request, 'core/login.html', {'form': form})
@@ -104,16 +106,23 @@ class DashboardView(LoginRequiredMixin, View):
             })
         elif user.user_type == 'manager':
             projects = Project.objects.filter(manager=user)
+            company = _manager_company(user)
+            auth = PackageAuthorization.objects.filter(manager=user).order_by('-created_at').first()
             ctx.update({
                 'projects': projects[:5],
                 'project_count': projects.count(),
+                'total_projects_allocated': company.project_limit if company else 0,
+                'remaining_projects': company.projects_remaining() if company else 0,
+                'allocated_forms_count': (
+                    AuthorizedForm.objects.filter(authorization=auth, is_active=True).count()
+                    if auth else 0
+                ),
                 'team_member_count': TeamMember.objects.filter(
                     project__manager=user, is_active=True
                 ).count(),
                 'pending_reviews': FormRecord.objects.filter(
                     project__manager=user, status='submitted'
                 ).count(),
-                'authorizations': PackageAuthorization.objects.filter(manager=user),
             })
         else:
             assignments = get_employee_projects(user)
@@ -250,16 +259,33 @@ class UserProfileView(LoginRequiredMixin, View):
 
 
 class ProfileView(LoginRequiredMixin, View):
+    def _profile_form(self, user, data=None):
+        if user.user_type == 'admin':
+            form_class = AdminSelfProfileForm
+        else:
+            form_class = UserProfileEditForm
+        if data is None:
+            return form_class(instance=user)
+        return form_class(data, instance=user)
+
     def get(self, request):
-        return render(request, 'core/profile.html', {'form': UserProfileEditForm(instance=request.user)})
+        user = request.user
+        return render(request, 'core/profile.html', {
+            'form': self._profile_form(user),
+            'is_admin_profile': user.user_type == 'admin',
+        })
 
     def post(self, request):
-        form = UserProfileEditForm(request.POST, request.FILES, instance=request.user)
+        user = request.user
+        form = self._profile_form(user, request.POST)
         if form.is_valid():
             form.save()
-            messages.success(request, 'Profile updated.')
+            messages.success(request, 'Your profile has been updated successfully.')
             return redirect('core:profile')
-        return render(request, 'core/profile.html', {'form': form})
+        return render(request, 'core/profile.html', {
+            'form': form,
+            'is_admin_profile': user.user_type == 'admin',
+        })
 
 
 class EditUserProfileView(LoginRequiredMixin, View):
@@ -375,6 +401,7 @@ def _company_search_q(search):
     )
     if search.isdigit():
         num = int(search)
+        q |= Q(project_limit=num)
         q |= Q(authorized_manager__package_authorizations__package_count=num)
         q |= Q(authorized_manager__package_authorizations__year=num)
         if len(search) == 4:
@@ -413,7 +440,7 @@ class CompanyListView(AdminRequiredMixin, ListView):
 
         ctx['success_action'] = self.request.GET.get('success', '')
         ctx['success_company'] = self.request.GET.get('company', '')
-        ctx['success_packages'] = self.request.GET.get('packages', '')
+        ctx['success_projects'] = self.request.GET.get('projects', '')
         return ctx
 
 
@@ -437,36 +464,38 @@ def _company_authorization(company):
     ).order_by('-created_at').first()
 
 
-def _deactivated_form_ids(authorization):
+def _activated_form_ids(authorization):
     if not authorization:
         return set()
     return set(
         AuthorizedForm.objects.filter(
-            authorization=authorization, is_active=False,
+            authorization=authorization, is_active=True,
         ).values_list('form_definition_id', flat=True)
     )
 
 
+def _apply_activated_forms(authorization, activated_ids):
+    """Set authorized forms active only for checked form definition IDs."""
+    AuthorizedForm.objects.filter(authorization=authorization).update(is_active=False)
+    if activated_ids:
+        AuthorizedForm.objects.filter(
+            authorization=authorization,
+            form_definition_id__in=activated_ids,
+        ).update(is_active=True)
+
+
 class CompanyCreateView(AdminRequiredMixin, View):
     def get(self, request):
-        package_template = PackageTemplate.objects.filter(is_active=True).first()
-        ctx = {
+        return render(request, 'core/company_form.html', {
             'form': CompanyCreateForm(),
             'title': 'Create Company',
             'is_create': True,
-            'deactivated_form_ids': set(),
-            **_company_package_context(package_template),
-        }
-        return render(request, 'core/company_form.html', ctx)
+        })
 
     @transaction.atomic
     def post(self, request):
         form = CompanyCreateForm(request.POST)
         package_template = PackageTemplate.objects.filter(is_active=True).first()
-        pkg_ctx = _company_package_context(package_template)
-        pkg_ctx['deactivated_form_ids'] = set(
-            int(x) for x in request.POST.getlist('deactivated_forms') if x.isdigit()
-        )
 
         if form.is_valid():
             if not package_template:
@@ -480,6 +509,7 @@ class CompanyCreateView(AdminRequiredMixin, View):
                     version=form.cleaned_data.get('version', ''),
                     designated_person=form.cleaned_data.get('designated_person', ''),
                     client_email=form.cleaned_data['client_email'],
+                    project_limit=form.cleaned_data['project_limit'],
                     created_by=request.user,
                 )
                 mgr = CustomUser.objects.create_user(
@@ -497,6 +527,7 @@ class CompanyCreateView(AdminRequiredMixin, View):
 
                 issue_date = form.cleaned_data.get('issue_date')
                 start_date = form.cleaned_data['start_date']
+                project_limit = form.cleaned_data['project_limit']
                 auth = PackageAuthorization.objects.create(
                     package_template=package_template,
                     manager=mgr,
@@ -505,28 +536,20 @@ class CompanyCreateView(AdminRequiredMixin, View):
                     year=(issue_date or start_date).year,
                     start_date=start_date,
                     end_date=form.cleaned_data['end_date'],
-                    package_count=form.cleaned_data['package_count'],
+                    package_count=project_limit,
                     access_password=form.cleaned_data['access_password'],
                     created_by=request.user,
                 )
                 auth.generate_package_instances()
 
-                deactivated_ids = request.POST.getlist('deactivated_forms')
-                if deactivated_ids:
-                    AuthorizedForm.objects.filter(
-                        authorization=auth,
-                        form_definition_id__in=deactivated_ids,
-                    ).update(is_active=False)
-
                 return company_list_success_redirect(
-                    'created', company.name, auth.package_count,
+                    'created', company.name, company.project_limit,
                 )
 
         return render(request, 'core/company_form.html', {
             'form': form,
             'title': 'Create Company',
             'is_create': True,
-            **pkg_ctx,
         })
 
 
@@ -547,7 +570,7 @@ class CompanyUpdateView(AdminRequiredMixin, View):
             'title': 'Edit Company',
             'company': company,
             'is_edit': True,
-            'deactivated_form_ids': _deactivated_form_ids(auth),
+            'activated_form_ids': _activated_form_ids(auth),
             **_company_package_context(package_template),
         })
 
@@ -561,8 +584,8 @@ class CompanyUpdateView(AdminRequiredMixin, View):
         )
         form = CompanyEditForm(request.POST, company=company)
         pkg_ctx = _company_package_context(package_template)
-        pkg_ctx['deactivated_form_ids'] = set(
-            int(x) for x in request.POST.getlist('deactivated_forms') if x.isdigit()
+        pkg_ctx['activated_form_ids'] = set(
+            int(x) for x in request.POST.getlist('activated_forms') if x.isdigit()
         )
 
         if form.is_valid():
@@ -573,6 +596,7 @@ class CompanyUpdateView(AdminRequiredMixin, View):
             company.version = form.cleaned_data.get('version', '')
             company.designated_person = form.cleaned_data.get('designated_person', '')
             company.client_email = form.cleaned_data['client_email']
+            company.project_limit = form.cleaned_data['project_limit']
             company.save()
 
             mgr = company.authorized_manager
@@ -602,13 +626,14 @@ class CompanyUpdateView(AdminRequiredMixin, View):
 
             issue_date = form.cleaned_data.get('issue_date')
             start_date = form.cleaned_data['start_date']
+            project_limit = form.cleaned_data['project_limit']
             if auth:
                 auth.vvb_name = company.name
                 auth.abbreviation = company.abbreviation
                 auth.year = (issue_date or start_date).year
                 auth.start_date = start_date
                 auth.end_date = form.cleaned_data['end_date']
-                auth.package_count = form.cleaned_data['package_count']
+                auth.package_count = project_limit
                 if new_password:
                     auth.access_password = new_password
                 auth.save()
@@ -622,20 +647,17 @@ class CompanyUpdateView(AdminRequiredMixin, View):
                     year=(issue_date or start_date).year,
                     start_date=start_date,
                     end_date=form.cleaned_data['end_date'],
-                    package_count=form.cleaned_data['package_count'],
+                    package_count=project_limit,
                     access_password=new_password or '',
                     created_by=request.user,
                 )
                 auth.generate_package_instances()
 
             if auth:
-                deactivated_ids = request.POST.getlist('deactivated_forms')
-                AuthorizedForm.objects.filter(authorization=auth).update(is_active=True)
-                if deactivated_ids:
-                    AuthorizedForm.objects.filter(
-                        authorization=auth,
-                        form_definition_id__in=deactivated_ids,
-                    ).update(is_active=False)
+                _apply_activated_forms(
+                    auth,
+                    request.POST.getlist('activated_forms'),
+                )
 
             return company_list_success_redirect('updated', company.name)
 
@@ -649,18 +671,15 @@ class CompanyUpdateView(AdminRequiredMixin, View):
 
 
 class CompanyDetailView(AdminRequiredMixin, View):
-    def get(self, request, pk):
-        company = get_object_or_404(
-            Company.objects.select_related('authorized_manager'), pk=pk,
-        )
-        auth = _company_authorization(company)
+    def _context(self, company, auth):
         mgr = company.authorized_manager
         pm_name = ''
         if mgr:
             pm_name = (mgr.get_full_name() or '').strip() or mgr.username
 
-        deactivated_forms = []
         active_count = inactive_count = 0
+        package_rows = []
+        activated_form_ids = set()
         if auth:
             for af in AuthorizedForm.objects.filter(
                 authorization=auth,
@@ -669,17 +688,39 @@ class CompanyDetailView(AdminRequiredMixin, View):
                     active_count += 1
                 else:
                     inactive_count += 1
-                    deactivated_forms.append(af.form_definition.code)
+            activated_form_ids = _activated_form_ids(auth)
+            package_rows = _company_package_context(auth.package_template).get('package_rows', [])
 
-        return render(request, 'core/company_detail.html', {
+        return {
             'company': company,
             'authorization': auth,
             'manager_name': pm_name,
             'manager_username': mgr.username if mgr else '',
             'active_form_count': active_count,
             'inactive_form_count': inactive_count,
-            'deactivated_forms': deactivated_forms,
-        })
+            'package_rows': package_rows,
+            'activated_form_ids': activated_form_ids,
+        }
+
+    def get(self, request, pk):
+        company = get_object_or_404(
+            Company.objects.select_related('authorized_manager'), pk=pk,
+        )
+        auth = _company_authorization(company)
+        return render(request, 'core/company_detail.html', self._context(company, auth))
+
+    @transaction.atomic
+    def post(self, request, pk):
+        company = get_object_or_404(
+            Company.objects.select_related('authorized_manager'), pk=pk,
+        )
+        auth = _company_authorization(company)
+        if auth:
+            _apply_activated_forms(auth, request.POST.getlist('activated_forms'))
+            messages.success(request, 'Form allocation saved for this company.')
+        else:
+            messages.error(request, 'No package authorization linked to this company.')
+        return redirect('core:company-detail', pk=pk)
 
 
 class CompanyDeleteView(AdminRequiredMixin, DeleteView):
@@ -829,7 +870,10 @@ class LibraryDocumentListView(LoginRequiredMixin, ListView):
 
 class LibraryDocumentCreateView(AdminRequiredMixin, View):
     def get(self, request):
-        return render(request, 'core/library_form.html', {'form': LibraryDocumentForm(), 'title': 'Upload Information'})
+        return render(request, 'core/library_form.html', {
+            'form': LibraryDocumentForm(),
+            'title': 'Upload Information',
+        })
 
     def post(self, request):
         form = LibraryDocumentForm(request.POST, request.FILES)
@@ -837,14 +881,9 @@ class LibraryDocumentCreateView(AdminRequiredMixin, View):
             doc = form.save(commit=False)
             doc.uploaded_by = request.user
             doc.save()
-            from .models import AuthorizedLibraryDocument
-            for auth in PackageAuthorization.objects.all():
-                AuthorizedLibraryDocument.objects.get_or_create(
-                    authorization=auth,
-                    library_document=doc,
-                    defaults={'is_active': True},
-                )
-            messages.success(request, 'Document uploaded.')
+            doc.allowed_companies.set([form.cleaned_data['allowed_client']])
+            _sync_library_document_access(doc)
+            messages.success(request, 'Document uploaded to the Documents Library.')
             return redirect('core:library-list')
         return render(request, 'core/library_form.html', {'form': form, 'title': 'Upload Information'})
 
@@ -1044,22 +1083,66 @@ class ProjectListView(LoginRequiredMixin, View):
         })
 
 
+def _manager_company(user):
+    try:
+        return user.managed_company
+    except Company.DoesNotExist:
+        return user.company
+
+
+def _manager_at_project_limit(user):
+    company = _manager_company(user)
+    if not company:
+        return False, None
+    return company.manager_project_count() >= company.project_limit, company
+
+
+def _next_package_instance_for_manager(manager):
+    """Pick the next unused package instance for a manager's authorization."""
+    auth = PackageAuthorization.objects.filter(manager=manager).order_by('-created_at').first()
+    if not auth:
+        return None
+    used_ids = set(
+        Project.objects.filter(manager=manager).values_list('package_instance_id', flat=True)
+    )
+    inst = auth.instances.exclude(id__in=used_ids).order_by('package_number').first()
+    if inst:
+        return inst
+    return auth.instances.order_by('package_number').first()
+
+
 class ProjectCreateView(ManagerRequiredMixin, View):
     def get(self, request):
+        at_limit, company = _manager_at_project_limit(request.user)
+        if at_limit:
+            messages.error(
+                request,
+                f'You have reached the maximum of {company.project_limit} project(s) allowed for your company.',
+            )
+            return redirect('core:project-list')
         form = ProjectForm()
-        form.fields['package_instance'].queryset = PackageInstance.objects.filter(
-            authorization__manager=request.user
-        )
         return render(request, 'core/project_form.html', {'form': form, 'title': 'Create Project'})
 
     def post(self, request):
+        at_limit, company = _manager_at_project_limit(request.user)
+        if at_limit:
+            messages.error(
+                request,
+                f'You have reached the maximum of {company.project_limit} project(s) allowed for your company.',
+            )
+            return redirect('core:project-list')
         form = ProjectForm(request.POST)
-        form.fields['package_instance'].queryset = PackageInstance.objects.filter(
-            authorization__manager=request.user
-        )
         if form.is_valid():
+            package_instance = _next_package_instance_for_manager(request.user)
+            if not package_instance:
+                form.add_error(
+                    None,
+                    'No package instance is available. Contact your administrator to authorize packages.',
+                )
+                return render(request, 'core/project_form.html', {'form': form, 'title': 'Create Project'})
             project = form.save(commit=False)
             project.manager = request.user
+            project.package_instance = package_instance
             project.save()
             messages.success(request, f'Project {project.project_number} created. Access password: {project.access_password}')
             return redirect('core:project-detail', pk=project.pk)
@@ -1123,15 +1206,21 @@ class ProjectUpdateView(ManagerOrAdminMixin, View):
         return render(request, 'core/project_form.html', {'form': form, 'title': 'Edit Project', 'project': project})
 
 
-class ProjectDeleteView(ManagerOrAdminMixin, DeleteView):
-    model = Project
-    template_name = 'core/confirm_delete.html'
-    success_url = reverse_lazy('core:project-list')
+class ProjectDeleteView(AdminRequiredMixin, View):
+    def get(self, request, pk):
+        project = get_object_or_404(Project, pk=pk)
+        return render(request, 'core/confirm_delete.html', {
+            'object': project,
+            'title': 'Delete Project',
+            'cancel_url': reverse('core:project-detail', args=[project.pk]),
+        })
 
-    def get_queryset(self):
-        if self.request.user.user_type == 'admin':
-            return Project.objects.all()
-        return Project.objects.filter(manager=self.request.user)
+    def post(self, request, pk):
+        project = get_object_or_404(Project, pk=pk)
+        project_number = project.project_number
+        project.delete()
+        messages.success(request, f'Project {project_number} deleted.')
+        return redirect('core:project-list')
 
 
 # --- Manager: Team Authorization ---
@@ -1210,7 +1299,7 @@ class FormRecordCreateView(LoginRequiredMixin, View):
             record.project = project
             record.form_definition = form_def
             record.created_by_user = request.user
-            record.data = _parse_form_data(request.POST)
+            record.data = {**_project_header_data(project), **_parse_form_data(request.POST)}
             record.save()
             messages.success(request, 'Form record created.')
             return redirect('core:form-record-detail', pk=record.pk)
@@ -1224,7 +1313,10 @@ class FormRecordDetailView(LoginRequiredMixin, View):
         if not can_access_form(request.user, record.project, record.form_definition):
             return redirect('core:dashboard')
         return render(request, 'core/form_record_detail.html', {
-            'record': record, 'reviews': record.reviews.filter(approved=True),
+            'record': record,
+            'company': company_for_project(record.project),
+            'form_owner': _form_owner_label(company_for_project(record.project), record.project),
+            'reviews': record.reviews.filter(approved=True),
             'can_edit': record.can_edit(request.user),
             'can_submit': record.can_submit(request.user),
             'can_review': record.can_review(request.user),
@@ -1443,6 +1535,22 @@ class DeleteNotificationView(LoginRequiredMixin, View):
         return redirect('core:notifications-list')
 
 
+def _sync_library_document_access(doc):
+    """Activate library access only for package authorizations of selected clients."""
+    from .models import AuthorizedLibraryDocument
+    allowed_manager_ids = set(
+        doc.allowed_companies.filter(
+            authorized_manager__isnull=False,
+        ).values_list('authorized_manager_id', flat=True)
+    )
+    for auth in PackageAuthorization.objects.all():
+        AuthorizedLibraryDocument.objects.update_or_create(
+            authorization=auth,
+            library_document=doc,
+            defaults={'is_active': auth.manager_id in allowed_manager_ids},
+        )
+
+
 # --- Helpers ---
 def _form_template_name(form_def):
     code = form_def.code
@@ -1455,7 +1563,17 @@ def _form_template_name(form_def):
     return 'core/form_record_form.html'
 
 
+def _form_owner_label(company, project):
+    if company and company.designated_person:
+        return f'VVB, {company.designated_person}'
+    if project and project.manager:
+        name = project.manager.get_full_name() or project.manager.username
+        return f'VVB, {name}'
+    return 'VVB'
+
+
 def _form_record_context(request, project, form_def, record, form=None):
+    company = company_for_project(project)
     return {
         'form': form or FormRecordForm(
             instance=record,
@@ -1464,6 +1582,8 @@ def _form_record_context(request, project, form_def, record, form=None):
         'project': project,
         'form_def': form_def,
         'record': record,
+        'company': company,
+        'form_owner': _form_owner_label(company, project),
         'dropdown_lists': DropdownList.objects.prefetch_related('options'),
         'reviews': record.reviews.filter(approved=True) if record else [],
     }
@@ -1471,6 +1591,21 @@ def _form_record_context(request, project, form_def, record, form=None):
 
 def _can_access_project(user, project, session=None):
     return can_access_project(user, project, session)
+
+
+def _project_header_data(project):
+    """Snapshot project metadata on new form records."""
+    return {
+        'project_number': project.project_number,
+        'client_name': project.company_name,
+        'facility': project.location,
+        'report_type': project.report_type,
+        'phase': project.phase,
+        'phase_display': project.get_phase_display() if project.phase else '',
+        'document_type': project.document_type,
+        'document_type_display': project.get_document_type_display() if project.document_type else '',
+        'engagement_year': project.engagement_year or str(project.year),
+    }
 
 
 def _parse_form_data(post):

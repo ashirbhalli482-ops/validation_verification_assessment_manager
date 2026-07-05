@@ -14,31 +14,31 @@
                 <div class="row">
                     <div class="col-12 col-md-6">
                         <div class="card">
-                            <div class="card-header d-flex justify-content-between align-items-center">
+                            <div class="card-header">
                                 <strong>Profile Information</strong>
-                                <!-- <a href="{% url 'core:edit-user-profile' logged_user.id %}" class="btn btn-primary btn-sm">
-                                    <i class="fa fa-edit"></i> Edit Profile
-                                </a> -->
                             </div>
                             <div class="card-body">
                                 <div class="message">
-                                    <div class="py-3 pb-5 mr-3 float-left">
-                                        <div class="avatar">
-                                            <img src="{{ logged_user.avatar_url }}" class="img-avatar" alt="{{ logged_user.get_full_name }}">
-                                            <span class="avatar-status badge-success"></span>
-                                        </div>
-                                    </div>
                                     <div>
-                                        <small class="text-muted">{{ logged_user.get_full_name }}</small>
+                                        <small class="text-muted">
+                                            {% if is_admin_profile %}{{ logged_user.username }}{% else %}{{ logged_user.get_full_name|default:logged_user.username }}{% endif %}
+                                        </small>
                                         {% if logged_user.last_login %}
-                                        <small class="text-muted float-right mt-1">Last login: {{ logged_user.last_login|date:"H:i" }} in {{ logged_user.last_login|date:"d/m" }}</small>
+                                        <small class="text-muted float-right mt-1">Last login: {{ logged_user.last_login|date:"H:i" }} on {{ logged_user.last_login|date:"d/m/Y" }}</small>
                                         {% endif %}
                                     </div>
                                     <div class="mt-2">
-                                        <strong>User Type:</strong> {{ logged_user.get_user_type_display }}<br>
-                                        <strong>Designation:</strong> {{ logged_user.designation }}<br>
-                                        <strong>Supervisor:</strong> {{ logged_user.under_supervision.get_full_name|default:'-' }}<br>
+                                        <strong>Username:</strong> {{ logged_user.username }}<br>
                                         <strong>Email:</strong> {{ logged_user.email }}<br>
+                                        <strong>User Type:</strong> {{ logged_user.get_user_type_display }}<br>
+                                        {% if not is_admin_profile %}
+                                        <strong>Designation:</strong> {{ logged_user.designation|default:'-' }}<br>
+                                        <strong>Contact:</strong> {{ logged_user.contact_number|default:'-' }}<br>
+                                        <strong>Supervisor:</strong> {{ logged_user.under_supervision.get_full_name|default:'-' }}<br>
+                                        {% if logged_user.company %}
+                                        <strong>Company:</strong> {{ logged_user.company.name }}<br>
+                                        {% endif %}
+                                        {% endif %}
                                         <strong>Date Joined:</strong> {{ logged_user.date_joined|date:"F d, Y" }}
                                     </div>
                                 </div>
@@ -49,32 +49,24 @@
                         <div class="card">
                             <div class="card-header">
                                 <strong>Edit Profile Information</strong>
-                                <!-- {% if logged_user.user_type in 'manager,employee' %}
+                                {% if is_admin_profile %}
                                 <small class="text-muted d-block mt-1">
-                                    <i class="fa fa-info-circle"></i> 
-                                    You can only edit First Name, Last Name, and Profile Picture.
+                                    <i class="fa fa-info-circle"></i>
+                                    Update your username and email.
                                 </small>
-                                {% elif logged_user.user_type == 'admin' %}
+                                {% else %}
                                 <small class="text-muted d-block mt-1">
-                                    <i class="fa fa-info-circle"></i> 
-                                    You can edit all profile fields including User Type and Supervisor.
+                                    <i class="fa fa-info-circle"></i>
+                                    You can edit your name, designation, and contact number.
                                 </small>
-                                {% endif %} -->
+                                {% endif %}
                             </div>
                             <div class="card-body">
-                                {% if updated %}
-                                <div class="alert alert-success">
-                                    <strong>Success!</strong> Your profile has been updated.
-                                </div>
-                                {% endif %}
-                                {% if avatar_updated %}
-                                <div class="alert alert-success">
-                                    <strong>Success!</strong> Your profile picture has been updated.
-                                </div>
-                                {% endif %}
-                                
-                                <form method="post" enctype="multipart/form-data">
+                                <form method="post">
                                     {% csrf_token %}
+                                    {% if form.non_field_errors %}
+                                    <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+                                    {% endif %}
                                     {% if messages %}
                                         {% for message in messages %}
                                             <div class="alert alert-{{ message.tags }}" role="alert">
@@ -82,104 +74,58 @@
                                             </div>
                                         {% endfor %}
                                     {% endif %}
+                                    {% if form.username %}
                                     <div class="form-group">
-                                        <label for="{{ profile_form.first_name.id_for_label }}">First Name:</label>
-                                        {{ profile_form.first_name }}
-                                        {% if profile_form.first_name.errors %}
-                                        <div class="alert alert-danger">
-                                            {{ profile_form.first_name.errors }}
-                                        </div>
-                                        {% endif %}
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="{{ profile_form.last_name.id_for_label }}">Last Name:</label>
-                                        {{ profile_form.last_name }}
-                                        {% if profile_form.last_name.errors %}
-                                        <div class="alert alert-danger">
-                                            {{ profile_form.last_name.errors }}
-                                        </div>
-                                        {% endif %}
-                                    </div>
-                                    {% if profile_form.email %}
-                                    <div class="form-group">
-                                        <label for="{{ profile_form.email.id_for_label }}">Email:</label>
-                                        {{ profile_form.email }}
-                                        {% if profile_form.email.errors %}
-                                        <div class="alert alert-danger">
-                                            {{ profile_form.email.errors }}
-                                        </div>
-                                        {% endif %}
+                                        <label for="{{ form.username.id_for_label }}">Username</label>
+                                        {{ form.username }}
+                                        {% if form.username.errors %}<div class="text-danger small">{{ form.username.errors }}</div>{% endif %}
                                     </div>
                                     {% endif %}
-                                    {% if profile_form.designation %}
+                                    {% if form.email %}
                                     <div class="form-group">
-                                        <label for="{{ profile_form.designation.id_for_label }}">Designation:</label>
-                                        {{ profile_form.designation }}
-                                        {% if profile_form.designation.errors %}
-                                        <div class="alert alert-danger">
-                                            {{ profile_form.designation.errors }}
-                                        </div>
-                                        {% endif %}
+                                        <label for="{{ form.email.id_for_label }}">Email</label>
+                                        {{ form.email }}
+                                        {% if form.email.errors %}<div class="text-danger small">{{ form.email.errors }}</div>{% endif %}
                                     </div>
                                     {% endif %}
-                                    {% if profile_form.user_type %}
+                                    {% if form.first_name %}
                                     <div class="form-group">
-                                        <label for="{{ profile_form.user_type.id_for_label }}">User Type:</label>
-                                        {{ profile_form.user_type }}
-                                        {% if profile_form.user_type.errors %}
-                                        <div class="alert alert-danger">
-                                            {{ profile_form.user_type.errors }}
-                                        </div>
-                                        {% endif %}
+                                        <label for="{{ form.first_name.id_for_label }}">First Name</label>
+                                        {{ form.first_name }}
+                                        {% if form.first_name.errors %}<div class="text-danger small">{{ form.first_name.errors }}</div>{% endif %}
                                     </div>
                                     {% endif %}
-                                    {% if profile_form.under_supervision %}
+                                    {% if form.last_name %}
                                     <div class="form-group">
-                                        <label for="{{ profile_form.under_supervision.id_for_label }}">Supervisor:</label>
-                                        {{ profile_form.under_supervision }}
-                                        {% if profile_form.under_supervision.errors %}
-                                        <div class="alert alert-danger">
-                                            {{ profile_form.under_supervision.errors }}
-                                        </div>
-                                        {% endif %}
+                                        <label for="{{ form.last_name.id_for_label }}">Last Name</label>
+                                        {{ form.last_name }}
+                                        {% if form.last_name.errors %}<div class="text-danger small">{{ form.last_name.errors }}</div>{% endif %}
                                     </div>
                                     {% endif %}
-                                    <button type="submit" name="update_profile" class="btn btn-primary">Update Profile</button>
+                                    {% if form.designation %}
+                                    <div class="form-group">
+                                        <label for="{{ form.designation.id_for_label }}">Designation</label>
+                                        {{ form.designation }}
+                                        {% if form.designation.errors %}<div class="text-danger small">{{ form.designation.errors }}</div>{% endif %}
+                                    </div>
+                                    {% endif %}
+                                    {% if form.contact_number %}
+                                    <div class="form-group">
+                                        <label for="{{ form.contact_number.id_for_label }}">Contact Number</label>
+                                        {{ form.contact_number }}
+                                        {% if form.contact_number.errors %}<div class="text-danger small">{{ form.contact_number.errors }}</div>{% endif %}
+                                    </div>
+                                    {% endif %}
+                                    <div class="btn-group flex-wrap" role="group">
+                                        <button type="submit" class="btn btn-primary">Update Profile</button>
+                                        {% if is_admin_profile %}
+                                        <a href="{% url 'core:admin-set-password' logged_user.id %}" class="btn btn-warning">Change Password</a>
+                                        {% endif %}
+                                    </div>
                                 </form>
                             </div>
                         </div>
                     </div>
-                </div>
-                
-                <div class="row mt-4">
-                    <div class="col-12 col-md-6">
-                        <div class="card">
-                            <div class="card-header">
-                                <strong>Update Profile Picture</strong>
-                            </div>
-                            <div class="card-body">
-                                <form method="post" enctype="multipart/form-data">
-                                    {% csrf_token %}
-                                    <div class="form-group">
-                                        <label for="{{ img_form.avatar.id_for_label }}">Profile Picture:</label>
-                                        {{ img_form.avatar }}
-                                        {% if img_form.avatar.errors %}
-                                        <div class="alert alert-danger">
-                                            {{ img_form.avatar.errors }}
-                                        </div>
-                                        {% endif %}
-                                    </div>
-                                    <button type="submit" name="update_avatar" class="btn btn-success">Update Picture</button>
-                                </form>
-                            </div>
-                        </div>
-                    </div>
-                    
-                   
-
-
-
-
                 </div>
             </div>
         </div>
