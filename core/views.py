@@ -35,6 +35,7 @@ from .access import (
     company_for_project,
 )
 from .permissions import AdminRequiredMixin, ManagerRequiredMixin, EmployeeBlockedMixin, ManagerOrAdminMixin
+from .package_seed import get_active_package_template
 
 
 def admin_users_success_redirect(action, username=''):
@@ -467,6 +468,8 @@ def _form_definitions_by_type(form_definitions):
 
 def _company_package_context(package_template):
     if not package_template:
+        package_template = get_active_package_template()
+    if not package_template:
         return {
             'form_definitions': [],
             'form_definition_groups': [],
@@ -521,7 +524,7 @@ class CompanyCreateView(AdminRequiredMixin, View):
     @transaction.atomic
     def post(self, request):
         form = CompanyCreateForm(request.POST)
-        package_template = PackageTemplate.objects.filter(is_active=True).first()
+        package_template = get_active_package_template()
 
         if form.is_valid():
             if not package_template:
@@ -585,7 +588,7 @@ class CompanyUpdateView(AdminRequiredMixin, View):
         auth = _company_authorization(company)
         package_template = (
             auth.package_template if auth
-            else PackageTemplate.objects.filter(is_active=True).first()
+            else get_active_package_template()
         )
         form = CompanyEditForm(
             initial=company_edit_initial(company, auth),
@@ -606,7 +609,7 @@ class CompanyUpdateView(AdminRequiredMixin, View):
         auth = _company_authorization(company)
         package_template = (
             auth.package_template if auth
-            else PackageTemplate.objects.filter(is_active=True).first()
+            else get_active_package_template()
         )
         form = CompanyEditForm(request.POST, company=company)
         pkg_ctx = _company_package_context(package_template)
@@ -758,7 +761,7 @@ class CompanyDeleteView(AdminRequiredMixin, DeleteView):
 
 # --- Admin: Form Details (FormDefinition) ---
 def _default_sub_package_for_new_form():
-    template = PackageTemplate.objects.filter(is_active=True).first()
+    template = get_active_package_template()
     if not template:
         return None
     return (
@@ -773,6 +776,7 @@ class FormDetailsListView(AdminRequiredMixin, ListView):
     context_object_name = 'forms'
 
     def get_queryset(self):
+        get_active_package_template()
         return FormDefinition.objects.select_related(
             'sub_package', 'sub_package__package_template',
         ).order_by('code')
@@ -798,7 +802,7 @@ class FormDetailsCreateView(AdminRequiredMixin, View):
             if not sub_package:
                 form.add_error(
                     None,
-                    'No active package template found. Run seed_forms or create a package template first.',
+                    'Could not assign a sub-package for this form. Please contact support.',
                 )
             else:
                 form_def = form.save(commit=False)
