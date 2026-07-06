@@ -15,7 +15,7 @@
       <div class="row">
         <div class="col-md-6">
           <p><strong>Client:</strong> {{ project.company_name }} | <strong>Facility & Jurisdiction:</strong> {{ project.location }}</p>
-          <p><strong>Report Type:</strong> {{ project.report_type }} | <strong>Engagement & Year:</strong> {{ project.engagement_year|default:project.year }}</p>
+          <p><strong>Report Type:</strong> {{ project.report_type }} | <strong>Engagement:</strong> {{ project.engagement_year|default:"—" }} | <strong>Year:</strong> {{ project.year }}</p>
           <p><strong>Phase:</strong> {{ project.get_phase_display|default:"—" }} | <strong>Document Type:</strong> {{ project.get_document_type_display|default:"—" }}</p>
           <p><strong>Package:</strong> {{ project.package_instance.name }}</p>
         </div>
@@ -124,4 +124,46 @@
   </div>
   {% endif %}
 </div>
+
+{% if success_action %}
+<div class="modal fade" id="projectSuccessModal" tabindex="-1" role="dialog" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" role="document">
+    <div class="modal-content">
+      <div class="modal-header bg-success text-white">
+        <h5 class="modal-title">
+          {% if success_action == 'created' %}Project Created
+          {% elif success_action == 'updated' %}Project Updated
+          {% else %}Success{% endif %}
+        </h5>
+        <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body text-center">
+        <i class="fa fa-check-circle fa-3x text-success mb-3"></i>
+        <p class="lead mb-0">
+          {% if success_action == 'created' %}
+            Project <strong>{{ success_project }}</strong> has been created successfully.
+            <!-- {% if success_access_password %}
+            <br><small class="text-muted mt-2 d-block">Access password: <strong>{{ success_access_password }}</strong></small>
+            {% endif %} -->
+          {% elif success_action == 'updated' %}
+            Project <strong>{{ success_project }}</strong> has been updated successfully.
+          {% else %}
+            Action has been completed successfully.
+          {% endif %}
+        </p>
+      </div>
+      <div class="modal-footer justify-content-center">
+        <button type="button" class="btn btn-success" data-dismiss="modal">OK</button>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    $('#projectSuccessModal').modal('show');
+  });
+</script>
+{% endif %}
 {% endblock %}

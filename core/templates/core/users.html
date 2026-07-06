@@ -231,17 +231,24 @@ function filterUsers(userType) {
 </script>
 {% endif %}
 
-{% if admin_users_only and success_action %}
-<div class="modal fade" id="adminSuccessModal" tabindex="-1" role="dialog" aria-hidden="true">
+{% if success_action %}
+<div class="modal fade" id="userSuccessModal" tabindex="-1" role="dialog" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered" role="document">
     <div class="modal-content">
       <div class="modal-header bg-success text-white">
         <h5 class="modal-title">
-          {% if success_action == 'created' %}Admin Created
-          {% elif success_action == 'updated' %}Admin Updated
-          {% elif success_action == 'password' %}Password Updated
-          {% elif success_action == 'deleted' %}Admin Deleted
-          {% else %}Success{% endif %}
+          {% if admin_users_only %}
+            {% if success_action == 'created' %}Admin Created
+            {% elif success_action == 'updated' %}Admin Updated
+            {% elif success_action == 'password' %}Password Updated
+            {% elif success_action == 'deleted' %}Admin Deleted
+            {% else %}Success{% endif %}
+          {% else %}
+            {% if success_action == 'created' %}User Created
+            {% elif success_action == 'updated' %}User Updated
+            {% elif success_action == 'deleted' %}User Deleted
+            {% else %}Success{% endif %}
+          {% endif %}
         </h5>
         <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
           <span aria-hidden="true">&times;</span>
@@ -250,16 +257,28 @@ function filterUsers(userType) {
       <div class="modal-body text-center">
         <i class="fa fa-check-circle fa-3x text-success mb-3"></i>
         <p class="lead mb-0">
-          {% if success_action == 'created' %}
-            Admin <strong>{{ success_user }}</strong> has been created successfully.
-          {% elif success_action == 'updated' %}
-            Admin <strong>{{ success_user }}</strong> has been updated successfully.
-          {% elif success_action == 'password' %}
-            Password for <strong>{{ success_user }}</strong> has been updated successfully.
-          {% elif success_action == 'deleted' %}
-            Admin <strong>{{ success_user }}</strong> has been deleted successfully.
+          {% if admin_users_only %}
+            {% if success_action == 'created' %}
+              Admin <strong>{{ success_user }}</strong> has been created successfully.
+            {% elif success_action == 'updated' %}
+              Admin <strong>{{ success_user }}</strong> has been updated successfully.
+            {% elif success_action == 'password' %}
+              Password for <strong>{{ success_user }}</strong> has been updated successfully.
+            {% elif success_action == 'deleted' %}
+              Admin <strong>{{ success_user }}</strong> has been deleted successfully.
+            {% else %}
+              Action has been completed successfully.
+            {% endif %}
           {% else %}
-            Action has been completed successfully.
+            {% if success_action == 'created' %}
+              User <strong>{{ success_user }}</strong> has been created successfully.
+            {% elif success_action == 'updated' %}
+              User <strong>{{ success_user }}</strong> has been updated successfully.
+            {% elif success_action == 'deleted' %}
+              User <strong>{{ success_user }}</strong> has been deleted successfully.
+            {% else %}
+              Action has been completed successfully.
+            {% endif %}
           {% endif %}
         </p>
       </div>
@@ -271,7 +290,7 @@ function filterUsers(userType) {
 </div>
 <script>
   document.addEventListener('DOMContentLoaded', function() {
-    $('#adminSuccessModal').modal('show');
+    $('#userSuccessModal').modal('show');
   });
 </script>
 {% endif %}

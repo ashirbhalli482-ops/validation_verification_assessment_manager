@@ -9,7 +9,7 @@
   <div class="card">
     <div class="card-header"><strong>{{ title }}</strong></div>
     <div class="card-body">
-      <p class="text-muted">Upload PDF, PowerPoint, Word, or Excel documents. The file is saved to the <strong>Documents Library</strong>. Choose which client companies may view it.</p>
+      <p class="text-muted">Upload PDF, PowerPoint, Word, or Excel documents. The file is saved to the <strong>Documents Library</strong> for all users.</p>
       <form method="post" enctype="multipart/form-data">{% csrf_token %}
         {% if form.non_field_errors %}
         <div class="alert alert-danger">{{ form.non_field_errors }}</div>
@@ -25,20 +25,9 @@
           {% if form.category.errors %}<div class="text-danger small">{{ form.category.errors }}</div>{% endif %}
         </div>
         <div class="form-group">
-          <label for="{{ form.allowed_client.id_for_label }}">{{ form.allowed_client.label }}</label>
-          {{ form.allowed_client }}
-          {% if form.allowed_client.errors %}<div class="text-danger small">{{ form.allowed_client.errors }}</div>{% endif %}
-          {% if form.allowed_client.help_text %}<small class="text-muted d-block mt-1">{{ form.allowed_client.help_text }}</small>{% endif %}
-        </div>
-        <div class="form-group">
           <label for="{{ form.file.id_for_label }}">{{ form.file.label }}</label>
           {{ form.file }}
           {% if form.file.errors %}<div class="text-danger small">{{ form.file.errors }}</div>{% endif %}
-        </div>
-        <div class="form-group">
-          <label for="{{ form.description.id_for_label }}">{{ form.description.label }}</label>
-          {{ form.description }}
-          {% if form.description.errors %}<div class="text-danger small">{{ form.description.errors }}</div>{% endif %}
         </div>
         <button type="submit" class="btn btn-primary">Upload to Documents Library</button>
         <a href="{% url 'core:library-list' %}" class="btn btn-secondary">Cancel</a>

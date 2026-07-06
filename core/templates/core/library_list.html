@@ -14,21 +14,12 @@
     </div>
     <div class="card-body">
       <table class="table table-striped">
-        <thead><tr><th>Title</th><th>Category</th>{% if user.user_type == 'admin' %}<th>Allowed Clients</th>{% endif %}<th>Uploaded</th><th>Actions</th></tr></thead>
+        <thead><tr><th>Title</th><th>Category</th><th>Uploaded</th><th>Actions</th></tr></thead>
         <tbody>
           {% for doc in documents %}
           <tr>
             <td>{{ doc.title }}</td>
             <td>{{ doc.get_category_display }}</td>
-            {% if user.user_type == 'admin' %}
-            <td>
-              {% for company in doc.allowed_companies.all %}
-              <span class="badge badge-secondary">{{ company.name }}</span>
-              {% empty %}
-              <span class="text-muted">All (legacy)</span>
-              {% endfor %}
-            </td>
-            {% endif %}
             <td>{{ doc.uploaded_at|date:"M d, Y" }}</td>
             <td>
               <a href="{% url 'core:library-download' doc.pk %}" class="btn btn-sm btn-info">Download</a>
@@ -38,7 +29,7 @@
             </td>
           </tr>
           {% empty %}
-          <tr><td colspan="{% if user.user_type == 'admin' %}5{% else %}4{% endif %}" class="text-muted text-center">No documents uploaded.</td></tr>
+          <tr><td colspan="4" class="text-muted text-center">No documents uploaded.</td></tr>
           {% endfor %}
         </tbody>
       </table>

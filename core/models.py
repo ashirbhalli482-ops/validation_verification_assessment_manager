@@ -52,12 +52,27 @@ PROJECT_DOCUMENT_TYPE_CHOICES = [
     ('external', 'External'),
 ]
 
+USER_ROLE_CHOICES = [
+    ('verifier_1', 'Verifier 1'),
+    ('verifier_2', 'Verifier 2'),
+    ('verifier_3', 'Verifier 3'),
+    ('lead_verifier', 'Lead Verifier'),
+    ('co_lead_verifier', 'Co-Lead Verifier'),
+    ('technical_expert_1', 'Technical Expert 1'),
+    ('technical_expert_2', 'Technical Expert 2'),
+    ('peer_reviewer', 'Peer Reviewer'),
+]
+
 
 class CustomUser(AbstractUser):
     """Admin, Manager (VVB/Project Manager), or Employee."""
     email = models.EmailField(unique=True)
     user_type = models.CharField(max_length=15, choices=USER_TYPE_CHOICES)
+    user_role = models.CharField(
+        max_length=30, choices=USER_ROLE_CHOICES, blank=True, verbose_name='User Role',
+    )
     designation = models.CharField(max_length=100, blank=True, null=True)
+    position_title = models.CharField(max_length=150, blank=True, verbose_name='Position Title')
     contact_number = models.CharField(max_length=20, blank=True, null=True)
     cv = models.FileField(upload_to='core/cvs/', blank=True, null=True)
     company = models.ForeignKey(

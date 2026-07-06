@@ -67,6 +67,42 @@ def form_details_list_success_redirect(action, form_code=''):
     return redirect(f'{url}?{query}')
 
 
+def manager_users_success_redirect(action, username=''):
+    """Redirect to user list with a manager user-action popup flag."""
+    url = reverse('core:users')
+    query = f'success={action}'
+    if username:
+        query += f'&user={quote(username)}'
+    return redirect(f'{url}?{query}')
+
+
+def user_profile_success_redirect(profile_id, action='updated', username=''):
+    """Redirect to user profile with a popup action flag."""
+    url = reverse('core:user', args=[profile_id])
+    query = f'success={action}'
+    if username:
+        query += f'&user={quote(username)}'
+    return redirect(f'{url}?{query}')
+
+
+def project_detail_success_redirect(pk, action, project_number='', access_password=''):
+    """Redirect to project detail with a popup action flag."""
+    url = reverse('core:project-detail', args=[pk])
+    query = f'success={action}'
+    if project_number:
+        query += f'&project={quote(project_number)}'
+    if access_password:
+        query += f'&access_password={quote(access_password)}'
+    return redirect(f'{url}?{query}')
+
+
+def project_list_redirect(**params):
+    """Redirect to project list with popup query flags."""
+    url = reverse('core:project-list')
+    query = '&'.join(f'{key}={quote(str(value))}' for key, value in params.items())
+    return redirect(f'{url}?{query}')
+
+
 # --- Authentication ---
 class LoginView(View):
     def get(self, request):
@@ -176,8 +212,7 @@ class RegisterView(ManagerOrAdminMixin, View):
             if creating_admin:
                 return admin_users_success_redirect('created', new_user.username)
             display_name = new_user.get_full_name() or new_user.username
-            messages.success(request, f'User {display_name} created successfully.')
-            return redirect('core:users')
+            return manager_users_success_redirect('created', display_name)
         return render(request, 'core/reg_form.html', {
             'form': form,
             'creating_admin': creating_admin,
@@ -265,7 +300,11 @@ class UserProfileView(LoginRequiredMixin, View):
         if not request.user.can_manage_user(profile) and request.user != profile:
             messages.error(request, 'Access denied.')
             return redirect('core:dashboard')
-        return render(request, 'core/user.html', {'user_view': profile})
+        return render(request, 'core/user.html', {
+            'user_view': profile,
+            'success_action': request.GET.get('success', ''),
+            'success_user': request.GET.get('user', ''),
+        })
 
 
 class ProfileView(LoginRequiredMixin, View):
@@ -333,8 +372,8 @@ class EditUserProfileView(LoginRequiredMixin, View):
             updated.save()
             if request.user.user_type == 'admin' and target.user_type == 'admin':
                 return admin_users_success_redirect('updated', updated.username)
-            messages.success(request, 'User updated.')
-            return redirect('core:user', profile_id=target.id)
+            display_name = updated.get_full_name() or updated.username
+            return user_profile_success_redirect(target.id, 'updated', display_name)
         return render(request, 'core/edit_user_profile.html', {
             'form': form,
             'target_user': target,
@@ -360,12 +399,12 @@ class UserDeleteView(LoginRequiredMixin, View):
             and target != request.user
             and not (request.user.user_type == 'manager' and target.user_type == 'admin')
         ):
-            username = target.username
+            username = target.get_full_name() or target.username
             is_admin = target.user_type == 'admin'
             target.delete()
             if is_admin:
                 return admin_users_success_redirect('deleted', username)
-            messages.success(request, 'User deleted.')
+            return manager_users_success_redirect('deleted', username)
         return redirect('core:users')
 
 
@@ -963,7 +1002,6 @@ class LibraryDocumentCreateView(AdminRequiredMixin, View):
             doc = form.save(commit=False)
             doc.uploaded_by = request.user
             doc.save()
-            doc.allowed_companies.set([form.cleaned_data['allowed_client']])
             _sync_library_document_access(doc)
             messages.success(request, 'Document uploaded to the Documents Library.')
             return redirect('core:library-list')
@@ -1162,6 +1200,9 @@ class ProjectListView(LoginRequiredMixin, View):
         return render(request, 'core/project_list.html', {
             'projects': projects,
             'assignments': assignments,
+            'success_action': request.GET.get('success', ''),
+            'error_action': request.GET.get('error', ''),
+            'project_limit': request.GET.get('limit', ''),
         })
 
 
@@ -1197,22 +1238,20 @@ class ProjectCreateView(ManagerRequiredMixin, View):
     def get(self, request):
         at_limit, company = _manager_at_project_limit(request.user)
         if at_limit:
-            messages.error(
-                request,
-                f'You have reached the maximum of {company.project_limit} project(s) allowed for your company.',
+            return project_list_redirect(
+                error='project_limit',
+                limit=company.project_limit,
             )
-            return redirect('core:project-list')
         form = ProjectForm()
         return render(request, 'core/project_form.html', {'form': form, 'title': 'Create Project'})
 
     def post(self, request):
         at_limit, company = _manager_at_project_limit(request.user)
         if at_limit:
-            messages.error(
-                request,
-                f'You have reached the maximum of {company.project_limit} project(s) allowed for your company.',
+            return project_list_redirect(
+                error='project_limit',
+                limit=company.project_limit,
             )
-            return redirect('core:project-list')
         form = ProjectForm(request.POST)
         if form.is_valid():
             package_instance = _next_package_instance_for_manager(request.user)
@@ -1226,8 +1265,12 @@ class ProjectCreateView(ManagerRequiredMixin, View):
             project.manager = request.user
             project.package_instance = package_instance
             project.save()
-            messages.success(request, f'Project {project.project_number} created. Access password: {project.access_password}')
-            return redirect('core:project-detail', pk=project.pk)
+            return project_detail_success_redirect(
+                project.pk,
+                'created',
+                project.project_number,
+                project.access_password,
+            )
         return render(request, 'core/project_form.html', {'form': form, 'title': 'Create Project'})
 
 
@@ -1265,6 +1308,9 @@ class ProjectDetailView(LoginRequiredMixin, View):
             'team_member': team_member,
             'can_authorize_library': get_authorized_library_documents(request.user).exists(),
             'report_records': report_records,
+            'success_action': request.GET.get('success', ''),
+            'success_project': request.GET.get('project', ''),
+            'success_access_password': request.GET.get('access_password', ''),
         })
 
 
@@ -1283,8 +1329,11 @@ class ProjectUpdateView(ManagerOrAdminMixin, View):
         form = ProjectForm(request.POST, instance=project)
         if form.is_valid():
             form.save()
-            messages.success(request, 'Project updated.')
-            return redirect('core:project-detail', pk=project.pk)
+            return project_detail_success_redirect(
+                project.pk,
+                'updated',
+                project.project_number,
+            )
         return render(request, 'core/project_form.html', {'form': form, 'title': 'Edit Project', 'project': project})
 
 
@@ -1618,8 +1667,18 @@ class DeleteNotificationView(LoginRequiredMixin, View):
 
 
 def _sync_library_document_access(doc):
-    """Activate library access only for package authorizations of selected clients."""
+    """Sync library document visibility across package authorizations."""
     from .models import AuthorizedLibraryDocument
+
+    if not doc.allowed_companies.exists():
+        for auth in PackageAuthorization.objects.all():
+            AuthorizedLibraryDocument.objects.update_or_create(
+                authorization=auth,
+                library_document=doc,
+                defaults={'is_active': True},
+            )
+        return
+
     allowed_manager_ids = set(
         doc.allowed_companies.filter(
             authorized_manager__isnull=False,
@@ -1686,7 +1745,13 @@ def _project_header_data(project):
         'phase_display': project.get_phase_display() if project.phase else '',
         'document_type': project.document_type,
         'document_type_display': project.get_document_type_display() if project.document_type else '',
-        'engagement_year': project.engagement_year or str(project.year),
+        'engagement_year': project.engagement_year or '',
+        'year': project.year,
+        'report_type_year': (
+            f'{project.report_type}-{project.year}'
+            if project.report_type and project.year
+            else project.report_type or str(project.year or '')
+        ),
     }
 
 

@@ -14,6 +14,7 @@
           <th class="pkg-check-col">Option for Activation</th>
           <th>Form Number</th>
           <th>Form Name</th>
+          <th>Form Type</th>
           <th>Description</th>
         </tr>
       </thead>
@@ -25,6 +26,7 @@
           </td>
           <td class="pkg-form-number">{{ form_def.code }}</td>
           <td>{{ form_def.name }}</td>
+          <td>{{ form_def.get_form_type_display|default:"-" }}</td>
           <td class="pkg-form-description">{{ form_def.description|default:"-" }}</td>
         </tr>
         {% endfor %}

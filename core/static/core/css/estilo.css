@@ -721,28 +721,65 @@
 	font-size: 0.92rem;
 }
 
-.form-doc-project-bar {
-	display: grid;
-	grid-template-columns: repeat(3, 1fr);
-	background: #00B0F0;
-	color: #f0f4f8;
+.form-doc-project-control-title {
+	font-style: italic;
+	font-size: 0.85rem;
+	color: #1f2d3d;
 	margin-top: 0.65rem;
-	border: 1px solid #0090c8;
+	margin-bottom: 0.15rem;
+}
+
+.form-doc-project-bar {
+	background: #00AEEF;
+	color: #fff;
+	margin-top: 0;
+	border: 1px solid #0099d6;
 	border-radius: 2px;
+	overflow: hidden;
 }
 
-.form-doc-project-item {
-	padding: 0.55rem 0.85rem;
-	border-right: 1px solid rgba(0, 0, 0, 0.1);
-	border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+.form-doc-project-row {
+	display: grid;
+	border-bottom: 1px solid rgba(255, 255, 255, 0.45);
 }
 
-.form-doc-project-item:nth-child(3n) {
+.form-doc-project-row:last-child {
+	border-bottom: none;
+}
+
+.form-doc-project-row-3 {
+	grid-template-columns: repeat(3, 1fr);
+}
+
+.form-doc-project-row-4 {
+	grid-template-columns: repeat(4, 1fr);
+}
+
+.form-doc-project-bar .form-doc-project-item {
+	padding: 0.5rem 0.75rem;
+	border-right: 1px solid rgba(255, 255, 255, 0.45);
+}
+
+.form-doc-project-bar .form-doc-project-item:last-child {
 	border-right: none;
 }
 
-.form-doc-project-item:nth-last-child(-n+3) {
-	border-bottom: none;
+.form-doc-project-bar .form-doc-meta-label,
+.form-doc-project-bar .form-doc-meta-value {
+	display: block;
+	font-style: italic;
+	color: #fff;
+}
+
+.form-doc-project-bar .form-doc-meta-label {
+	font-size: 0.78rem;
+	font-weight: 600;
+	margin-bottom: 0.1rem;
+}
+
+.form-doc-project-bar .form-doc-meta-value {
+	font-size: 0.92rem;
+	font-weight: 500;
 }
 
 .form-doc-record-meta,
@@ -756,15 +793,16 @@
 		grid-template-columns: 1fr;
 	}
 
-	.form-doc-project-bar {
+	.form-doc-project-row-3,
+	.form-doc-project-row-4 {
 		grid-template-columns: 1fr 1fr;
 	}
 
-	.form-doc-project-item:nth-child(3n) {
-		border-right: 1px solid rgba(0, 0, 0, 0.1);
+	.form-doc-project-bar .form-doc-project-item:nth-child(2n) {
+		border-right: none;
 	}
 
-	.form-doc-project-item:nth-child(2n) {
-		border-right: none;
+	.form-doc-project-bar .form-doc-project-item {
+		border-bottom: 1px solid rgba(255, 255, 255, 0.45);
 	}
 }

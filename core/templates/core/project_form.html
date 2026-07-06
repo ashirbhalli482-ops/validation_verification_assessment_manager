@@ -47,6 +47,13 @@
             </div>
           </div>
           <div class="company-field-row">
+            <label class="company-field-label" for="{{ form.year.id_for_label }}">{{ form.year.label }}</label>
+            <div class="company-field-value">
+              {{ form.year }}
+              {% if form.year.errors %}<div class="text-danger small">{{ form.year.errors }}</div>{% endif %}
+            </div>
+          </div>
+          <div class="company-field-row">
             <label class="company-field-label" for="{{ form.phase.id_for_label }}">{{ form.phase.label }}</label>
             <div class="company-field-value">
               {{ form.phase }}

@@ -7,7 +7,7 @@ from .models import (
     LibraryDocument, DropdownList, DropdownOption, Project, TeamMember,
     EmployeeRecord, FormRecord, FormDefinition, USER_TYPE_CHOICES, TEAM_ROLE_CHOICES,
     LIBRARY_CATEGORY_CHOICES, PROJECT_PHASE_CHOICES, PROJECT_DOCUMENT_TYPE_CHOICES,
-    FORM_TYPE_CHOICES, FORM_TYPE_TO_CATEGORY,
+    FORM_TYPE_CHOICES, FORM_TYPE_TO_CATEGORY, USER_ROLE_CHOICES,
 )
 import os
 import re
@@ -196,10 +196,10 @@ MANAGER_USER_TYPE_CHOICES = [
 
 
 class ManagerRegistrationForm(UserCreationForm):
-    """Managers create manager or employee accounts (not admin)."""
-    user_type = forms.ChoiceField(
-        choices=MANAGER_USER_TYPE_CHOICES,
-        label='User type',
+    """Managers create team member accounts with a verification role."""
+    user_role = forms.ChoiceField(
+        choices=[('', '---------')] + list(USER_ROLE_CHOICES),
+        label='User Role',
         widget=forms.Select(attrs={'class': 'form-control'}),
     )
     username = forms.CharField(
@@ -213,11 +213,11 @@ class ManagerRegistrationForm(UserCreationForm):
         required=False,
         widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Enter designation'}),
     )
-    under_supervision = forms.ModelChoiceField(
-        queryset=CustomUser.objects.none(),
+    position_title = forms.CharField(
+        max_length=150,
         required=False,
-        label='Under supervision',
-        widget=forms.Select(attrs={'class': 'form-control'}),
+        label='Position Title',
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Enter position title'}),
     )
     email = forms.EmailField(
         required=True,
@@ -235,20 +235,13 @@ class ManagerRegistrationForm(UserCreationForm):
     class Meta:
         model = CustomUser
         fields = [
-            'user_type', 'username', 'designation', 'under_supervision',
+            'user_role', 'username', 'designation', 'position_title',
             'email', 'password1', 'password2',
         ]
 
     def __init__(self, *args, **kwargs):
         self.user = kwargs.pop('user', None)
         super().__init__(*args, **kwargs)
-        if self.user:
-            self.fields['under_supervision'].queryset = CustomUser.objects.filter(
-                user_type='manager',
-            ).filter(
-                Q(created_by=self.user) | Q(pk=self.user.pk),
-            ).order_by('username')
-        self.fields['under_supervision'].required = False
 
     def clean_email(self):
         email = self.cleaned_data['email']
@@ -256,32 +249,22 @@ class ManagerRegistrationForm(UserCreationForm):
             raise forms.ValidationError('A user with this email already exists.')
         return email
 
-    def clean_user_type(self):
-        user_type = self.cleaned_data['user_type']
-        if user_type not in ('manager', 'employee'):
-            raise forms.ValidationError('Managers can only create Manager or Employee accounts.')
-        return user_type
-
-    def clean_under_supervision(self):
-        supervisor = self.cleaned_data.get('under_supervision')
-        if supervisor and self.user:
-            if supervisor.pk != self.user.pk and supervisor.created_by_id != self.user.id:
-                raise forms.ValidationError(
-                    'Selected supervisor must be yourself or a manager you created.',
-                )
-        return supervisor
+    def clean_user_role(self):
+        user_role = self.cleaned_data.get('user_role')
+        if not user_role:
+            raise forms.ValidationError('Select a user role.')
+        return user_role
 
     def save(self, commit=True):
         user = super().save(commit=False)
         user.email = self.cleaned_data['email']
         user.designation = self.cleaned_data.get('designation', '')
-        user.user_type = self.cleaned_data['user_type']
-        if user.user_type == 'employee':
-            user.under_supervision = self.cleaned_data.get('under_supervision')
-        else:
-            user.under_supervision = None
+        user.user_role = self.cleaned_data['user_role']
+        user.position_title = self.cleaned_data.get('position_title', '')
+        user.user_type = 'employee'
         if self.user:
             user.created_by = self.user
+            user.under_supervision = self.user
             if self.user.company_id:
                 user.company_id = self.user.company_id
         if commit:
@@ -686,38 +669,15 @@ class AuthorizedFormToggleForm(forms.ModelForm):
 
 class LibraryDocumentForm(forms.ModelForm):
     ALLOWED_EXTENSIONS = {'.pdf', '.doc', '.docx', '.ppt', '.pptx', '.xls', '.xlsx'}
-    allowed_client = forms.ModelChoiceField(
-        queryset=Company.objects.none(),
-        label='Client (who can view)',
-        widget=forms.Select(attrs={'class': 'form-control'}),
-        required=True,
-        empty_label='---------',
-    )
 
     class Meta:
         model = LibraryDocument
-        fields = ['title', 'category', 'file', 'description']
+        fields = ['title', 'category', 'file']
         widgets = {
             'title': forms.TextInput(attrs={'class': 'form-control'}),
             'category': forms.Select(attrs={'class': 'form-control'}),
             'file': forms.FileInput(attrs={'class': 'form-control', 'accept': '.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx'}),
-            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
         }
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.fields['allowed_client'].queryset = Company.objects.order_by('name')
-        
-        if self.instance.pk:
-            company = self.instance.allowed_companies.first()
-            if company:
-                self.fields['allowed_client'].initial = company.pk
-
-    def clean_allowed_client(self):
-        client = self.cleaned_data.get('allowed_client')
-        if not client:
-            raise forms.ValidationError('Select a client who may view this document.')
-        return client
 
     def clean_file(self):
         uploaded = self.cleaned_data.get('file')
@@ -758,7 +718,7 @@ class ProjectForm(forms.ModelForm):
         model = Project
         fields = [
             'project_number', 'company_name', 'location', 'report_type',
-            'engagement_year', 'phase', 'document_type',
+            'engagement_year', 'year', 'phase', 'document_type',
         ]
         widgets = {
             'project_number': forms.TextInput(attrs={'class': 'form-control'}),
@@ -769,6 +729,11 @@ class ProjectForm(forms.ModelForm):
             'location': forms.TextInput(attrs={'class': 'form-control'}),
             'report_type': forms.TextInput(attrs={'class': 'form-control'}),
             'engagement_year': forms.TextInput(attrs={'class': 'form-control'}),
+            'year': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'min': 1900,
+                'max': 2100,
+            }),
             'phase': forms.Select(attrs={'class': 'form-control'}),
             'document_type': forms.Select(attrs={'class': 'form-control'}),
         }
@@ -779,34 +744,14 @@ class ProjectForm(forms.ModelForm):
         self.fields['company_name'].label = 'Client Name'
         self.fields['location'].label = 'Facility & Jurisdiction'
         self.fields['report_type'].label = 'Report Type'
-        self.fields['engagement_year'].label = 'Engagement & Year'
+        self.fields['engagement_year'].label = 'Engagement'
+        self.fields['year'].label = 'Year'
         self.fields['phase'].label = 'Phase'
         self.fields['document_type'].label = 'Document Type'
         self.fields['phase'].choices = [('', '---------')] + list(PROJECT_PHASE_CHOICES)
         self.fields['document_type'].choices = [('', '---------')] + list(PROJECT_DOCUMENT_TYPE_CHOICES)
-        if self.instance.pk and not self.instance.engagement_year and self.instance.year:
-            self.initial.setdefault('engagement_year', str(self.instance.year))
-
-    def clean(self):
-        cleaned = super().clean()
-        engagement = (cleaned.get('engagement_year') or '').strip()
-        self._parsed_year = None
-        if engagement:
-            match = re.search(r'(19|20)\d{2}', engagement)
-            if match:
-                self._parsed_year = int(match.group())
-        return cleaned
-
-    def save(self, commit=True):
-        project = super().save(commit=False)
-        parsed_year = getattr(self, '_parsed_year', None)
-        if parsed_year:
-            project.year = parsed_year
-        elif not project.year:
-            project.year = timezone.now().year
-        if commit:
-            project.save()
-        return project
+        if not self.instance.pk:
+            self.fields['year'].initial = timezone.now().year
 
 
 class TeamMemberForm(forms.ModelForm):
