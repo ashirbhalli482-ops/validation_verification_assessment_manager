@@ -28,12 +28,12 @@ urlpatterns = [
     path('admin/companies/<int:pk>/edit/', views.CompanyUpdateView.as_view(), name='company-edit'),
     path('admin/companies/<int:pk>/delete/', views.CompanyDeleteView.as_view(), name='company-delete'),
 
-    # Admin: Package Templates
-    path('admin/packages/', views.PackageTemplateListView.as_view(), name='package-template-list'),
-    path('admin/packages/create/', views.PackageTemplateCreateView.as_view(), name='package-template-create'),
-    path('admin/packages/<int:pk>/', views.PackageTemplateDetailView.as_view(), name='package-template-detail'),
-    path('admin/packages/<int:pk>/edit/', views.PackageTemplateUpdateView.as_view(), name='package-template-edit'),
-    path('admin/packages/<int:pk>/delete/', views.PackageTemplateDeleteView.as_view(), name='package-template-delete'),
+    # Admin: Form Details
+    path('admin/form-details/', views.FormDetailsListView.as_view(), name='form-details-list'),
+    path('admin/form-details/create/', views.FormDetailsCreateView.as_view(), name='form-details-create'),
+    path('admin/form-details/<int:pk>/', views.FormDetailsDetailView.as_view(), name='form-details-detail'),
+    path('admin/form-details/<int:pk>/edit/', views.FormDetailsUpdateView.as_view(), name='form-details-edit'),
+    path('admin/form-details/<int:pk>/delete/', views.FormDetailsDeleteView.as_view(), name='form-details-delete'),
 
     # Admin: Package Authorization
     path('admin/authorize/', views.PackageAuthorizationListView.as_view(), name='package-authorization-list'),

@@ -18,7 +18,7 @@
   <div class="col-6 col-lg-4"><div class="dashboard-card"><div class="dashboard-card-title">ADMINS</div><div class="dashboard-card-value">{{ admin_count|default:0 }}</div></div></div>
   <div class="col-6 col-lg-4"><div class="dashboard-card"><div class="dashboard-card-title">MANAGERS</div><div class="dashboard-card-value">{{ manager_count|default:0 }}</div></div></div>
   <div class="col-6 col-lg-4"><div class="dashboard-card"><div class="dashboard-card-title">COMPANIES</div><div class="dashboard-card-value">{{ company_count|default:0 }}</div></div></div>
-  <div class="col-6 col-lg-4 mt-4"><div class="dashboard-card"><div class="dashboard-card-title">PACKAGES</div><div class="dashboard-card-value">{{ package_count|default:0 }}</div></div></div>
+  <div class="col-6 col-lg-4 mt-4"><div class="dashboard-card"><div class="dashboard-card-title">FORMS</div><div class="dashboard-card-value">{{ form_details_count|default:0 }}</div></div></div>
   <div class="col-6 col-lg-4 mt-4"><div class="dashboard-card"><div class="dashboard-card-title">AUTHORIZATIONS</div><div class="dashboard-card-value">{{ authorization_count|default:0 }}</div></div></div>
   <div class="col-6 col-lg-4 mt-4"><div class="dashboard-card"><div class="dashboard-card-title">LIBRARY DOCS</div><div class="dashboard-card-value">{{ library_count|default:0 }}</div></div></div>
 </div>
@@ -36,7 +36,7 @@
             <a class="dropdown-item" href="{% url 'core:notifications-list' %}"><i class="fa fa-bell"></i> View Notifications</a>
             <a class="dropdown-item" href="{% url 'core:users' %}?user_type=admin"><i class="fa fa-user-shield"></i> View Admins</a>
             <a class="dropdown-item" href="{% url 'core:company-list' %}"><i class="fa fa-building"></i> View Companies</a>
-            <a class="dropdown-item" href="{% url 'core:package-template-list' %}"><i class="fa fa-box"></i> View Packages</a>
+            <a class="dropdown-item" href="{% url 'core:form-details-list' %}"><i class="fa fa-box"></i> View Form Details</a>
             <a class="dropdown-item" href="{% url 'core:library-list' %}"><i class="fa fa-book"></i> View Informations</a>
             <a class="dropdown-item" href="{% url 'core:dropdown-list' %}"><i class="fa fa-list"></i> View Drop-Down List</a>
           </div>
@@ -47,7 +47,7 @@
           <a href="{% url 'core:notifications-list' %}" class="list-group-item list-group-item-action"><i class="fa fa-bell text-primary"></i> View Notifications</a>
           <a href="{% url 'core:users' %}?user_type=admin" class="list-group-item list-group-item-action"><i class="fa fa-user-shield text-primary"></i> View Admins</a>
           <a href="{% url 'core:company-list' %}" class="list-group-item list-group-item-action"><i class="fa fa-building text-primary"></i> View Companies</a>
-          <a href="{% url 'core:package-template-list' %}" class="list-group-item list-group-item-action"><i class="fa fa-box text-primary"></i> View Packages</a>
+          <a href="{% url 'core:form-details-list' %}" class="list-group-item list-group-item-action"><i class="fa fa-box text-primary"></i> View Form Details</a>
           <a href="{% url 'core:library-list' %}" class="list-group-item list-group-item-action"><i class="fa fa-book text-primary"></i> View Informations</a>
           <a href="{% url 'core:dropdown-list' %}" class="list-group-item list-group-item-action"><i class="fa fa-list text-primary"></i> View Drop-Down List</a>
         </div>
@@ -65,7 +65,7 @@
           <div class="dropdown-menu dropdown-menu-right" aria-labelledby="adminAdministrationDropdown">
             <a class="dropdown-item" href="{% url 'core:new-user' %}"><i class="fa fa-user-plus"></i> Create Admin</a>
             <a class="dropdown-item" href="{% url 'core:company-create' %}"><i class="fa fa-building"></i> Create Company</a>
-            <a class="dropdown-item" href="{% url 'core:package-template-create' %}"><i class="fa fa-box"></i> Create Package</a>
+            <a class="dropdown-item" href="{% url 'core:form-details-create' %}"><i class="fa fa-box"></i> Create Form Details</a>
             <a class="dropdown-item" href="{% url 'core:package-authorization-create' %}"><i class="fa fa-key"></i> Authorize Packages</a>
             <a class="dropdown-item" href="{% url 'core:dropdown-create' %}"><i class="fa fa-list"></i> Create Drop-Down List</a>
             <a class="dropdown-item" href="{% url 'core:library-upload' %}"><i class="fa fa-upload"></i> Upload Information</a>
@@ -77,7 +77,7 @@
         <div class="list-group list-group-flush">
           <a href="{% url 'core:new-user' %}" class="list-group-item list-group-item-action"><i class="fa fa-user-plus text-success"></i> Create Admin</a>
           <a href="{% url 'core:company-create' %}" class="list-group-item list-group-item-action"><i class="fa fa-building text-success"></i> Create Company</a>
-          <a href="{% url 'core:package-template-create' %}" class="list-group-item list-group-item-action"><i class="fa fa-box text-success"></i> Create Package</a>
+          <a href="{% url 'core:form-details-create' %}" class="list-group-item list-group-item-action"><i class="fa fa-box text-success"></i> Create Form Details</a>
           <a href="{% url 'core:package-authorization-create' %}" class="list-group-item list-group-item-action"><i class="fa fa-key text-success"></i> Authorize Packages</a>
           <a href="{% url 'core:dropdown-create' %}" class="list-group-item list-group-item-action"><i class="fa fa-list text-success"></i> Create Drop-Down List</a>
           <a href="{% url 'core:library-upload' %}" class="list-group-item list-group-item-action"><i class="fa fa-upload text-success"></i> Upload Information</a>

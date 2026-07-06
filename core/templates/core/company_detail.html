@@ -70,7 +70,7 @@
         </div>
       </div>
 
-      {% if authorization and package_rows %}
+      {% if authorization and form_definition_groups %}
       <form method="post">
         {% csrf_token %}
         {% include 'core/includes/forms_selection_table.html' with help_text="Check forms under Option for Activation to allocate them to this company." %}

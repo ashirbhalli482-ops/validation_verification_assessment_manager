@@ -1,0 +1,42 @@
+{% extends 'core/base.html' %}
+{% block breadcrumb %}
+<li class="breadcrumb-item">Admin</li>
+<li class="breadcrumb-item"><a href="{% url 'core:form-details-list' %}">Form Details</a></li>
+<li class="breadcrumb-item active">{{ title }}</li>
+{% endblock %}
+{% block content %}
+<div class="container-fluid">
+  <div class="card company-form-card">
+    <div class="card-header"><strong>{{ title }}</strong></div>
+    <div class="card-body">
+      <form method="post">{% csrf_token %}
+        {% if form.non_field_errors %}
+        <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+        {% endif %}
+        <div class="form-group">
+          <label for="{{ form.code.id_for_label }}">{{ form.code.label }}</label>
+          {{ form.code }}
+          {% if form.code.errors %}<div class="text-danger small">{{ form.code.errors }}</div>{% endif %}
+        </div>
+        <div class="form-group">
+          <label for="{{ form.name.id_for_label }}">{{ form.name.label }}</label>
+          {{ form.name }}
+          {% if form.name.errors %}<div class="text-danger small">{{ form.name.errors }}</div>{% endif %}
+        </div>
+        <div class="form-group">
+          <label for="{{ form.form_type.id_for_label }}">{{ form.form_type.label }}</label>
+          {{ form.form_type }}
+          {% if form.form_type.errors %}<div class="text-danger small">{{ form.form_type.errors }}</div>{% endif %}
+        </div>
+        <div class="form-group">
+          <label for="{{ form.description.id_for_label }}">{{ form.description.label }}</label>
+          {{ form.description }}
+          {% if form.description.errors %}<div class="text-danger small">{{ form.description.errors }}</div>{% endif %}
+        </div>
+        <button type="submit" class="btn btn-primary">Save</button>
+        <a href="{% url 'core:form-details-list' %}" class="btn btn-secondary">Cancel</a>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

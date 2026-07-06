@@ -596,6 +596,20 @@
 	color: #2c3e50;
 }
 
+.package-selection-group:last-child {
+	margin-bottom: 0 !important;
+}
+
+.pkg-form-type-heading {
+	font-size: 1rem;
+	font-weight: 700;
+	color: #2c3e50;
+	margin: 0 0 0.5rem;
+	padding: 0.4rem 0.75rem;
+	background: #d6eaf8;
+	border-left: 4px solid #3498db;
+}
+
 .package-selection-table-wrap {
 	max-width: 100%;
 	overflow-x: auto;
@@ -619,16 +633,15 @@
 	background: #f8f9fa;
 }
 
-.package-selection-table .pkg-code-col {
-	background: #fff;
+.package-selection-table .pkg-form-number {
 	font-family: monospace;
+	font-weight: 600;
+	white-space: nowrap;
 }
 
-.package-selection-table .pkg-section-header {
-	background: #e9ecef;
-	font-weight: 600;
-	padding: 0.25rem 0.5rem;
-	margin: -0.5rem;
+.package-selection-table .pkg-form-description {
+	max-width: 280px;
+	font-size: 0.85rem;
 }
 
 .pkg-deactivate-check,

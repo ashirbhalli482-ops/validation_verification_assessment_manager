@@ -188,8 +188,21 @@ class SubPackage(models.Model):
         return f'{self.code} - {self.name}'
 
 
+FORM_TYPE_CHOICES = [
+    ('project', 'Project'),
+    ('master_record', 'Master Record'),
+    ('proposal', 'Proposal'),
+]
+
+FORM_TYPE_TO_CATEGORY = {
+    'project': 'limited_form',
+    'master_record': 'master_record',
+    'proposal': 'unlimited_use',
+}
+
+
 class FormDefinition(models.Model):
-    """Individual form template within a sub-package."""
+    """Form detail definition (form number, name, type) within a sub-package."""
     FORM_CATEGORY_CHOICES = [
         ('master_record', 'Master Record'),
         ('unlimited_use', 'Unlimited Use'),
@@ -199,9 +212,13 @@ class FormDefinition(models.Model):
     sub_package = models.ForeignKey(
         SubPackage, on_delete=models.CASCADE, related_name='forms'
     )
-    code = models.CharField(max_length=20)
-    name = models.CharField(max_length=200)
+    code = models.CharField(max_length=20, verbose_name='Form Number')
+    name = models.CharField(max_length=200, verbose_name='Form Name')
     description = models.TextField(blank=True)
+    form_type = models.CharField(
+        max_length=20, choices=FORM_TYPE_CHOICES, default='project',
+        verbose_name='Form Type',
+    )
     category = models.CharField(
         max_length=20, choices=FORM_CATEGORY_CHOICES, default='limited_form',
     )
@@ -212,6 +229,8 @@ class FormDefinition(models.Model):
     order = models.PositiveIntegerField(default=0)
 
     class Meta:
+        verbose_name = 'Form Detail'
+        verbose_name_plural = 'Form Details'
         ordering = ['order', 'code']
         unique_together = ['sub_package', 'code']
 

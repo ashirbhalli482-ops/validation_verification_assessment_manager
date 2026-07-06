@@ -5,8 +5,9 @@ from django.utils import timezone
 from .models import (
     CustomUser, Company, PackageTemplate, PackageAuthorization, AuthorizedForm,
     LibraryDocument, DropdownList, DropdownOption, Project, TeamMember,
-    EmployeeRecord, FormRecord, USER_TYPE_CHOICES, TEAM_ROLE_CHOICES,
+    EmployeeRecord, FormRecord, FormDefinition, USER_TYPE_CHOICES, TEAM_ROLE_CHOICES,
     LIBRARY_CATEGORY_CHOICES, PROJECT_PHASE_CHOICES, PROJECT_DOCUMENT_TYPE_CHOICES,
+    FORM_TYPE_CHOICES, FORM_TYPE_TO_CATEGORY,
 )
 import os
 import re
@@ -610,6 +611,42 @@ def build_package_selection_rows(form_definitions):
             'limited2': col_limited_2[i] if i < len(col_limited_2) else None,
         })
     return rows
+
+
+class FormDetailsForm(forms.ModelForm):
+    class Meta:
+        model = FormDefinition
+        fields = ['code', 'name', 'form_type', 'description']
+        widgets = {
+            'code': forms.TextInput(attrs={
+                'class': 'form-control',
+            }),
+            'name': forms.TextInput(attrs={'class': 'form-control'}),
+            'form_type': forms.Select(attrs={'class': 'form-control'}),
+            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['code'].label = 'Form Number'
+        self.fields['name'].label = 'Form Name'
+        self.fields['form_type'].label = 'Form Type'
+        self.fields['form_type'].choices = [('', '---------')] + list(FORM_TYPE_CHOICES)
+
+    def clean_code(self):
+        code = (self.cleaned_data.get('code') or '').strip().upper()
+        if not code:
+            raise forms.ValidationError('Form number is required.')
+        return code
+
+    def save(self, commit=True):
+        form_def = super().save(commit=False)
+        form_type = self.cleaned_data.get('form_type')
+        if form_type:
+            form_def.category = FORM_TYPE_TO_CATEGORY.get(form_type, 'limited_form')
+        if commit:
+            form_def.save()
+        return form_def
 
 
 class PackageTemplateForm(forms.ModelForm):

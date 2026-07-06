@@ -1,0 +1,26 @@
+{% extends 'core/base.html' %}
+{% block breadcrumb %}
+<li class="breadcrumb-item">Admin</li>
+<li class="breadcrumb-item"><a href="{% url 'core:form-details-list' %}">Form Details</a></li>
+<li class="breadcrumb-item active">{{ form_def.code }}</li>
+{% endblock %}
+{% block content %}
+<div class="container-fluid">
+  <div class="card mb-3">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <strong>{{ form_def.code }} — {{ form_def.name }}</strong>
+      <div>
+        <a href="{% url 'core:form-details-edit' form_def.pk %}" class="btn btn-sm btn-info">Edit</a>
+        <a href="{% url 'core:form-details-list' %}" class="btn btn-sm btn-secondary">Back</a>
+      </div>
+    </div>
+    <div class="card-body">
+      <p><strong>Form Number:</strong> {{ form_def.code }}</p>
+      <p><strong>Form Name:</strong> {{ form_def.name }}</p>
+      <p><strong>Form Type:</strong> {{ form_def.get_form_type_display }}</p>
+      <p><strong>Sub-Package:</strong> {{ form_def.sub_package.code }} ({{ form_def.sub_package.package_template.name }})</p>
+      <p><strong>Description:</strong> {{ form_def.description|default:'No description.' }}</p>
+    </div>
+  </div>
+</div>
+{% endblock %}

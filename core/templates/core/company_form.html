@@ -73,7 +73,7 @@
         <p class="text-muted small mb-3">Leave password blank to keep the current manager and package access password.</p>
         {% endif %}
 
-        {% if is_edit and package_rows %}
+        {% if is_edit and form_definition_groups %}
         {% include 'core/includes/forms_selection_table.html' with title="Forms Selection" help_text="Check forms under Option for Activation to allocate them to this company." %}
         {% elif is_edit %}
         <!-- <div class="alert alert-warning">

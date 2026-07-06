@@ -17,16 +17,16 @@ from .models import (
     CustomUser, Company, PackageTemplate, PackageAuthorization, PackageInstance,
     AuthorizedForm, LibraryDocument, DropdownList, DropdownOption, Project,
     TeamMember, EmployeeRecord, FormRecord, FormReview, FormDefinition,
-    SubPackage, Notification, notify_user,
+    SubPackage, Notification, notify_user, FORM_TYPE_CHOICES,
 )
 from .forms import (
     EmailLoginForm, UserRegistrationForm, AdminRegistrationForm, AdminUserEditForm,
     AdminSelfProfileForm, ManagerRegistrationForm, ManagerUserEditForm, UserProfileEditForm, AdminSetPasswordForm,
-    CompanyForm, PackageTemplateForm, PackageAuthorizationForm, LibraryDocumentForm,
-    CompanyCreateForm, CompanyEditForm, company_edit_initial, build_package_selection_rows,
+    CompanyForm, PackageAuthorizationForm, LibraryDocumentForm,
+    CompanyCreateForm, CompanyEditForm, company_edit_initial,
     DropdownListForm, DropdownOptionForm, ProjectForm, TeamMemberForm,
     EmployeeRecordForm, FormRecordForm, CVApprovalForm, ViewPackageSearchForm,
-    ProjectAccessForm,
+    ProjectAccessForm, FormDetailsForm,
 )
 from .access import (
     can_access_project, can_access_form, can_create_form_record,
@@ -54,6 +54,15 @@ def company_list_success_redirect(action, company_name='', projects=''):
         query += f'&company={quote(company_name)}'
     if projects:
         query += f'&projects={quote(str(projects))}'
+    return redirect(f'{url}?{query}')
+
+
+def form_details_list_success_redirect(action, form_code=''):
+    """Redirect to form details list with a popup action flag."""
+    url = reverse('core:form-details-list')
+    query = f'success={action}'
+    if form_code:
+        query += f'&form={quote(form_code)}'
     return redirect(f'{url}?{query}')
 
 
@@ -101,7 +110,7 @@ class DashboardView(LoginRequiredMixin, View):
                 'employee_count': CustomUser.objects.filter(user_type='employee').count(),
                 'company_count': Company.objects.count(),
                 'authorization_count': PackageAuthorization.objects.count(),
-                'package_count': PackageTemplate.objects.count(),
+                'form_details_count': FormDefinition.objects.count(),
                 'library_count': LibraryDocument.objects.count(),
             })
         elif user.user_type == 'manager':
@@ -444,15 +453,32 @@ class CompanyListView(AdminRequiredMixin, ListView):
         return ctx
 
 
+def _form_definitions_by_type(form_definitions):
+    """Group form definitions under their form-type headings."""
+    by_type = {key: [] for key, _ in FORM_TYPE_CHOICES}
+    for form_def in form_definitions:
+        by_type.setdefault(form_def.form_type, []).append(form_def)
+    return [
+        {'key': key, 'label': label, 'forms': by_type[key]}
+        for key, label in FORM_TYPE_CHOICES
+        if by_type.get(key)
+    ]
+
+
 def _company_package_context(package_template):
     if not package_template:
-        return {'package_rows': [], 'package_template': None}
+        return {
+            'form_definitions': [],
+            'form_definition_groups': [],
+            'package_template': None,
+        }
     form_definitions = FormDefinition.objects.filter(
         sub_package__package_template=package_template,
     ).order_by('order', 'code')
     return {
         'package_template': package_template,
-        'package_rows': build_package_selection_rows(form_definitions),
+        'form_definitions': form_definitions,
+        'form_definition_groups': _form_definitions_by_type(form_definitions),
     }
 
 
@@ -678,8 +704,8 @@ class CompanyDetailView(AdminRequiredMixin, View):
             pm_name = (mgr.get_full_name() or '').strip() or mgr.username
 
         active_count = inactive_count = 0
-        package_rows = []
         activated_form_ids = set()
+        pkg_ctx = {'form_definitions': [], 'form_definition_groups': []}
         if auth:
             for af in AuthorizedForm.objects.filter(
                 authorization=auth,
@@ -689,7 +715,7 @@ class CompanyDetailView(AdminRequiredMixin, View):
                 else:
                     inactive_count += 1
             activated_form_ids = _activated_form_ids(auth)
-            package_rows = _company_package_context(auth.package_template).get('package_rows', [])
+            pkg_ctx = _company_package_context(auth.package_template)
 
         return {
             'company': company,
@@ -698,8 +724,8 @@ class CompanyDetailView(AdminRequiredMixin, View):
             'manager_username': mgr.username if mgr else '',
             'active_form_count': active_count,
             'inactive_form_count': inactive_count,
-            'package_rows': package_rows,
             'activated_form_ids': activated_form_ids,
+            **pkg_ctx,
         }
 
     def get(self, request, pk):
@@ -730,60 +756,112 @@ class CompanyDeleteView(AdminRequiredMixin, DeleteView):
     context_object_name = 'object'
 
 
-# --- Admin: Package Templates ---
-class PackageTemplateListView(AdminRequiredMixin, ListView):
-    model = PackageTemplate
-    template_name = 'core/package_template_list.html'
-    context_object_name = 'packages'
+# --- Admin: Form Details (FormDefinition) ---
+def _default_sub_package_for_new_form():
+    template = PackageTemplate.objects.filter(is_active=True).first()
+    if not template:
+        return None
+    return (
+        template.sub_packages.filter(code='P1-C').first()
+        or template.sub_packages.order_by('order').first()
+    )
 
 
-class PackageTemplateCreateView(AdminRequiredMixin, View):
-    def get(self, request):
-        return render(request, 'core/package_template_form.html', {'form': PackageTemplateForm(), 'title': 'Create Package'})
+class FormDetailsListView(AdminRequiredMixin, ListView):
+    model = FormDefinition
+    template_name = 'core/form_details_list.html'
+    context_object_name = 'forms'
 
-    def post(self, request):
-        form = PackageTemplateForm(request.POST)
-        if form.is_valid():
-            pkg = form.save(commit=False)
-            pkg.created_by = request.user
-            pkg.save()
-            messages.success(request, 'Package template created.')
-            return redirect('core:package-template-list')
-        return render(request, 'core/package_template_form.html', {'form': form, 'title': 'Create Package'})
-
-
-class PackageTemplateUpdateView(AdminRequiredMixin, View):
-    def get(self, request, pk):
-        pkg = get_object_or_404(PackageTemplate, pk=pk)
-        return render(request, 'core/package_template_form.html', {'form': PackageTemplateForm(instance=pkg), 'title': 'Edit Package', 'package': pkg})
-
-    def post(self, request, pk):
-        pkg = get_object_or_404(PackageTemplate, pk=pk)
-        form = PackageTemplateForm(request.POST, instance=pkg)
-        if form.is_valid():
-            form.save()
-            messages.success(request, 'Package updated.')
-            return redirect('core:package-template-list')
-        return render(request, 'core/package_template_form.html', {'form': form, 'title': 'Edit Package', 'package': pkg})
-
-
-class PackageTemplateDeleteView(AdminRequiredMixin, DeleteView):
-    model = PackageTemplate
-    template_name = 'core/confirm_delete.html'
-    success_url = reverse_lazy('core:package-template-list')
-
-
-class PackageTemplateDetailView(AdminRequiredMixin, DetailView):
-    model = PackageTemplate
-    template_name = 'core/package_template_detail.html'
-    context_object_name = 'package'
+    def get_queryset(self):
+        return FormDefinition.objects.select_related(
+            'sub_package', 'sub_package__package_template',
+        ).order_by('code')
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
-        sub_packages = self.object.sub_packages.prefetch_related('forms').all()
-        ctx['sub_packages'] = sub_packages
-        ctx['form_count'] = sum(sub.forms.count() for sub in sub_packages)
+        ctx['success_action'] = self.request.GET.get('success', '')
+        ctx['success_form'] = self.request.GET.get('form', '')
         return ctx
+
+
+class FormDetailsCreateView(AdminRequiredMixin, View):
+    def get(self, request):
+        return render(request, 'core/form_details_form.html', {
+            'form': FormDetailsForm(),
+            'title': 'Create Form Details',
+        })
+
+    def post(self, request):
+        form = FormDetailsForm(request.POST)
+        if form.is_valid():
+            sub_package = _default_sub_package_for_new_form()
+            if not sub_package:
+                form.add_error(
+                    None,
+                    'No active package template found. Run seed_forms or create a package template first.',
+                )
+            else:
+                form_def = form.save(commit=False)
+                form_def.sub_package = sub_package
+                form_def.order = sub_package.forms.count()
+                form_def.save()
+                for auth in PackageAuthorization.objects.filter(
+                    package_template=sub_package.package_template,
+                ):
+                    AuthorizedForm.objects.get_or_create(
+                        authorization=auth,
+                        form_definition=form_def,
+                        defaults={'is_active': False},
+                    )
+                return form_details_list_success_redirect('created', form_def.code)
+        return render(request, 'core/form_details_form.html', {
+            'form': form,
+            'title': 'Create Form Details',
+        })
+
+
+class FormDetailsUpdateView(AdminRequiredMixin, View):
+    def get(self, request, pk):
+        form_def = get_object_or_404(FormDefinition, pk=pk)
+        return render(request, 'core/form_details_form.html', {
+            'form': FormDetailsForm(instance=form_def),
+            'title': 'Edit Form Details',
+            'form_def': form_def,
+        })
+
+    def post(self, request, pk):
+        form_def = get_object_or_404(FormDefinition, pk=pk)
+        form = FormDetailsForm(request.POST, instance=form_def)
+        if form.is_valid():
+            form.save()
+            return form_details_list_success_redirect('updated', form_def.code)
+        return render(request, 'core/form_details_form.html', {
+            'form': form,
+            'title': 'Edit Form Details',
+            'form_def': form_def,
+        })
+
+
+class FormDetailsDeleteView(AdminRequiredMixin, DeleteView):
+    model = FormDefinition
+    template_name = 'core/confirm_delete.html'
+    success_url = reverse_lazy('core:form-details-list')
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx['title'] = 'Delete Form Details'
+        return ctx
+
+    def form_valid(self, form):
+        form_code = self.object.code
+        self.object.delete()
+        return form_details_list_success_redirect('deleted', form_code)
+
+
+class FormDetailsDetailView(AdminRequiredMixin, DetailView):
+    model = FormDefinition
+    template_name = 'core/form_details_detail.html'
+    context_object_name = 'form_def'
 
 
 # --- Admin: Package Authorization ---

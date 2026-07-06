@@ -139,8 +139,24 @@ def can_access_library_document(user, document):
     ).exists()
 
 
+def _legacy_library_documents(auth_ids):
+    """Documents uploaded before client assignment, still authorized by package."""
+    from django.db.models import Exists, OuterRef
+    from .models import LibraryDocument
+
+    if not auth_ids:
+        return LibraryDocument.objects.none()
+    company_link = LibraryDocument.allowed_companies.through.objects.filter(
+        librarydocument_id=OuterRef('pk'),
+    )
+    return LibraryDocument.objects.filter(
+        ~Exists(company_link),
+        authorizations__authorization_id__in=auth_ids,
+        authorizations__is_active=True,
+    ).distinct()
+
+
 def get_authorized_library_documents(user):
-    from django.db.models import Count
     from .models import LibraryDocument
 
     if user.user_type == 'admin':
@@ -150,15 +166,16 @@ def get_authorized_library_documents(user):
         company = manager_company_for_user(user)
         auth_ids = list(user.package_authorizations.values_list('id', flat=True))
         if company:
-            assigned = LibraryDocument.objects.filter(allowed_companies=company)
-            legacy = LibraryDocument.objects.annotate(
-                company_count=Count('allowed_companies'),
-            ).filter(
-                company_count=0,
-                authorizations__authorization_id__in=auth_ids,
-                authorizations__is_active=True,
+            doc_ids = set(
+                LibraryDocument.objects.filter(
+                    allowed_companies=company,
+                ).values_list('pk', flat=True)
+            ) | set(
+                _legacy_library_documents(auth_ids).values_list('pk', flat=True)
             )
-            return (assigned | legacy).distinct().prefetch_related('allowed_companies')
+            return LibraryDocument.objects.filter(
+                pk__in=doc_ids,
+            ).prefetch_related('allowed_companies')
         if not auth_ids:
             return LibraryDocument.objects.none()
         doc_ids = AuthorizedLibraryDocument.objects.filter(
@@ -178,15 +195,16 @@ def get_authorized_library_documents(user):
             'project__package_instance__authorization_id', flat=True
         ))
         if company_ids:
-            assigned = LibraryDocument.objects.filter(allowed_companies__in=company_ids).distinct()
-            legacy = LibraryDocument.objects.annotate(
-                company_count=Count('allowed_companies'),
-            ).filter(
-                company_count=0,
-                authorizations__authorization_id__in=auth_ids,
-                authorizations__is_active=True,
+            doc_ids = set(
+                LibraryDocument.objects.filter(
+                    allowed_companies__in=company_ids,
+                ).values_list('pk', flat=True)
+            ) | set(
+                _legacy_library_documents(auth_ids).values_list('pk', flat=True)
             )
-            return (assigned | legacy).distinct().prefetch_related('allowed_companies')
+            return LibraryDocument.objects.filter(
+                pk__in=doc_ids,
+            ).prefetch_related('allowed_companies')
         if not auth_ids:
             return LibraryDocument.objects.none()
         doc_ids = AuthorizedLibraryDocument.objects.filter(
