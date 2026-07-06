@@ -12745,23 +12745,12 @@ hr.transparent {
 }
 
 .app-header.navbar .brand-gui {
-  /* height: 68px !important;
-  width: auto;
-  background: #fff;
-  border-radius: 14px;
-  box-shadow: 0 4px 24px rgba(0,0,0,0.18), 0 0 0 4px #fff;
-  padding: 8px 20px;
-  margin-left: 18px;
-  margin-right: 32px;
-  transition: box-shadow 0.2s, transform 0.2s;
-  border: 2px solid #4f8cff; */
-  height: 68px !important;
-  width: auto;
-  /* background: #fff; */
-  border-radius: 10px;
-  padding: 8px 20px;
-  margin-left: 10px;
-  margin-right: 32px;
+  height: 70px !important;
+    width: auto;
+    border-radius: 10px;
+    /* padding: 8px 20px; */
+    margin-left: 20px;
+    margin-right: 32px;
 }
 
 /* .app-header.navbar .brand-gui:hover {

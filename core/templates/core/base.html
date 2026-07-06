@@ -21,7 +21,7 @@
   <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.0.9/css/all.css" integrity="sha384-5SOiIsAziJl6AWe0HWRKTXlfcSHKmYV4RBF18PPJ173Kzn7jzMyFuTtk8JA7QQG1" crossorigin="anonymous">
   <link href="{% static 'core/css/simple-line-icons.min.css' %}" rel="stylesheet">
   <link href="{% static 'core/css/style.css' %}" rel="stylesheet">
-  <link href="{% static 'core/css/estilo.css' %}" rel="stylesheet">
+  <link href="{% static 'core/css/estilo.css' %}?v={{ STATIC_VERSION }}" rel="stylesheet">
 
 </head>
 {% block body %}

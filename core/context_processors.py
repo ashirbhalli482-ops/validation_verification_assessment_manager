@@ -1,3 +1,5 @@
+from django.conf import settings
+
 from core.models import CustomUser, Notification
 
 def logged_user_processor(request):
@@ -21,4 +23,8 @@ def notifications_processor(request):
     if request.user.is_authenticated:
         unread_notifications = Notification.objects.filter(recipient=request.user, read=False)[:10]
         return {'unread_notifications': unread_notifications}
-    return {'unread_notifications': []} 
+    return {'unread_notifications': []}
+
+
+def static_version_processor(request):
+    return {'STATIC_VERSION': getattr(settings, 'STATIC_VERSION', '1')} 

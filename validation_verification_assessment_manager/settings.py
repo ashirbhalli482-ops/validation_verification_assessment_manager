@@ -98,6 +98,7 @@ TEMPLATES = [
             'django.contrib.messages.context_processors.messages',
             'core.context_processors.logged_user_processor',
             'core.context_processors.notifications_processor',
+            'core.context_processors.static_version_processor',
         ],
         },
     },
@@ -156,7 +157,16 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 STATICFILES_DIRS = [
     os.path.join(BASE_DIR, 'core/static'),
 ]
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
+STATIC_VERSION = os.environ.get('STATIC_VERSION', '2')
+
+STORAGES = {
+    'default': {
+        'BACKEND': 'django.core.files.storage.FileSystemStorage',
+    },
+    'staticfiles': {
+        'BACKEND': 'whitenoise.storage.CompressedStaticFilesStorage',
+    },
+}
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'core/media')
