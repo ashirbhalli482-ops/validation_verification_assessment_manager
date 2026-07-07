@@ -18,7 +18,7 @@
                         {% if creating_admin %}
                         Enter a username, email, and password to create a new admin account.
                         {% else %}
-                        Enter user role, user name, designation, position title, email, and password.
+                        Enter user name, email, and password to create a new user.
                         {% endif %}
                     </p>
                     <form action="" method="post" enctype="multipart/form-data">
@@ -39,16 +39,7 @@
                             </div>
                             {% else %}
                             <div class="col-12 col-md-6 mb-3">
-                                {{ form.user_role.label_tag }}{{ form.user_role }}
-                            </div>
-                            <div class="col-12 col-md-6 mb-3">
                                 {{ form.username.label_tag }}{{ form.username }}
-                            </div>
-                            <div class="col-12 col-md-6 mb-3">
-                                {{ form.designation.label_tag }}{{ form.designation }}
-                            </div>
-                            <div class="col-12 col-md-6 mb-3">
-                                {{ form.position_title.label_tag }}{{ form.position_title }}
                             </div>
                             <div class="col-12 col-md-6 mb-3">
                                 {{ form.email.label_tag }}{{ form.email }}

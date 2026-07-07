@@ -53,44 +53,23 @@
                 <div class="card">
                     <div class="card-header">
                         <strong>{% if admin_users_only %}Admin List{% else %}User List{% endif %}</strong>
-                        {% if user.user_type == 'manager' %}
-                        <div class="float-right">
-                            <div class="btn-group" role="group">
-                                <button type="button" class="btn btn-sm btn-outline-primary" onclick="filterUsers('all')">All</button>
-                                <button type="button" class="btn btn-sm btn-outline-info" onclick="filterUsers('manager')">Managers</button>
-                                <button type="button" class="btn btn-sm btn-outline-success" onclick="filterUsers('employee')">Employees</button>
-                            </div>
-                        </div>
-                        {% endif %}
                     </div>
                     <div class="card-body">
                         <form method="get" class="form-row align-items-end mb-3">
-                            <div class="col-md-{% if admin_users_only %}10{% else %}2{% endif %} mb-2">
+                            <div class="col-md-{% if admin_users_only %}10{% else %}6{% endif %} mb-2">
                                 <input type="text" name="search" class="form-control" placeholder="Name or email..." value="{{ search_query }}">
                             </div>
                             {% if not admin_users_only %}
-                            <div class="col-md-2 mb-2">
-                                <select name="user_type" class="form-control">
-                                    <option value="">All Types</option>
-                                    <option value="manager" {% if user_type_filter == 'manager' %}selected{% endif %}>Manager</option>
-                                    <option value="employee" {% if user_type_filter == 'employee' %}selected{% endif %}>Employee</option>
-                                </select>
-                            </div>
-                            <div class="col-md-2 mb-2">
-                                <input type="text" name="designation" class="form-control" placeholder="Designation..." value="{{ designation_filter }}">
-                            </div>
-                            <div class="col-md-2 mb-2">
-                                <input type="text" name="supervisor" class="form-control" placeholder="Supervisor..." value="{{ supervisor_filter }}">
-                            </div>
-                            <div class="col-md-2 mb-2">
-                                <select name="active" class="form-control">
-                                    <option value="">All Status</option>
-                                    <option value="active" {% if active_filter == 'active' %}selected{% endif %}>Active</option>
-                                    <option value="inactive" {% if active_filter == 'inactive' %}selected{% endif %}>Inactive</option>
+                            <div class="col-md-4 mb-2">
+                                <select name="user_role" class="form-control">
+                                    <option value="">All User Roles</option>
+                                    {% for value, label in user_role_choices %}
+                                    <option value="{{ value }}" {% if user_role_filter == value %}selected{% endif %}>{{ label }}</option>
+                                    {% endfor %}
                                 </select>
                             </div>
                             {% endif %}
-                            <div class="col-md-{% if admin_users_only %}2{% else %}2{% endif %} mb-2">
+                            <div class="col-md-2 mb-2">
                                 <button type="submit" class="btn btn-primary w-100"><i class="fa fa-search"></i> Filter</button>
                             </div>
                         </form>
@@ -102,9 +81,7 @@
                                     <th class="text-nowrap" style="min-width:120px;">User</th>
                                     <th class="text-nowrap" style="min-width:160px;">Email</th>
                                     {% if not admin_users_only %}
-                                    <th class="text-nowrap d-none d-sm-table-cell" style="min-width:100px;">User Type</th>
-                                    <th class="text-nowrap d-none d-md-table-cell" style="min-width:110px;">Designation</th>
-                                    <th class="text-nowrap d-none d-md-table-cell" style="min-width:110px;">Supervisor</th>
+                                    <th class="text-nowrap d-none d-md-table-cell" style="min-width:130px;">User Role</th>
                                     {% endif %}
                                     <th class="text-nowrap d-none d-lg-table-cell" style="min-width:120px;">Activity</th>
                                     <th class="text-center text-nowrap" style="min-width:220px;">Actions</th>
@@ -120,20 +97,14 @@
                                 </div>
                             </td>
                             <td class="text-nowrap" style="min-width:120px;">
-                                {% if admin_users_only %}
                                 <div><strong>{{ user1.username }}</strong></div>
-                                {% else %}
-                                <div>{{ user1.get_full_name }}</div>
-                                {% endif %}
                                 <div class="small text-muted">
                                 Joined: {{ user1.date_joined|date:"F d, Y" }}
                                 </div>
                             </td>
                             <td class="text-nowrap" style="min-width:160px;">{{ user1.email }}</td>
                             {% if not admin_users_only %}
-                            <td class="text-nowrap d-none d-sm-table-cell" style="min-width:100px;">{{ user1.get_user_type_display }}</td>
-                            <td class="text-nowrap d-none d-md-table-cell" style="min-width:110px;">{{ user1.designation|default:'-' }}</td>
-                            <td class="text-nowrap d-none d-md-table-cell" style="min-width:110px;">{{ user1.under_supervision.get_full_name|default:'-' }}</td>
+                            <td class="text-nowrap d-none d-md-table-cell" style="min-width:130px;">{{ user1.get_user_role_display|default:'-' }}</td>
                             {% endif %}
                             <td class="text-nowrap d-none d-lg-table-cell" style="min-width:120px;">
                                 <div class="small text-muted">Last login</div>
@@ -165,7 +136,7 @@
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="{% if admin_users_only %}5{% else %}8{% endif %}" class="text-center text-muted py-4">
+                            <td colspan="{% if admin_users_only %}5{% else %}6{% endif %}" class="text-center text-muted py-4">
                                 {% if admin_users_only %}No admin users found.{% else %}No users found.{% endif %}
                             </td>
                         </tr>
@@ -178,10 +149,10 @@
                 <ul class="pagination justify-content-center">
                     {% if users.has_previous %}
                         <li class="page-item">
-                            <a class="page-link" href="?page=1{% if search_query %}&search={{ search_query }}{% endif %}{% if user_type_filter %}&user_type={{ user_type_filter }}{% endif %}{% if designation_filter %}&designation={{ designation_filter }}{% endif %}{% if supervisor_filter %}&supervisor={{ supervisor_filter }}{% endif %}{% if active_filter %}&active={{ active_filter }}{% endif %}">First</a>
+                            <a class="page-link" href="?page=1{% if search_query %}&search={{ search_query }}{% endif %}{% if user_role_filter %}&user_role={{ user_role_filter }}{% endif %}">First</a>
                         </li>
                         <li class="page-item">
-                            <a class="page-link" href="?page={{ users.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if user_type_filter %}&user_type={{ user_type_filter }}{% endif %}{% if designation_filter %}&designation={{ designation_filter }}{% endif %}{% if supervisor_filter %}&supervisor={{ supervisor_filter }}{% endif %}{% if active_filter %}&active={{ active_filter }}{% endif %}">Previous</a>
+                            <a class="page-link" href="?page={{ users.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if user_role_filter %}&user_role={{ user_role_filter }}{% endif %}">Previous</a>
                         </li>
                     {% endif %}
                     <li class="page-item active">
@@ -191,10 +162,10 @@
                     </li>
                     {% if users.has_next %}
                         <li class="page-item">
-                            <a class="page-link" href="?page={{ users.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if user_type_filter %}&user_type={{ user_type_filter }}{% endif %}{% if designation_filter %}&designation={{ designation_filter }}{% endif %}{% if supervisor_filter %}&supervisor={{ supervisor_filter }}{% endif %}{% if active_filter %}&active={{ active_filter }}{% endif %}">Next</a>
+                            <a class="page-link" href="?page={{ users.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if user_role_filter %}&user_role={{ user_role_filter }}{% endif %}">Next</a>
                         </li>
                         <li class="page-item">
-                            <a class="page-link" href="?page={{ users.paginator.num_pages }}{% if search_query %}&search={{ search_query }}{% endif %}{% if user_type_filter %}&user_type={{ user_type_filter }}{% endif %}{% if designation_filter %}&designation={{ designation_filter }}{% endif %}{% if supervisor_filter %}&supervisor={{ supervisor_filter }}{% endif %}{% if active_filter %}&active={{ active_filter }}{% endif %}">Last</a>
+                            <a class="page-link" href="?page={{ users.paginator.num_pages }}{% if search_query %}&search={{ search_query }}{% endif %}{% if user_role_filter %}&user_role={{ user_role_filter }}{% endif %}">Last</a>
                         </li>
                     {% endif %}
                 </ul>
@@ -206,30 +177,6 @@
         </div>
     </div>
 </div>
-
-{% if user.user_type == 'manager' %}
-<script>
-function filterUsers(userType) {
-    const table = document.getElementById('usersTable');
-    const rows = table.getElementsByTagName('tr');
-
-    for (let i = 1; i < rows.length; i++) {
-        const row = rows[i];
-        const userTypeCell = row.cells[3];
-
-        if (!userTypeCell) continue;
-
-        if (userType === 'all') {
-            row.style.display = '';
-        } else if (userTypeCell.textContent.trim().toLowerCase().includes(userType.toLowerCase())) {
-            row.style.display = '';
-        } else {
-            row.style.display = 'none';
-        }
-    }
-}
-</script>
-{% endif %}
 
 {% if success_action %}
 <div class="modal fade" id="userSuccessModal" tabindex="-1" role="dialog" aria-hidden="true">

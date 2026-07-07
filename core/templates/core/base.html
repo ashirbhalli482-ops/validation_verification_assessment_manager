@@ -158,7 +158,10 @@
                 <a class="nav-link" href="{% url 'core:users'%}"><i class="fa fa-user"></i> View Users</a>
               </li>
               <li class="nav-item">
-                <a class="nav-link" href="{% url 'core:team-member-list' %}"><i class="fa fa-users ml-2"></i> Authorized Team</a>
+                <a class="nav-link" href="{% url 'core:team-member-list' %}"><i class="fa fa-users ml-2"></i> View Authorized Teams</a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link" href="{% url 'core:library-list' %}?view=documents"><i class="fa fa-book ml-2"></i> Documents Library</a>
               </li>
               {% else %}
               <li class="nav-item">
@@ -191,7 +194,7 @@
                 <a class="nav-link" href="{% url 'core:library-upload' %}"><i class="fa fa-upload"></i> Upload Documents</a>
               </li>
               <li class="nav-item">
-                <a class="nav-link" href="{% url 'core:library-list' %}"><i class="fa fa-book ml-2"></i> Documents Library</a>
+                <a class="nav-link" href="{% url 'core:library-list' %}?view=documents"><i class="fa fa-book ml-2"></i> Documents Library</a>
               </li>
             </ul>
           </li>
@@ -200,19 +203,13 @@
             <a class="nav-link nav-dropdown-toggle" href="#"><i class="fa fa-briefcase"></i> Management</a>
             <ul class="nav-dropdown-items">
               <li class="nav-item">
-                <a class="nav-link" href="{% url 'core:project-list' %}"><i class="fa fa-folder ml-2"></i> Projects</a>
-              </li>
-              <li class="nav-item">
                 <a class="nav-link" href="{% url 'core:project-create' %}"><i class="fa fa-plus"></i> New Project</a>
-              </li>
-              <li class="nav-item">
-                <a class="nav-link" href="{% url 'core:users' %}"><i class="fa fa-users ml-2"></i> Manage Users</a>
               </li>
               <li class="nav-item">
                 <a class="nav-link" href="{% url 'core:new-user' %}"><i class="fa fa-user-plus ml-2"></i> Create User</a>
               </li>
               <li class="nav-item">
-                <a class="nav-link" href="{% url 'core:library-list' %}"><i class="fa fa-book ml-2"></i> Documents Library</a>
+                <a class="nav-link" href="{% url 'core:project-list' %}"><i class="fa fa-users ml-2"></i> Authorize Team</a>
               </li>
             </ul>
           </li>

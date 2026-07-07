@@ -10,6 +10,7 @@ from django.views import View
 from django.utils import timezone
 from django.db import transaction
 from django.db.models import Q
+from django.forms import formset_factory
 import json
 import mimetypes
 from urllib.parse import quote
@@ -18,7 +19,7 @@ from .models import (
     CustomUser, Company, PackageTemplate, PackageAuthorization, PackageInstance,
     AuthorizedForm, LibraryDocument, DropdownList, DropdownOption, Project,
     TeamMember, EmployeeRecord, FormRecord, FormReview, FormDefinition,
-    SubPackage, Notification, notify_user, FORM_TYPE_CHOICES,
+    SubPackage, Notification, notify_user, FORM_TYPE_CHOICES, USER_ROLE_CHOICES,
 )
 from .forms import (
     EmailLoginForm, UserRegistrationForm, AdminRegistrationForm, AdminUserEditForm,
@@ -224,10 +225,7 @@ class UsersView(ManagerOrAdminMixin, View):
     def get(self, request):
         user = request.user
         search = request.GET.get('search', '').strip()
-        user_type_filter = request.GET.get('user_type', '')
-        designation_filter = request.GET.get('designation', '').strip()
-        supervisor_filter = request.GET.get('supervisor', '').strip()
-        active_filter = request.GET.get('active', '')
+        user_role_filter = request.GET.get('user_role', '')
 
         if user.user_type == 'admin':
             users = CustomUser.objects.filter(user_type='admin')
@@ -240,19 +238,8 @@ class UsersView(ManagerOrAdminMixin, View):
                 )
         elif user.user_type == 'manager':
             users = get_manager_manageable_users(user).select_related('under_supervision')
-            if user_type_filter in ('manager', 'employee'):
-                users = users.filter(user_type=user_type_filter)
-            if designation_filter:
-                users = users.filter(designation__icontains=designation_filter)
-            if supervisor_filter:
-                users = users.filter(
-                    Q(under_supervision__first_name__icontains=supervisor_filter)
-                    | Q(under_supervision__last_name__icontains=supervisor_filter)
-                )
-            if active_filter == 'active':
-                users = users.filter(is_active=True)
-            elif active_filter == 'inactive':
-                users = users.filter(is_active=False)
+            if user_role_filter:
+                users = users.filter(user_role=user_role_filter)
             if search:
                 users = users.filter(
                     Q(username__icontains=search)
@@ -271,11 +258,9 @@ class UsersView(ManagerOrAdminMixin, View):
             'users': page_obj,
             'total_users': paginator.count,
             'logged_user': user,
-            'user_type_filter': user_type_filter,
+            'user_role_filter': user_role_filter,
+            'user_role_choices': USER_ROLE_CHOICES,
             'search_query': search,
-            'designation_filter': designation_filter,
-            'supervisor_filter': supervisor_filter,
-            'active_filter': active_filter,
             'admin_users_only': user.user_type == 'admin',
             'success_action': request.GET.get('success', ''),
             'success_user': request.GET.get('user', ''),
@@ -1392,42 +1377,62 @@ class ProjectDeleteView(AdminRequiredMixin, View):
 
 # --- Manager: Team Authorization ---
 class TeamMemberCreateView(ManagerRequiredMixin, View):
+    def _formset_class(self):
+        return formset_factory(TeamMemberForm, extra=1)
+
     def get(self, request, project_id):
         project = get_object_or_404(Project, pk=project_id, manager=request.user)
-        return render(request, 'core/team_member_form.html', {'form': TeamMemberForm(), 'project': project})
+        formset = self._formset_class()(form_kwargs={'manager': request.user})
+        return render(request, 'core/team_member_form.html', {'formset': formset, 'project': project})
 
     def post(self, request, project_id):
         project = get_object_or_404(Project, pk=project_id, manager=request.user)
-        form = TeamMemberForm(request.POST)
-        if form.is_valid():
-            member = form.save(commit=False)
-            member.project = project
-            user, _ = CustomUser.objects.get_or_create(
-                email=member.email,
-                defaults={
-                    'username': member.email.split('@')[0][:30],
-                    'first_name': member.name.split()[0] if member.name else '',
-                    'last_name': ' '.join(member.name.split()[1:]) if len(member.name.split()) > 1 else '',
-                    'user_type': 'employee',
-                }
-            )
-            pwd = project.vvb_password
-            user.set_password(pwd)
-            user.save()
-            member.user = user
-            member.save()
+        formset = self._formset_class()(request.POST, form_kwargs={'manager': request.user})
+        if formset.is_valid():
             access_url = request.build_absolute_uri(reverse('core:project-access', args=[project.pk]))
-            notify_user(
-                user,
-                f'You are authorized for project {project.project_number}. '
-                f'Email: {member.email} | Password: {project.vvb_password} | '
-                f'Access: {access_url}',
-                sender=request.user,
-                link=reverse('core:project-access', args=[project.pk]),
-            )
-            messages.success(request, f'{member.name} authorized. Notification sent.')
-            return redirect('core:project-detail', pk=project.pk)
-        return render(request, 'core/team_member_form.html', {'form': form, 'project': project})
+            authorized_names = []
+            for form in formset:
+                if not form.cleaned_data:
+                    continue
+                selected_user = form.cleaned_data.get('user')
+                if not selected_user:
+                    continue
+
+                selected_user.user_role = form.cleaned_data['user_role']
+                if form.cleaned_data.get('designation'):
+                    selected_user.designation = form.cleaned_data['designation']
+                if form.cleaned_data.get('position_title'):
+                    selected_user.position_title = form.cleaned_data['position_title']
+                selected_user.save()
+
+                member_name = selected_user.get_full_name() or selected_user.username
+                TeamMember.objects.update_or_create(
+                    project=project,
+                    email=selected_user.email,
+                    defaults={
+                        'name': member_name,
+                        'role': 'team_member',
+                        'user': selected_user,
+                        'is_active': True,
+                    },
+                )
+                notify_user(
+                    selected_user,
+                    f'You are authorized for project {project.project_number}. '
+                    f'Access: {access_url}',
+                    sender=request.user,
+                    link=reverse('core:project-access', args=[project.pk]),
+                )
+                authorized_names.append(member_name)
+
+            if authorized_names:
+                messages.success(
+                    request,
+                    f'{", ".join(authorized_names)} authorized. Notification sent.'
+                )
+                return redirect('core:project-detail', pk=project.pk)
+            messages.error(request, 'Select at least one user to authorize.')
+        return render(request, 'core/team_member_form.html', {'formset': formset, 'project': project})
 
 
 class TeamMemberDeleteView(ManagerRequiredMixin, View):

@@ -4,15 +4,58 @@
   <div class="card">
     <div class="card-header"><strong>Authorize Team Member — {{ project.project_number }}</strong></div>
     <div class="card-body">
-      <p><strong>VVB Password (shared):</strong> <code>{{ project.vvb_password }}</code> — all authorized users use this password with their email.</p>
       <form method="post">{% csrf_token %}
-        {% for field in form %}
-        <div class="form-group">{{ field.label_tag }}{{ field }}{% if field.help_text %}<small class="form-text text-muted">{{ field.help_text }}</small>{% endif %}</div>
-        {% endfor %}
+        {{ formset.management_form }}
+        <div id="member-forms">
+          {% for form in formset %}
+          <div class="member-form border rounded p-3 mb-3">
+            <div class="row">
+              <div class="col-12 col-md-6 mb-3">{{ form.user.label_tag }}{{ form.user }}</div>
+              <div class="col-12 col-md-6 mb-3">{{ form.user_role.label_tag }}{{ form.user_role }}</div>
+              <div class="col-12 col-md-6 mb-3">{{ form.designation.label_tag }}{{ form.designation }}</div>
+              <div class="col-12 col-md-6 mb-3">{{ form.position_title.label_tag }}{{ form.position_title }}</div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+
+        <div class="mb-3">
+          <button type="button" id="add-member" class="btn btn-outline-primary btn-sm">
+            <i class="fa fa-plus"></i> Add Member
+          </button>
+        </div>
+
         <button type="submit" class="btn btn-primary">Authorize &amp; Send Notification</button>
         <a href="{% url 'core:project-detail' project.pk %}" class="btn btn-secondary">Cancel</a>
       </form>
     </div>
   </div>
 </div>
+
+<div id="empty-member-form" style="display:none;">
+  <div class="member-form border rounded p-3 mb-3">
+    <div class="row">
+      <div class="col-12 col-md-6 mb-3">{{ formset.empty_form.user.label_tag }}{{ formset.empty_form.user }}</div>
+      <div class="col-12 col-md-6 mb-3">{{ formset.empty_form.user_role.label_tag }}{{ formset.empty_form.user_role }}</div>
+      <div class="col-12 col-md-6 mb-3">{{ formset.empty_form.designation.label_tag }}{{ formset.empty_form.designation }}</div>
+      <div class="col-12 col-md-6 mb-3">{{ formset.empty_form.position_title.label_tag }}{{ formset.empty_form.position_title }}</div>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    var addBtn = document.getElementById('add-member');
+    var totalForms = document.getElementById('id_form-TOTAL_FORMS');
+    var container = document.getElementById('member-forms');
+    var emptyTemplate = document.getElementById('empty-member-form').innerHTML;
+
+    addBtn.addEventListener('click', function () {
+      var index = parseInt(totalForms.value, 10);
+      var newForm = emptyTemplate.replace(/__prefix__/g, index);
+      container.insertAdjacentHTML('beforeend', newForm);
+      totalForms.value = index + 1;
+    });
+  });
+</script>
 {% endblock %}

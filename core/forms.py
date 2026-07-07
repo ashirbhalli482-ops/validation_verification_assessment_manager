@@ -196,28 +196,12 @@ MANAGER_USER_TYPE_CHOICES = [
 
 
 class ManagerRegistrationForm(UserCreationForm):
-    """Managers create team member accounts with a verification role."""
-    user_role = forms.ChoiceField(
-        choices=[('', '---------')] + list(USER_ROLE_CHOICES),
-        label='User Role',
-        widget=forms.Select(attrs={'class': 'form-control'}),
-    )
+    """Managers create team member accounts (role/designation are set per project)."""
     username = forms.CharField(
         max_length=150,
         required=True,
         label='User name',
         widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Enter username'}),
-    )
-    designation = forms.CharField(
-        max_length=100,
-        required=False,
-        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Enter designation'}),
-    )
-    position_title = forms.CharField(
-        max_length=150,
-        required=False,
-        label='Position Title',
-        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Enter position title'}),
     )
     email = forms.EmailField(
         required=True,
@@ -234,10 +218,7 @@ class ManagerRegistrationForm(UserCreationForm):
 
     class Meta:
         model = CustomUser
-        fields = [
-            'user_role', 'username', 'designation', 'position_title',
-            'email', 'password1', 'password2',
-        ]
+        fields = ['username', 'email', 'password1', 'password2']
 
     def __init__(self, *args, **kwargs):
         self.user = kwargs.pop('user', None)
@@ -249,18 +230,9 @@ class ManagerRegistrationForm(UserCreationForm):
             raise forms.ValidationError('A user with this email already exists.')
         return email
 
-    def clean_user_role(self):
-        user_role = self.cleaned_data.get('user_role')
-        if not user_role:
-            raise forms.ValidationError('Select a user role.')
-        return user_role
-
     def save(self, commit=True):
         user = super().save(commit=False)
         user.email = self.cleaned_data['email']
-        user.designation = self.cleaned_data.get('designation', '')
-        user.user_role = self.cleaned_data['user_role']
-        user.position_title = self.cleaned_data.get('position_title', '')
         user.user_type = 'employee'
         if self.user:
             user.created_by = self.user
@@ -754,15 +726,38 @@ class ProjectForm(forms.ModelForm):
             self.fields['year'].initial = timezone.now().year
 
 
-class TeamMemberForm(forms.ModelForm):
-    class Meta:
-        model = TeamMember
-        fields = ['name', 'email', 'role']
-        widgets = {
-            'name': forms.TextInput(attrs={'class': 'form-control'}),
-            'email': forms.EmailInput(attrs={'class': 'form-control'}),
-            'role': forms.Select(attrs={'class': 'form-control'}),
-        }
+class TeamMemberForm(forms.Form):
+    """Authorize an existing user (created by the manager) onto a project."""
+    user = forms.ModelChoiceField(
+        queryset=CustomUser.objects.none(),
+        label='User',
+        empty_label='--------- Select a user ---------',
+        widget=forms.Select(attrs={'class': 'form-control'}),
+    )
+    user_role = forms.ChoiceField(
+        choices=[('', '---------')] + list(USER_ROLE_CHOICES),
+        label='User Role',
+        widget=forms.Select(attrs={'class': 'form-control'}),
+    )
+    designation = forms.CharField(
+        max_length=100,
+        required=False,
+        label='Designation',
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Enter designation'}),
+    )
+    position_title = forms.CharField(
+        max_length=150,
+        required=False,
+        label='Position Title',
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Enter position title'}),
+    )
+
+    def __init__(self, *args, manager=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        queryset = CustomUser.objects.filter(user_type='employee')
+        if manager is not None:
+            queryset = queryset.filter(created_by=manager)
+        self.fields['user'].queryset = queryset.order_by('first_name', 'last_name', 'username')
 
 
 class EmployeeRecordForm(forms.ModelForm):
