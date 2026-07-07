@@ -4,6 +4,21 @@
 <li class="breadcrumb-item active">Form Details</li>
 {% endblock %}
 {% block content %}
+<style>
+  /* Keep the Form Details table layout consistent across environments
+     even if external CSS is slow/partial to load (e.g. on Render). */
+  #formDetailsTable th,
+  #formDetailsTable td.form-details-actions {
+    white-space: nowrap;
+  }
+  #formDetailsTable td.form-details-actions .btn {
+    display: inline-block;
+    margin-bottom: 2px;
+  }
+  #formDetailsTable td.form-details-desc {
+    min-width: 320px;
+  }
+</style>
 <div class="container-fluid">
   <div class="card">
     <div class="card-header d-flex justify-content-between align-items-center">
@@ -11,7 +26,7 @@
       <a href="{% url 'core:form-details-create' %}" class="btn btn-primary btn-sm"><i class="fa fa-plus"></i> Create Form Details</a>
     </div>
     <div class="card-body">
-      <table class="table table-striped">
+      <table id="formDetailsTable" class="table table-striped">
         <thead>
           <tr>
             <th>Form Number</th>
@@ -27,8 +42,8 @@
             <td>{{ form_def.code }}</td>
             <td>{{ form_def.name }}</td>
             <td>{{ form_def.get_form_type_display }}</td>
-            <td>{{ form_def.description|truncatechars:60 }}</td>
-            <td>
+            <td class="form-details-desc">{{ form_def.description|truncatechars:60 }}</td>
+            <td class="form-details-actions">
               <a href="{% url 'core:form-details-detail' form_def.pk %}" class="btn btn-sm btn-primary">View</a>
               <a href="{% url 'core:form-details-edit' form_def.pk %}" class="btn btn-sm btn-info">Edit</a>
               <a href="{% url 'core:form-details-delete' form_def.pk %}" class="btn btn-sm btn-danger">Delete</a>
