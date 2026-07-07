@@ -11,6 +11,8 @@ def remove_seeded_forms(apps, schema_editor):
 
 class Migration(migrations.Migration):
 
+    atomic = False
+
     dependencies = [
         ('core', '0023_customuser_user_role_position_title'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
