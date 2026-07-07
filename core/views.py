@@ -26,7 +26,7 @@ from .forms import (
     AdminSelfProfileForm, ManagerRegistrationForm, ManagerUserEditForm, UserProfileEditForm, AdminSetPasswordForm,
     CompanyForm, PackageAuthorizationForm, LibraryDocumentForm,
     CompanyCreateForm, CompanyEditForm, company_edit_initial,
-    DropdownListForm, DropdownOptionForm, ProjectForm, TeamMemberForm,
+    DropdownListForm, DropdownOptionForm, ProjectForm, TeamMemberForm, TeamMemberEditForm,
     EmployeeRecordForm, FormRecordForm, CVApprovalForm, ViewPackageSearchForm,
     ProjectAccessForm, FormDetailsForm,
 )
@@ -286,8 +286,14 @@ class UserProfileView(LoginRequiredMixin, View):
         if not request.user.can_manage_user(profile) and request.user != profile:
             messages.error(request, 'Access denied.')
             return redirect('core:dashboard')
+        project_authorizations = (
+            profile.team_assignments.filter(is_active=True)
+            .select_related('project')
+            .order_by('project__project_number')
+        )
         return render(request, 'core/user.html', {
             'user_view': profile,
+            'project_authorizations': project_authorizations,
             'success_action': request.GET.get('success', ''),
             'success_user': request.GET.get('user', ''),
         })
@@ -990,6 +996,11 @@ class LibraryDocumentListView(LoginRequiredMixin, ListView):
     def get_queryset(self):
         return get_authorized_library_documents(self.request.user)
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['error_action'] = self.request.GET.get('error', '')
+        return context
+
 
 class LibraryDocumentCreateView(AdminRequiredMixin, View):
     def get(self, request):
@@ -1016,28 +1027,30 @@ class LibraryDocumentDeleteView(AdminRequiredMixin, DeleteView):
     success_url = reverse_lazy('core:library-list')
 
 
+def _library_redirect_with_error(request, error_code):
+    """Redirect back to the library list, preserving the Documents tab, with an error popup flag."""
+    url = reverse('core:library-list')
+    params = []
+    if 'view=documents' in request.META.get('HTTP_REFERER', ''):
+        params.append('view=documents')
+    params.append(f'error={error_code}')
+    return redirect(f'{url}?{"&".join(params)}')
+
+
 def _serve_library_document(request, pk, as_attachment):
     doc = get_object_or_404(LibraryDocument, pk=pk)
     if not can_access_library_document(request.user, doc):
-        messages.error(request, 'You are not authorized to access this document.')
-        return redirect('core:dashboard')
+        return _library_redirect_with_error(request, 'unauthorized')
     if as_attachment and request.user.user_type != 'admin':
-        messages.error(request, 'You are not authorized to download this document.')
-        return redirect('core:library-list')
+        return _library_redirect_with_error(request, 'download_forbidden')
     if not doc.file:
-        messages.error(request, 'This document file is no longer available.')
-        return redirect('core:library-list')
+        return _library_redirect_with_error(request, 'file_missing')
     filename = doc.file.name.split('/')[-1]
     content_type, _ = mimetypes.guess_type(filename)
     try:
         file_handle = doc.file.open('rb')
     except (FileNotFoundError, ValueError, OSError):
-        messages.error(
-            request,
-            'This document file could not be found on the server. '
-            'Please ask an admin to re-upload it.'
-        )
-        return redirect('core:library-list')
+        return _library_redirect_with_error(request, 'file_missing')
     return FileResponse(
         file_handle,
         as_attachment=as_attachment,
@@ -1424,6 +1437,9 @@ class TeamMemberCreateView(ManagerRequiredMixin, View):
                     defaults={
                         'name': member_name,
                         'role': 'team_member',
+                        'user_role': form.cleaned_data['user_role'],
+                        'designation': form.cleaned_data.get('designation', ''),
+                        'position_title': form.cleaned_data.get('position_title', ''),
                         'user': selected_user,
                         'is_active': True,
                     },
@@ -1445,6 +1461,28 @@ class TeamMemberCreateView(ManagerRequiredMixin, View):
                 return redirect('core:project-detail', pk=project.pk)
             messages.error(request, 'Select at least one user to authorize.')
         return render(request, 'core/team_member_form.html', {'formset': formset, 'project': project})
+
+
+class TeamMemberEditView(ManagerRequiredMixin, View):
+    """Edit an authorized member's user role, designation and position for a project."""
+    def get(self, request, pk):
+        member = get_object_or_404(TeamMember, pk=pk, project__manager=request.user)
+        form = TeamMemberEditForm(instance=member)
+        return render(request, 'core/team_member_edit_form.html', {'form': form, 'member': member})
+
+    def post(self, request, pk):
+        member = get_object_or_404(TeamMember, pk=pk, project__manager=request.user)
+        form = TeamMemberEditForm(request.POST, instance=member)
+        if form.is_valid():
+            form.save()
+            if member.user:
+                member.user.user_role = member.user_role
+                member.user.designation = member.designation
+                member.user.position_title = member.position_title
+                member.user.save()
+            messages.success(request, f'{member.name} updated for project {member.project.project_number}.')
+            return redirect('core:project-detail', pk=member.project_id)
+        return render(request, 'core/team_member_edit_form.html', {'form': form, 'member': member})
 
 
 class TeamMemberDeleteView(ManagerRequiredMixin, View):

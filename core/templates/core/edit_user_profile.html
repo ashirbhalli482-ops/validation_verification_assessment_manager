@@ -35,11 +35,6 @@
                                     <div class="mt-2">
                                         <strong>Username:</strong> {{ target_user.username }}<br>
                                         <strong>Email:</strong> {{ target_user.email }}<br>
-                                        <strong>User Type:</strong> {{ target_user.get_user_type_display }}<br>
-                                        {% if not editing_admin %}
-                                        <strong>Designation:</strong> {{ target_user.designation|default:'-' }}<br>
-                                        <strong>Supervisor:</strong> {{ target_user.under_supervision.get_full_name|default:'-' }}<br>
-                                        {% endif %}
                                         <strong>Status:</strong> {% if target_user.is_active %}Active{% else %}Inactive{% endif %}<br>
                                         <strong>Date Joined:</strong> {{ target_user.date_joined|date:"F d, Y" }}
                                     </div>
@@ -93,13 +88,6 @@
                                         {% if form.designation.errors %}<div class="text-danger small">{{ form.designation.errors }}</div>{% endif %}
                                     </div>
                                     {% endif %}
-                                    {% if form.user_type %}
-                                    <div class="form-group">
-                                        <label for="{{ form.user_type.id_for_label }}">User Type</label>
-                                        {{ form.user_type }}
-                                        {% if form.user_type.errors %}<div class="text-danger small">{{ form.user_type.errors }}</div>{% endif %}
-                                    </div>
-                                    {% endif %}
                                     {% if form.under_supervision %}
                                     <div class="form-group">
                                         <label for="{{ form.under_supervision.id_for_label }}">Supervisor</label>
@@ -123,9 +111,7 @@
                                     <div class="btn-group flex-wrap" role="group">
                                         <button type="submit" class="btn btn-primary">{% if editing_admin %}Update Admin{% else %}Update Profile{% endif %}</button>
                                         <a href="{% url 'core:users' %}" class="btn btn-secondary">Cancel</a>
-                                        {% if user.user_type == 'admin' %}
-                                        <a href="{% url 'core:admin-set-password' target_user.id %}" class="btn btn-warning">Change Password</a>
-                                        {% endif %}
+                                        <a href="{% url 'core:admin-set-password' target_user.id %}" class="btn btn-warning">Reset Password</a>
                                     </div>
                                 </form>
                             </div>

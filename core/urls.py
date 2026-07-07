@@ -65,6 +65,7 @@ urlpatterns = [
     path('projects/<int:pk>/delete/', views.ProjectDeleteView.as_view(), name='project-delete'),
     path('projects/<int:project_id>/access/', views.ProjectAccessView.as_view(), name='project-access'),
     path('projects/<int:project_id>/team/add/', views.TeamMemberCreateView.as_view(), name='team-member-create'),
+    path('team/<int:pk>/edit/', views.TeamMemberEditView.as_view(), name='team-member-edit'),
     path('team/<int:pk>/remove/', views.TeamMemberDeleteView.as_view(), name='team-member-remove'),
 
     # Form Records & Workflow

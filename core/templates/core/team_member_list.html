@@ -17,10 +17,9 @@
           <tr>
             <th>Name</th>
             <th>Email</th>
-            <th>Role</th>
-            <th>Project</th>
+            <th>Project Number</th>
             <th>Authorized</th>
-            <th>Action</th>
+            <th>Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -28,16 +27,22 @@
           <tr>
             <td>{{ member.name }}</td>
             <td>{{ member.email }}</td>
-            <td>{{ member.get_role_display }}</td>
-            <td>{{ member.project.project_number }} — {{ member.project.company_name }}</td>
+            <td>{{ member.project.project_number }}</td>
             <td>{{ member.authorized_at|date:"M d, Y" }}</td>
-            <td>
-              <a href="{% url 'core:project-detail' member.project.pk %}" class="btn btn-sm btn-info">Open Project</a>
+            <td class="text-nowrap">
+              {% if member.user %}
+              <a href="{% url 'core:user' member.user.id %}" class="btn btn-sm btn-info">View</a>
+              {% endif %}
+              <a href="{% url 'core:team-member-edit' member.pk %}" class="btn btn-sm btn-warning">Edit</a>
+              <form method="post" action="{% url 'core:team-member-remove' member.pk %}" class="d-inline"
+                    onsubmit="return confirm('Remove this member from project {{ member.project.project_number }}?');">{% csrf_token %}
+                <button class="btn btn-sm btn-danger">Delete</button>
+              </form>
             </td>
           </tr>
           {% empty %}
           <tr>
-            <td colspan="6" class="text-muted text-center">
+            <td colspan="5" class="text-muted text-center">
               No team members authorized yet.
               <a href="{% url 'core:project-list' %}">Open a project</a> and use <strong>Authorize Team</strong>.
             </td>

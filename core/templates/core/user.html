@@ -81,26 +81,55 @@
                                     <p>{{ user_view.last_login|date:"F d, Y H:i" }}</p>
                                         </div>
                                     </div>
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <strong>Active Status:</strong>
-                                    <p>{% if user_view.is_active %}Active{% else %}Inactive{% endif %}</p>
-                                </div>
-                                <div class="col-md-6">
-                                    <strong>Staff Status:</strong>
-                                    <p>{% if user_view.is_staff %}Staff{% else %}Regular User{% endif %}</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row mt-3">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header">
+                                <strong>Authorized Projects</strong>
+                            </div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table table-striped mb-0">
+                                        <thead>
+                                            <tr>
+                                                <th>Project Number</th>
+                                                <th>User Role</th>
+                                                <th>Designation</th>
+                                                <th>Position Title</th>
+                                                <th>Authorized</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for auth in project_authorizations %}
+                                            <tr>
+                                                <td>{{ auth.project.project_number }}</td>
+                                                <td>{{ auth.get_user_role_display|default:'-' }}</td>
+                                                <td>{{ auth.designation|default:'-' }}</td>
+                                                <td>{{ auth.position_title|default:'-' }}</td>
+                                                <td>{{ auth.authorized_at|date:"M d, Y" }}</td>
+                                            </tr>
+                                            {% empty %}
+                                            <tr>
+                                                <td colspan="5" class="text-muted text-center">This user is not authorized on any project yet.</td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
+
                 <div class="row mt-3">
                     <div class="col-12">
                         <a href="{% url 'core:users' %}" class="btn btn-secondary">Back to Users</a>
                         {% if user|can_manage_user:user_view and user_view != user %}
                         <a href="{% url 'core:edit-user-profile' user_view.id %}" class="btn btn-warning">Edit</a>
-                        <a href="{% url 'core:admin-set-password' user_view.id %}" class="btn btn-info">Set Password</a>
-                        <a href="{% url 'core:delete-user' user_view.id %}" class="btn btn-danger" onclick="return confirm('Delete this user?');">Delete</a>
                         {% endif %}
                     </div>
                 </div>

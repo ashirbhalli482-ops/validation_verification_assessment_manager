@@ -1,0 +1,39 @@
+{% extends 'core/base.html' %}
+{% block breadcrumb %}
+<li class="breadcrumb-item">Home</li>
+<li class="breadcrumb-item">Authorized Team</li>
+<li class="breadcrumb-item active">Edit Authorize Team</li>
+{% endblock %}
+{% block content %}
+<div class="container-fluid">
+  <div class="card">
+    <div class="card-header">
+      <strong>Edit Authorize Team — {{ member.project.project_number }}</strong>
+    </div>
+    <div class="card-body">
+      <p class="text-muted">
+        Editing authorization for <strong>{{ member.name }}</strong> ({{ member.email }})
+        on project <strong>{{ member.project.project_number }}</strong>.
+      </p>
+      <form method="post">{% csrf_token %}
+        <div class="row">
+          <div class="col-12 col-md-6 mb-3">
+            {{ form.user_role.label_tag }}{{ form.user_role }}
+          </div>
+          <div class="col-12 col-md-6 mb-3">
+            {{ form.designation.label_tag }}{{ form.designation }}
+          </div>
+          <div class="col-12 col-md-6 mb-3">
+            {{ form.position_title.label_tag }}{{ form.position_title }}
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary">Save Changes</button>
+        <a href="{% url 'core:project-detail' member.project.pk %}" class="btn btn-secondary">Cancel</a>
+      </form>
+      {% if form.errors %}
+      <div class="alert alert-danger mt-3">{{ form.errors }}</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

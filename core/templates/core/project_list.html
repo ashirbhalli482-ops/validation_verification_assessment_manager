@@ -27,13 +27,13 @@
       </div>
       {% else %}
       <table class="table table-striped">
-        <thead><tr><th>Project #</th><th>Company</th><th>Package</th>{% if user.user_type == 'admin' %}<th>Manager</th>{% endif %}<th>Actions</th></tr></thead>
+        <thead><tr><th>Project #</th><th>Company</th><th>Year</th>{% if user.user_type == 'admin' %}<th>Manager</th>{% endif %}<th>Actions</th></tr></thead>
         <tbody>
           {% for project in projects %}
           <tr>
             <td>{{ project.project_number }}</td>
             <td>{{ project.company_name }}</td>
-            <td>{{ project.package_instance.name }}</td>
+            <td>{{ project.year }}</td>
             {% if user.user_type == 'admin' %}<td>{{ project.manager.get_full_name }}</td>{% endif %}
             <td><a href="{% url 'core:project-detail' project.pk %}" class="btn btn-sm btn-info">Open</a></td>
           </tr>

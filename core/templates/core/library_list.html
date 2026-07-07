@@ -38,4 +38,46 @@
     </div>
   </div>
 </div>
+
+{% if error_action %}
+<div class="modal fade" id="libraryErrorModal" tabindex="-1" role="dialog" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" role="document">
+    <div class="modal-content">
+      <div class="modal-header bg-danger text-white">
+        <h5 class="modal-title">
+          {% if error_action == 'file_missing' %}Document Not Available
+          {% elif error_action == 'download_forbidden' %}Download Not Allowed
+          {% elif error_action == 'unauthorized' %}Access Denied
+          {% else %}Error{% endif %}
+        </h5>
+        <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body text-center">
+        <i class="fa fa-exclamation-triangle fa-3x text-danger mb-3"></i>
+        <p class="lead mb-0">
+          {% if error_action == 'file_missing' %}
+            This document file could not be found on the server. Please ask an admin to re-upload it.
+          {% elif error_action == 'download_forbidden' %}
+            You are not authorized to download this document.
+          {% elif error_action == 'unauthorized' %}
+            You are not authorized to access this document.
+          {% else %}
+            Something went wrong while opening this document.
+          {% endif %}
+        </p>
+      </div>
+      <div class="modal-footer justify-content-center">
+        <button type="button" class="btn btn-danger" data-dismiss="modal">OK</button>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    $('#libraryErrorModal').modal('show');
+  });
+</script>
+{% endif %}
 {% endblock %}

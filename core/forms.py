@@ -248,20 +248,12 @@ class ManagerUserEditForm(forms.ModelForm):
     """Edit manager/employee accounts — managers cannot change users to admin."""
     class Meta:
         model = CustomUser
-        fields = ['username', 'email', 'user_type', 'first_name', 'last_name', 'designation', 'is_active']
+        fields = ['username', 'email', 'is_active']
         widgets = {
             'username': forms.TextInput(attrs={'class': 'form-control'}),
             'email': forms.EmailInput(attrs={'class': 'form-control'}),
-            'user_type': forms.Select(attrs={'class': 'form-control'}),
-            'first_name': forms.TextInput(attrs={'class': 'form-control'}),
-            'last_name': forms.TextInput(attrs={'class': 'form-control'}),
-            'designation': forms.TextInput(attrs={'class': 'form-control'}),
             'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.fields['user_type'].choices = MANAGER_USER_TYPE_CHOICES
 
     def clean_user_type(self):
         user_type = self.cleaned_data['user_type']
@@ -758,6 +750,29 @@ class TeamMemberForm(forms.Form):
         if manager is not None:
             queryset = queryset.filter(created_by=manager)
         self.fields['user'].queryset = queryset.order_by('first_name', 'last_name', 'username')
+
+
+class TeamMemberEditForm(forms.ModelForm):
+    """Edit an authorized member's role/designation/position for a specific project."""
+    user_role = forms.ChoiceField(
+        choices=[('', '---------')] + list(USER_ROLE_CHOICES),
+        label='User Role',
+        widget=forms.Select(attrs={'class': 'form-control'}),
+    )
+
+    class Meta:
+        model = TeamMember
+        fields = ['user_role', 'designation', 'position_title']
+        widgets = {
+            'designation': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Enter designation'}),
+            'position_title': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Enter position title'}),
+        }
+
+    def clean_user_role(self):
+        user_role = self.cleaned_data.get('user_role')
+        if not user_role:
+            raise forms.ValidationError('Select a user role.')
+        return user_role
 
 
 class EmployeeRecordForm(forms.ModelForm):
