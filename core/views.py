@@ -1024,10 +1024,22 @@ def _serve_library_document(request, pk, as_attachment):
     if as_attachment and request.user.user_type != 'admin':
         messages.error(request, 'You are not authorized to download this document.')
         return redirect('core:library-list')
+    if not doc.file:
+        messages.error(request, 'This document file is no longer available.')
+        return redirect('core:library-list')
     filename = doc.file.name.split('/')[-1]
     content_type, _ = mimetypes.guess_type(filename)
+    try:
+        file_handle = doc.file.open('rb')
+    except (FileNotFoundError, ValueError, OSError):
+        messages.error(
+            request,
+            'This document file could not be found on the server. '
+            'Please ask an admin to re-upload it.'
+        )
+        return redirect('core:library-list')
     return FileResponse(
-        doc.file.open('rb'),
+        file_handle,
         as_attachment=as_attachment,
         filename=filename if as_attachment else None,
         content_type=content_type or 'application/octet-stream',
