@@ -22,9 +22,11 @@
             <td>{{ doc.get_category_display }}</td>
             <td>{{ doc.uploaded_at|date:"M d, Y" }}</td>
             <td>
-              <a href="{% url 'core:library-download' doc.pk %}" class="btn btn-sm btn-info">Download</a>
               {% if user.user_type == 'admin' %}
+              <a href="{% url 'core:library-download' doc.pk %}" class="btn btn-sm btn-info">Download</a>
               <a href="{% url 'core:library-delete' doc.pk %}" class="btn btn-sm btn-danger">Delete</a>
+              {% else %}
+              <a href="{% url 'core:library-view' doc.pk %}" class="btn btn-sm btn-primary" target="_blank" rel="noopener">View</a>
               {% endif %}
             </td>
           </tr>

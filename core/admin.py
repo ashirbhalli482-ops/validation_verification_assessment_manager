@@ -18,7 +18,7 @@ class CustomUserAdmin(UserAdmin):
 
 @admin.register(FormDefinition)
 class FormDefinitionAdmin(admin.ModelAdmin):
-    list_display = ['code', 'name', 'form_type', 'sub_package', 'order']
+    list_display = ['code', 'name', 'form_type', 'sub_package', 'created_by', 'order']
     list_filter = ['form_type', 'sub_package']
     search_fields = ['code', 'name', 'description']
     ordering = ['code']

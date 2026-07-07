@@ -4,8 +4,10 @@ from core.package_seed import ensure_default_package_seed
 
 
 class Command(BaseCommand):
-    help = 'Seed default package template with sub-packages P1-A through P1-D and forms'
+    help = 'Ensure default package template and sub-packages exist (no sample forms)'
 
     def handle(self, *args, **options):
         ensure_default_package_seed()
-        self.stdout.write(self.style.SUCCESS('Seeded package template, sub-packages, and forms.'))
+        self.stdout.write(self.style.SUCCESS(
+            'Ensured package template and sub-packages (admin-created forms only).',
+        ))

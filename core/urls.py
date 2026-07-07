@@ -47,6 +47,7 @@ urlpatterns = [
     path('library/', views.LibraryDocumentListView.as_view(), name='library-list'),
     path('admin/library/upload/', views.LibraryDocumentCreateView.as_view(), name='library-upload'),
     path('admin/library/<int:pk>/delete/', views.LibraryDocumentDeleteView.as_view(), name='library-delete'),
+    path('library/<int:pk>/view/', views.LibraryViewView.as_view(), name='library-view'),
     path('library/<int:pk>/download/', views.LibraryDownloadView.as_view(), name='library-download'),
     path('admin/dropdown-lists/', views.DropdownListView.as_view(), name='dropdown-list'),
     path('admin/dropdown-lists/create/', views.DropdownListCreateView.as_view(), name='dropdown-create'),

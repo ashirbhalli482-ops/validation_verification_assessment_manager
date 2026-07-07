@@ -207,12 +207,14 @@ FORM_TYPE_CHOICES = [
     ('project', 'Project'),
     ('master_record', 'Master Record'),
     ('proposal', 'Proposal'),
+    ('others', 'Others'),
 ]
 
 FORM_TYPE_TO_CATEGORY = {
     'project': 'limited_form',
     'master_record': 'master_record',
     'proposal': 'unlimited_use',
+    'others': 'limited_form',
 }
 
 
@@ -242,6 +244,11 @@ class FormDefinition(models.Model):
         help_text='Public forms (e.g. F-02-IRR) accessible without login'
     )
     order = models.PositiveIntegerField(default=0)
+    created_by = models.ForeignKey(
+        CustomUser, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='created_form_definitions',
+        help_text='Set when an admin creates this form via Form Details.',
+    )
 
     class Meta:
         verbose_name = 'Form Detail'
@@ -296,7 +303,8 @@ class PackageAuthorization(models.Model):
     def generate_package_instances(self):
         """Generate P1..Pn package instances and sync authorized forms/library."""
         for form_def in FormDefinition.objects.filter(
-            sub_package__package_template=self.package_template
+            sub_package__package_template=self.package_template,
+            created_by__isnull=False,
         ):
             AuthorizedForm.objects.get_or_create(
                 authorization=self,

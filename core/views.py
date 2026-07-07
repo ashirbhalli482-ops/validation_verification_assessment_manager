@@ -11,6 +11,7 @@ from django.utils import timezone
 from django.db import transaction
 from django.db.models import Q
 import json
+import mimetypes
 from urllib.parse import quote
 
 from .models import (
@@ -147,7 +148,7 @@ class DashboardView(LoginRequiredMixin, View):
                 'employee_count': CustomUser.objects.filter(user_type='employee').count(),
                 'company_count': Company.objects.count(),
                 'authorization_count': PackageAuthorization.objects.count(),
-                'form_details_count': FormDefinition.objects.count(),
+                'form_details_count': _admin_form_definitions().count(),
                 'library_count': LibraryDocument.objects.count(),
             })
         elif user.user_type == 'manager':
@@ -493,6 +494,12 @@ class CompanyListView(AdminRequiredMixin, ListView):
         return ctx
 
 
+def _admin_form_definitions(queryset=None):
+    """Forms created by admin via Form Details (excludes removed seed data)."""
+    qs = queryset if queryset is not None else FormDefinition.objects.all()
+    return qs.filter(created_by__isnull=False)
+
+
 def _form_definitions_by_type(form_definitions):
     """Group form definitions under their form-type headings."""
     by_type = {key: [] for key, _ in FORM_TYPE_CHOICES}
@@ -514,8 +521,10 @@ def _company_package_context(package_template):
             'form_definition_groups': [],
             'package_template': None,
         }
-    form_definitions = FormDefinition.objects.filter(
-        sub_package__package_template=package_template,
+    form_definitions = _admin_form_definitions(
+        FormDefinition.objects.filter(
+            sub_package__package_template=package_template,
+        )
     ).order_by('order', 'code')
     return {
         'package_template': package_template,
@@ -815,9 +824,10 @@ class FormDetailsListView(AdminRequiredMixin, ListView):
     context_object_name = 'forms'
 
     def get_queryset(self):
-        get_active_package_template()
-        return FormDefinition.objects.select_related(
-            'sub_package', 'sub_package__package_template',
+        return _admin_form_definitions(
+            FormDefinition.objects.select_related(
+                'sub_package', 'sub_package__package_template', 'created_by',
+            )
         ).order_by('code')
 
     def get_context_data(self, **kwargs):
@@ -847,6 +857,7 @@ class FormDetailsCreateView(AdminRequiredMixin, View):
                 form_def = form.save(commit=False)
                 form_def.sub_package = sub_package
                 form_def.order = sub_package.forms.count()
+                form_def.created_by = request.user
                 form_def.save()
                 for auth in PackageAuthorization.objects.filter(
                     package_template=sub_package.package_template,
@@ -865,7 +876,7 @@ class FormDetailsCreateView(AdminRequiredMixin, View):
 
 class FormDetailsUpdateView(AdminRequiredMixin, View):
     def get(self, request, pk):
-        form_def = get_object_or_404(FormDefinition, pk=pk)
+        form_def = get_object_or_404(FormDefinition, pk=pk, created_by__isnull=False)
         return render(request, 'core/form_details_form.html', {
             'form': FormDetailsForm(instance=form_def),
             'title': 'Edit Form Details',
@@ -873,7 +884,7 @@ class FormDetailsUpdateView(AdminRequiredMixin, View):
         })
 
     def post(self, request, pk):
-        form_def = get_object_or_404(FormDefinition, pk=pk)
+        form_def = get_object_or_404(FormDefinition, pk=pk, created_by__isnull=False)
         form = FormDetailsForm(request.POST, instance=form_def)
         if form.is_valid():
             form.save()
@@ -890,6 +901,9 @@ class FormDetailsDeleteView(AdminRequiredMixin, DeleteView):
     template_name = 'core/confirm_delete.html'
     success_url = reverse_lazy('core:form-details-list')
 
+    def get_queryset(self):
+        return _admin_form_definitions()
+
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         ctx['title'] = 'Delete Form Details'
@@ -905,6 +919,9 @@ class FormDetailsDetailView(AdminRequiredMixin, DetailView):
     model = FormDefinition
     template_name = 'core/form_details_detail.html'
     context_object_name = 'form_def'
+
+    def get_queryset(self):
+        return _admin_form_definitions()
 
 
 # --- Admin: Package Authorization ---
@@ -1014,13 +1031,32 @@ class LibraryDocumentDeleteView(AdminRequiredMixin, DeleteView):
     success_url = reverse_lazy('core:library-list')
 
 
+def _serve_library_document(request, pk, as_attachment):
+    doc = get_object_or_404(LibraryDocument, pk=pk)
+    if not can_access_library_document(request.user, doc):
+        messages.error(request, 'You are not authorized to access this document.')
+        return redirect('core:dashboard')
+    if as_attachment and request.user.user_type != 'admin':
+        messages.error(request, 'You are not authorized to download this document.')
+        return redirect('core:library-list')
+    filename = doc.file.name.split('/')[-1]
+    content_type, _ = mimetypes.guess_type(filename)
+    return FileResponse(
+        doc.file.open('rb'),
+        as_attachment=as_attachment,
+        filename=filename if as_attachment else None,
+        content_type=content_type or 'application/octet-stream',
+    )
+
+
+class LibraryViewView(LoginRequiredMixin, View):
+    def get(self, request, pk):
+        return _serve_library_document(request, pk, as_attachment=False)
+
+
 class LibraryDownloadView(LoginRequiredMixin, View):
     def get(self, request, pk):
-        doc = get_object_or_404(LibraryDocument, pk=pk)
-        if not can_access_library_document(request.user, doc):
-            messages.error(request, 'You are not authorized to access this document.')
-            return redirect('core:dashboard')
-        return FileResponse(doc.file.open(), as_attachment=True, filename=doc.file.name.split('/')[-1])
+        return _serve_library_document(request, pk, as_attachment=True)
 
 
 # --- Admin: Dropdown Lists ---
@@ -1291,7 +1327,7 @@ class ProjectDetailView(LoginRequiredMixin, View):
         report_records = []
         for sub in template.sub_packages.prefetch_related('forms'):
             form_rows = []
-            for f in sub.forms.all():
+            for f in sub.forms.filter(created_by__isnull=False):
                 if f.id in active_form_ids:
                     rec = record_by_form.get(f.id)
                     form_rows.append({'form_def': f, 'record': rec})

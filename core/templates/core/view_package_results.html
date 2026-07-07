@@ -38,7 +38,11 @@
             {% if ald.is_active %}
             <li>
               {{ ald.library_document.title }} ({{ ald.library_document.get_category_display }})
+              {% if user.user_type == 'admin' %}
               <a href="{% url 'core:library-download' ald.library_document.pk %}" class="btn btn-xs btn-outline-primary btn-sm">Download</a>
+              {% else %}
+              <a href="{% url 'core:library-view' ald.library_document.pk %}" class="btn btn-xs btn-outline-primary btn-sm" target="_blank" rel="noopener">View</a>
+              {% endif %}
             </li>
             {% endif %}
             {% empty %}
