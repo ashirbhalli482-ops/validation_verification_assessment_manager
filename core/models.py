@@ -56,6 +56,7 @@ USER_ROLE_CHOICES = [
     ('verifier_1', 'Verifier 1'),
     ('verifier_2', 'Verifier 2'),
     ('verifier_3', 'Verifier 3'),
+    ('verifier_in_training', 'Verifier In-Training'),
     ('lead_verifier', 'Lead Verifier'),
     ('co_lead_verifier', 'Co-Lead Verifier'),
     ('technical_expert_1', 'Technical Expert 1'),
@@ -136,6 +137,9 @@ class Company(models.Model):
     issue_date = models.DateField(null=True, blank=True)
     version = models.CharField(max_length=50, blank=True)
     designated_person = models.CharField(max_length=200, blank=True)
+    client_contact = models.CharField(
+        max_length=200, blank=True, verbose_name='Contact of Client',
+    )
     client_email = models.EmailField(blank=True)
     project_limit = models.PositiveIntegerField(
         default=1, validators=[MinValueValidator(1)],
@@ -258,6 +262,37 @@ class FormDefinition(models.Model):
 
     def __str__(self):
         return f'{self.code} - {self.name}'
+
+
+class FormTableLayout(models.Model):
+    """Admin-defined table structure (rows and column headings) for a form."""
+    form_definition = models.OneToOneField(
+        FormDefinition, on_delete=models.CASCADE, related_name='table_layout',
+    )
+    row_count = models.PositiveIntegerField(
+        default=1, validators=[MinValueValidator(1)],
+    )
+    column_headers = models.JSONField(
+        default=list,
+        help_text='Ordered list of column heading labels.',
+    )
+    created_by = models.ForeignKey(
+        CustomUser, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='created_form_table_layouts',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Form Table Layout'
+        verbose_name_plural = 'Form Table Layouts'
+
+    def __str__(self):
+        return f'Table layout for {self.form_definition.code}'
+
+    @property
+    def column_count(self):
+        return len(self.column_headers or [])
 
 
 class PackageAuthorization(models.Model):
@@ -445,6 +480,9 @@ class Project(models.Model):
         limit_choices_to={'user_type': 'manager'}
     )
     company_name = models.CharField(max_length=200)
+    client_contact = models.CharField(
+        max_length=200, blank=True, verbose_name='Contact of Client',
+    )
     factory_name = models.CharField(max_length=200, blank=True)
     location = models.CharField(max_length=200, blank=True)
     factory_address = models.TextField(blank=True)

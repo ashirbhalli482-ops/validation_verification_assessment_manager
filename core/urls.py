@@ -16,6 +16,7 @@ urlpatterns = [
     path('users/', views.UsersView.as_view(), name='users'),
     path('team-members/', views.ManagerTeamListView.as_view(), name='team-member-list'),
     path('users/profile', views.ProfileView.as_view(), name='profile'),
+    path('users/profile/reset-password/', views.ProfilePasswordResetView.as_view(), name='profile-reset-password'),
     path('users/<int:profile_id>/', views.UserProfileView.as_view(), name='user'),
     path('users/<int:user_id>/edit/', views.EditUserProfileView.as_view(), name='edit-user-profile'),
     path('users/<int:pk>/delete/', views.UserDeleteView.as_view(), name='delete-user'),
@@ -34,6 +35,15 @@ urlpatterns = [
     path('admin/form-details/<int:pk>/', views.FormDetailsDetailView.as_view(), name='form-details-detail'),
     path('admin/form-details/<int:pk>/edit/', views.FormDetailsUpdateView.as_view(), name='form-details-edit'),
     path('admin/form-details/<int:pk>/delete/', views.FormDetailsDeleteView.as_view(), name='form-details-delete'),
+
+    # Admin: Create Tables In Form
+    path('admin/form-tables/', views.FormTableInFormListView.as_view(), name='form-table-list'),
+    path('admin/form-tables/<int:pk>/edit/', views.FormTableLayoutEditView.as_view(), name='form-table-edit'),
+
+    # Admin: View Tables In Form
+    path('admin/view-form-tables/', views.FormTableViewInFormListView.as_view(), name='form-table-view-list'),
+    path('admin/view-form-tables/<int:pk>/', views.FormTableLayoutDetailView.as_view(), name='form-table-detail'),
+    path('admin/view-form-tables/<int:pk>/delete/', views.FormTableLayoutDeleteView.as_view(), name='form-table-delete'),
 
     # Admin: Package Authorization
     path('admin/authorize/', views.PackageAuthorizationListView.as_view(), name='package-authorization-list'),
@@ -59,6 +69,7 @@ urlpatterns = [
 
     # Projects (employees access via team authorization only)
     path('projects/', views.ProjectListView.as_view(), name='project-list'),
+    path('forms/view/', views.ManagerViewFormsView.as_view(), name='manager-view-forms'),
     path('projects/create/', views.ProjectCreateView.as_view(), name='project-create'),
     path('projects/<int:pk>/', views.ProjectDetailView.as_view(), name='project-detail'),
     path('projects/<int:pk>/edit/', views.ProjectUpdateView.as_view(), name='project-edit'),

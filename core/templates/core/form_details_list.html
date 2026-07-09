@@ -26,34 +26,39 @@
       <a href="{% url 'core:form-details-create' %}" class="btn btn-primary btn-sm"><i class="fa fa-plus"></i> Create Form Details</a>
     </div>
     <div class="card-body">
-      <table id="formDetailsTable" class="table table-striped">
-        <thead>
-          <tr>
-            <th>Form Number</th>
-            <th>Form Name</th>
-            <th>Form Type</th>
-            <th>Description</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for form_def in forms %}
-          <tr>
-            <td>{{ form_def.code }}</td>
-            <td>{{ form_def.name }}</td>
-            <td>{{ form_def.get_form_type_display }}</td>
-            <td class="form-details-desc">{{ form_def.description|truncatechars:60 }}</td>
-            <td class="form-details-actions">
-              <a href="{% url 'core:form-details-detail' form_def.pk %}" class="btn btn-sm btn-primary">View</a>
-              <a href="{% url 'core:form-details-edit' form_def.pk %}" class="btn btn-sm btn-info">Edit</a>
-              <a href="{% url 'core:form-details-delete' form_def.pk %}" class="btn btn-sm btn-danger">Delete</a>
-            </td>
-          </tr>
-          {% empty %}
-          <tr><td colspan="5" class="text-muted text-center">No forms defined yet. Create a new form using the button above.</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
+      {% for group in form_definition_groups %}
+      <section class="mb-4">
+        <h6 class="pkg-form-type-heading">{{ group.label }}</h6>
+        <table id="formDetailsTable" class="table table-striped mb-0">
+          <thead>
+            <tr>
+              <th>Form Number</th>
+              <th>Form Name</th>
+              <th>Form Type</th>
+              <th>Description</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for form_def in group.forms %}
+            <tr>
+              <td>{{ form_def.code }}</td>
+              <td>{{ form_def.name }}</td>
+              <td>{{ form_def.get_form_type_display }}</td>
+              <td class="form-details-desc">{{ form_def.description|truncatechars:60 }}</td>
+              <td class="form-details-actions">
+                <a href="{% url 'core:form-details-detail' form_def.pk %}" class="btn btn-sm btn-primary">View</a>
+                <a href="{% url 'core:form-details-edit' form_def.pk %}" class="btn btn-sm btn-info">Edit</a>
+                <a href="{% url 'core:form-details-delete' form_def.pk %}" class="btn btn-sm btn-danger">Delete</a>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </section>
+      {% empty %}
+      <p class="text-muted text-center mb-0">No forms defined yet. Create a new form using the button above.</p>
+      {% endfor %}
     </div>
   </div>
 </div>

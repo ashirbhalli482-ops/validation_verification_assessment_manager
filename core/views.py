@@ -1,5 +1,5 @@
 from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth import authenticate, login, logout, update_session_auth_hash
 from django.contrib import messages
 from django.http import FileResponse, Http404
 from django.core.paginator import Paginator
@@ -18,17 +18,18 @@ from urllib.parse import quote
 from .models import (
     CustomUser, Company, PackageTemplate, PackageAuthorization, PackageInstance,
     AuthorizedForm, LibraryDocument, DropdownList, DropdownOption, Project,
-    TeamMember, EmployeeRecord, FormRecord, FormReview, FormDefinition,
+    TeamMember, EmployeeRecord, FormRecord, FormReview, FormDefinition, FormTableLayout,
     SubPackage, Notification, notify_user, FORM_TYPE_CHOICES, USER_ROLE_CHOICES,
 )
 from .forms import (
     EmailLoginForm, UserRegistrationForm, AdminRegistrationForm, AdminUserEditForm,
     AdminSelfProfileForm, ManagerRegistrationForm, ManagerUserEditForm, UserProfileEditForm, AdminSetPasswordForm,
+    SelfPasswordChangeForm,
     CompanyForm, PackageAuthorizationForm, LibraryDocumentForm,
     CompanyCreateForm, CompanyEditForm, company_edit_initial,
     DropdownListForm, DropdownOptionForm, ProjectForm, TeamMemberForm, TeamMemberEditForm,
     EmployeeRecordForm, FormRecordForm, CVApprovalForm, ViewPackageSearchForm,
-    ProjectAccessForm, FormDetailsForm,
+    ProjectAccessForm, FormDetailsForm, FormTableLayoutForm,
 )
 from .access import (
     can_access_project, can_access_form, can_create_form_record,
@@ -63,6 +64,24 @@ def company_list_success_redirect(action, company_name='', projects=''):
 def form_details_list_success_redirect(action, form_code=''):
     """Redirect to form details list with a popup action flag."""
     url = reverse('core:form-details-list')
+    query = f'success={action}'
+    if form_code:
+        query += f'&form={quote(form_code)}'
+    return redirect(f'{url}?{query}')
+
+
+def form_table_list_success_redirect(action, form_code=''):
+    """Redirect to form table list with a popup action flag."""
+    url = reverse('core:form-table-list')
+    query = f'success={action}'
+    if form_code:
+        query += f'&form={quote(form_code)}'
+    return redirect(f'{url}?{query}')
+
+
+def form_table_view_list_success_redirect(action, form_code=''):
+    """Redirect to view tables list with a popup action flag."""
+    url = reverse('core:form-table-view-list')
     query = f'success={action}'
     if form_code:
         query += f'&form={quote(form_code)}'
@@ -329,6 +348,28 @@ class ProfileView(LoginRequiredMixin, View):
         })
 
 
+class ProfilePasswordResetView(LoginRequiredMixin, View):
+    """Allow employees and managers to reset their own password."""
+    def get(self, request):
+        if request.user.user_type == 'admin':
+            return redirect('core:admin-set-password', user_id=request.user.id)
+        return render(request, 'core/profile_reset_password.html', {
+            'form': SelfPasswordChangeForm(request.user),
+        })
+
+    def post(self, request):
+        if request.user.user_type == 'admin':
+            return redirect('core:admin-set-password', user_id=request.user.id)
+        form = SelfPasswordChangeForm(request.user, request.POST)
+        if form.is_valid():
+            request.user.set_password(form.cleaned_data['new_password1'])
+            request.user.save()
+            update_session_auth_hash(request, request.user)
+            messages.success(request, 'Your password has been updated successfully.')
+            return redirect('core:profile')
+        return render(request, 'core/profile_reset_password.html', {'form': form})
+
+
 class EditUserProfileView(LoginRequiredMixin, View):
     def _edit_form(self, editor, target, data=None):
         if editor.user_type == 'admin':
@@ -576,6 +617,7 @@ class CompanyCreateView(AdminRequiredMixin, View):
                     issue_date=form.cleaned_data.get('issue_date'),
                     version=form.cleaned_data.get('version', ''),
                     designated_person=form.cleaned_data.get('designated_person', ''),
+                    client_contact=form.cleaned_data.get('client_contact', ''),
                     client_email=form.cleaned_data['client_email'],
                     project_limit=form.cleaned_data['project_limit'],
                     created_by=request.user,
@@ -663,6 +705,7 @@ class CompanyUpdateView(AdminRequiredMixin, View):
             company.issue_date = form.cleaned_data.get('issue_date')
             company.version = form.cleaned_data.get('version', '')
             company.designated_person = form.cleaned_data.get('designated_person', '')
+            company.client_contact = form.cleaned_data.get('client_contact', '')
             company.client_email = form.cleaned_data['client_email']
             company.project_limit = form.cleaned_data['project_limit']
             company.save()
@@ -823,6 +866,7 @@ class FormDetailsListView(AdminRequiredMixin, ListView):
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
+        ctx['form_definition_groups'] = _form_definitions_by_type(ctx['forms'])
         ctx['success_action'] = self.request.GET.get('success', '')
         ctx['success_form'] = self.request.GET.get('form', '')
         return ctx
@@ -913,6 +957,122 @@ class FormDetailsDetailView(AdminRequiredMixin, DetailView):
 
     def get_queryset(self):
         return _admin_form_definitions()
+
+
+# --- Admin: Create Tables In Form ---
+class FormTableInFormListView(AdminRequiredMixin, ListView):
+    model = FormDefinition
+    template_name = 'core/form_table_list.html'
+    context_object_name = 'forms'
+
+    def get_queryset(self):
+        return _admin_form_definitions(
+            FormDefinition.objects.select_related('table_layout', 'created_by')
+        ).order_by('code')
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx['form_definition_groups'] = _form_definitions_by_type(ctx['forms'])
+        ctx['success_action'] = self.request.GET.get('success', '')
+        ctx['success_form'] = self.request.GET.get('form', '')
+        return ctx
+
+
+class FormTableLayoutEditView(AdminRequiredMixin, View):
+    """Define row count and column headings for a form table."""
+    def _form_def(self, pk):
+        return get_object_or_404(_admin_form_definitions(), pk=pk)
+
+    def get(self, request, pk):
+        form_def = self._form_def(pk)
+        layout = FormTableLayout.objects.filter(form_definition=form_def).first()
+        headers = list(layout.column_headers) if layout and layout.column_headers else ['']
+        form = FormTableLayoutForm(initial={'row_count': layout.row_count if layout else 1})
+        return render(request, 'core/form_table_edit.html', {
+            'form_def': form_def,
+            'layout': layout,
+            'form': form,
+            'column_headers': headers,
+        })
+
+    def post(self, request, pk):
+        form_def = self._form_def(pk)
+        layout = FormTableLayout.objects.filter(form_definition=form_def).first()
+        form = FormTableLayoutForm(request.POST)
+        headers = [h.strip() for h in request.POST.getlist('column_headers') if h.strip()]
+        if not form.is_valid():
+            return render(request, 'core/form_table_edit.html', {
+                'form_def': form_def,
+                'layout': layout,
+                'form': form,
+                'column_headers': headers or [''],
+            })
+        if not headers:
+            form.add_error(None, 'Add at least one column heading.')
+            return render(request, 'core/form_table_edit.html', {
+                'form_def': form_def,
+                'layout': layout,
+                'form': form,
+                'column_headers': [''],
+            })
+        FormTableLayout.objects.update_or_create(
+            form_definition=form_def,
+            defaults={
+                'row_count': form.cleaned_data['row_count'],
+                'column_headers': headers,
+                'created_by': request.user,
+            },
+        )
+        if request.GET.get('return') == 'view' or request.POST.get('return') == 'view':
+            return form_table_view_list_success_redirect('saved', form_def.code)
+        return form_table_list_success_redirect('saved', form_def.code)
+
+
+# --- Admin: View Tables In Form ---
+class FormTableViewInFormListView(AdminRequiredMixin, ListView):
+    model = FormDefinition
+    template_name = 'core/form_table_view_list.html'
+    context_object_name = 'forms'
+
+    def get_queryset(self):
+        return _admin_form_definitions(
+            FormDefinition.objects.select_related('table_layout', 'created_by')
+        ).order_by('code')
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx['form_definition_groups'] = _form_definitions_by_type(ctx['forms'])
+        ctx['success_action'] = self.request.GET.get('success', '')
+        ctx['success_form'] = self.request.GET.get('form', '')
+        return ctx
+
+
+class FormTableLayoutDetailView(AdminRequiredMixin, View):
+    """Read-only view of a form table layout."""
+    def get(self, request, pk):
+        form_def = get_object_or_404(_admin_form_definitions(), pk=pk)
+        layout = FormTableLayout.objects.filter(form_definition=form_def).first()
+        if not layout:
+            messages.error(request, 'No table has been created for this form yet.')
+            return redirect('core:form-table-view-list')
+        return render(request, 'core/form_table_detail.html', {
+            'form_def': form_def,
+            'layout': layout,
+            'row_range': range(layout.row_count),
+        })
+
+
+class FormTableLayoutDeleteView(AdminRequiredMixin, View):
+    """Delete only the table layout, not the form definition."""
+    def post(self, request, pk):
+        form_def = get_object_or_404(_admin_form_definitions(), pk=pk)
+        layout = FormTableLayout.objects.filter(form_definition=form_def).first()
+        if not layout:
+            messages.error(request, 'No table exists for this form.')
+            return redirect('core:form-table-view-list')
+        form_code = form_def.code
+        layout.delete()
+        return form_table_view_list_success_redirect('deleted', form_code)
 
 
 # --- Admin: Package Authorization ---
@@ -1320,6 +1480,77 @@ class ProjectCreateView(ManagerRequiredMixin, View):
         return render(request, 'core/project_form.html', {'form': form, 'title': 'Create Project'})
 
 
+def _build_project_form_groups(project, user=None, form_types=None):
+    """Authorized admin-created forms for a project, grouped by sub-package."""
+    auth = project.package_instance.authorization
+    template = auth.package_template
+    active_form_ids = set(
+        AuthorizedForm.objects.filter(
+            authorization=auth, is_active=True,
+        ).values_list('form_definition_id', flat=True)
+    )
+    records = FormRecord.objects.filter(project=project).select_related('form_definition')
+    record_by_form = {r.form_definition_id: r for r in records}
+    allowed_types = set(form_types) if form_types else None
+    restrict_to_project_type = (
+        user is not None
+        and user.is_authenticated
+        and user.user_type == 'employee'
+    )
+    sub_packages = []
+    for sub in template.sub_packages.prefetch_related('forms'):
+        form_rows = []
+        for f in sub.forms.filter(created_by__isnull=False):
+            if f.id not in active_form_ids:
+                continue
+            if allowed_types is not None and f.form_type not in allowed_types:
+                continue
+            if restrict_to_project_type and f.form_type != 'project':
+                continue
+            form_rows.append({
+                'form_def': f,
+                'record': record_by_form.get(f.id),
+            })
+        if form_rows:
+            sub_packages.append({'sub_package': sub, 'form_rows': form_rows})
+    return sub_packages
+
+
+class ManagerViewFormsView(ManagerRequiredMixin, View):
+    """Manager: view allocated forms across projects, grouped by sub-package."""
+    def get(self, request):
+        all_projects = Project.objects.filter(
+            manager=request.user,
+        ).select_related(
+            'package_instance',
+            'package_instance__authorization',
+            'package_instance__authorization__package_template',
+        ).order_by('project_number')
+
+        project_id = request.GET.get('project', '').strip()
+        projects = all_projects
+        if project_id:
+            projects = projects.filter(pk=project_id)
+
+        project_groups = []
+        for project in projects:
+            sub_packages = _build_project_form_groups(
+                project, form_types=['project'],
+            )
+            if sub_packages:
+                project_groups.append({
+                    'project': project,
+                    'sub_packages': sub_packages,
+                })
+
+        return render(request, 'core/manager_view_forms.html', {
+            'project_groups': project_groups,
+            'projects': all_projects,
+            'selected_project_id': project_id,
+            'show_project_heading': all_projects.count() != 1 or bool(project_id),
+        })
+
+
 class ProjectDetailView(LoginRequiredMixin, View):
     def get(self, request, pk):
         project = get_object_or_404(Project, pk=pk)
@@ -1327,24 +1558,14 @@ class ProjectDetailView(LoginRequiredMixin, View):
             messages.error(request, 'Access denied.')
             return redirect('core:dashboard')
         auth = project.package_instance.authorization
-        template = auth.package_template
-        active_form_ids = AuthorizedForm.objects.filter(
-            authorization=auth, is_active=True
-        ).values_list('form_definition_id', flat=True)
-        sub_packages = []
+        manager_form_types = ['project'] if request.user.user_type == 'manager' else None
+        sub_packages = _build_project_form_groups(
+            project, request.user, form_types=manager_form_types,
+        )
         records = FormRecord.objects.filter(project=project).select_related('form_definition')
-        record_by_form = {r.form_definition_id: r for r in records}
-        report_records = []
-        for sub in template.sub_packages.prefetch_related('forms'):
-            form_rows = []
-            for f in sub.forms.filter(created_by__isnull=False):
-                if f.id in active_form_ids:
-                    rec = record_by_form.get(f.id)
-                    form_rows.append({'form_def': f, 'record': rec})
-                    if rec and can_view_report(request.user, rec):
-                        report_records.append(rec)
-            if form_rows:
-                sub_packages.append({'sub_package': sub, 'form_rows': form_rows})
+        report_records = [
+            r for r in records if can_view_report(request.user, r)
+        ]
         team_member = get_team_member(request.user, project)
         return render(request, 'core/project_detail.html', {
             'project': project,
@@ -1521,7 +1742,7 @@ class FormRecordCreateView(LoginRequiredMixin, View):
             record.project = project
             record.form_definition = form_def
             record.created_by_user = request.user
-            record.data = {**_project_header_data(project), **_parse_form_data(request.POST)}
+            record.data = _build_record_data(request.POST, project=project, form_def=form_def)
             record.save()
             messages.success(request, 'Form record created.')
             return redirect('core:form-record-detail', pk=record.pk)
@@ -1534,6 +1755,12 @@ class FormRecordDetailView(LoginRequiredMixin, View):
         record = get_object_or_404(FormRecord, pk=pk)
         if not can_access_form(request.user, record.project, record.form_definition):
             return redirect('core:dashboard')
+        layout = FormTableLayout.objects.filter(
+            form_definition=record.form_definition
+        ).first()
+        stored_cells = (record.data or {}).get('table_cells')
+        other_data = dict(record.data or {})
+        other_data.pop('table_cells', None)
         return render(request, 'core/form_record_detail.html', {
             'record': record,
             'company': company_for_project(record.project),
@@ -1543,6 +1770,9 @@ class FormRecordDetailView(LoginRequiredMixin, View):
             'can_submit': record.can_submit(request.user),
             'can_review': record.can_review(request.user),
             'can_finalize': record.can_finalize(request.user),
+            'table_layout': layout,
+            'display_table_cells': _default_table_cells(layout, stored_cells) if layout else None,
+            'other_data': other_data,
         })
 
 
@@ -1562,7 +1792,9 @@ class FormRecordEditView(LoginRequiredMixin, View):
         form = FormRecordForm(request.POST, instance=record)
         if form.is_valid():
             record = form.save(commit=False)
-            record.data = _parse_form_data(request.POST)
+            record.data = _build_record_data(
+                request.POST, form_def=record.form_definition, existing_data=record.data,
+            )
             record.save()
             messages.success(request, 'Form saved.')
             return redirect('core:form-record-detail', pk=record.pk)
@@ -1806,6 +2038,9 @@ def _form_owner_label(company, project):
 
 def _form_record_context(request, project, form_def, record, form=None):
     company = company_for_project(project)
+    layout = FormTableLayout.objects.filter(form_definition=form_def).first()
+    stored_cells = (record.data or {}).get('table_cells') if record else None
+    table_cells = _default_table_cells(layout, stored_cells) if layout else None
     return {
         'form': form or FormRecordForm(
             instance=record,
@@ -1818,6 +2053,8 @@ def _form_record_context(request, project, form_def, record, form=None):
         'form_owner': _form_owner_label(company, project),
         'dropdown_lists': DropdownList.objects.prefetch_related('options'),
         'reviews': record.reviews.filter(approved=True) if record else [],
+        'table_layout': layout,
+        'table_cells': table_cells,
     }
 
 
@@ -1830,6 +2067,7 @@ def _project_header_data(project):
     return {
         'project_number': project.project_number,
         'client_name': project.company_name,
+        'client_contact': project.client_contact or '',
         'facility': project.location,
         'report_type': project.report_type,
         'phase': project.phase,
@@ -1846,11 +2084,58 @@ def _project_header_data(project):
     }
 
 
+def _default_table_cells(layout, stored=None):
+    """Build a row/column grid for a table layout, optionally from saved data."""
+    cols = len(layout.column_headers)
+    rows = layout.row_count
+    cells = [['' for _ in range(cols)] for _ in range(rows)]
+    if stored:
+        for r in range(min(rows, len(stored))):
+            row = stored[r]
+            if not isinstance(row, (list, tuple)):
+                continue
+            for c in range(min(cols, len(row))):
+                cells[r][c] = row[c]
+    return cells
+
+
+def _parse_table_cells_from_post(post, layout):
+    """Read editable table cell values submitted by managers."""
+    cells = _default_table_cells(layout)
+    for key, value in post.items():
+        if not key.startswith('table_cell_'):
+            continue
+        parts = key.split('_')
+        if len(parts) < 4:
+            continue
+        try:
+            row_idx = int(parts[2])
+            col_idx = int(parts[3])
+        except ValueError:
+            continue
+        if 0 <= row_idx < layout.row_count and 0 <= col_idx < len(layout.column_headers):
+            cells[row_idx][col_idx] = value
+    return cells
+
+
+def _build_record_data(post, project=None, form_def=None, existing_data=None):
+    """Merge project snapshot, notes, dropdowns, and optional admin table cells."""
+    data = dict(existing_data or {})
+    if project and not existing_data:
+        data.update(_project_header_data(project))
+    data.update(_parse_form_data(post))
+    if form_def:
+        layout = FormTableLayout.objects.filter(form_definition=form_def).first()
+        if layout:
+            data['table_cells'] = _parse_table_cells_from_post(post, layout)
+    return data
+
+
 def _parse_form_data(post):
     data = {}
-    skip = {'csrfmiddlewaretoken', 'created_by_name', 'notes'}
+    skip = {'csrfmiddlewaretoken', 'created_by_name', 'notes', 'return'}
     for key, value in post.items():
-        if key in skip:
+        if key in skip or key.startswith('table_cell_'):
             continue
         if key.startswith('field_'):
             data[key[6:]] = value

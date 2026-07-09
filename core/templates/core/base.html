@@ -145,6 +145,9 @@
                 <a class="nav-link" href="{% url 'core:form-details-list' %}"><i class="fa fa-box ml-2"></i> View Form Details</a>
               </li>
               <li class="nav-item">
+                <a class="nav-link" href="{% url 'core:form-table-view-list' %}"><i class="fa fa-table ml-2"></i> View Tables In Form</a>
+              </li>
+              <li class="nav-item">
                 <a class="nav-link" href="{% url 'core:library-list' %}"><i class="fa fa-book ml-2"></i> View Informations</a>
               </li>
               <li class="nav-item">
@@ -153,6 +156,9 @@
               {% elif user.user_type == 'manager' %}
               <li class="nav-item">
                 <a class="nav-link" href="{% url 'core:project-list'%}"><i class="fa fa-folder ml-2"></i> View Projects</a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link" href="{% url 'core:manager-view-forms' %}"><i class="fa fa-file-alt ml-2"></i> View Forms</a>
               </li>
               <li class="nav-item">
                 <a class="nav-link" href="{% url 'core:users'%}"><i class="fa fa-user"></i> View Users</a>
@@ -183,6 +189,9 @@
               </li>
               <li class="nav-item">
                 <a class="nav-link" href="{% url 'core:form-details-create' %}"><i class="fa fa-box ml-2"></i> Create Form Details</a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link" href="{% url 'core:form-table-list' %}"><i class="fa fa-table ml-2"></i> Create Tables In Form</a>
               </li>
               <li class="nav-item">
                 <a class="nav-link" href="{% url 'core:package-authorization-create' %}"><i class="fa fa-key"></i> Authorize Packages</a>

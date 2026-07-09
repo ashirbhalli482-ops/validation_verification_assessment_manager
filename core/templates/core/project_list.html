@@ -17,9 +17,9 @@
             <div class="card-body">
               <h5 class="card-title">{{ assignment.project.project_number }}</h5>
               <p class="mb-1"><strong>Company:</strong> {{ assignment.project.company_name }}</p>
-              <p class="mb-1"><strong>Package:</strong> {{ assignment.project.package_instance.name }}</p>
+              <p class="mb-1"><strong>Project Name:</strong> {{ assignment.project.package_instance.name }}</p>
               <p class="mb-3"><strong>Role:</strong> {{ assignment.get_role_display }}</p>
-              <a href="{% url 'core:project-detail' assignment.project.pk %}" class="btn btn-primary btn-sm">Open Package</a>
+              <a href="{% url 'core:project-detail' assignment.project.pk %}" class="btn btn-primary btn-sm">Open Project</a>
             </div>
           </div>
         </div>

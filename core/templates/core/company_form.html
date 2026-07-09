@@ -67,6 +67,10 @@
             <label class="company-field-label">{{ form.client_email.label }}</label>
             <div class="company-field-value">{{ form.client_email }}{% if form.client_email.errors %}<div class="text-danger small">{{ form.client_email.errors }}</div>{% endif %}</div>
           </div>
+          <div class="company-field-row">
+            <label class="company-field-label">{{ form.client_contact.label }}</label>
+            <div class="company-field-value">{{ form.client_contact }}{% if form.client_contact.errors %}<div class="text-danger small">{{ form.client_contact.errors }}</div>{% endif %}</div>
+          </div>
         </div>
 
         {% if is_edit %}

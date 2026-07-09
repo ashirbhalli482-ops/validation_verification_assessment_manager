@@ -1,0 +1,56 @@
+{% extends 'core/base.html' %}
+{% block breadcrumb %}
+<li class="breadcrumb-item">Admin</li>
+<li class="breadcrumb-item"><a href="{% url 'core:form-table-view-list' %}">View Tables In Form</a></li>
+<li class="breadcrumb-item active">{{ form_def.code }}</li>
+{% endblock %}
+{% block content %}
+<div class="container-fluid">
+  <div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <strong>Table — {{ form_def.code }} ({{ form_def.name }})</strong>
+      <div>
+        <a href="{% url 'core:form-table-edit' form_def.pk %}?return=view" class="btn btn-sm btn-info">Edit Table</a>
+        <a href="{% url 'core:form-table-view-list' %}" class="btn btn-sm btn-secondary">Back</a>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="row mb-3">
+        <div class="col-md-4">
+          <strong>Form Type:</strong> {{ form_def.get_form_type_display }}
+        </div>
+        <div class="col-md-4">
+          <strong>Number of Rows:</strong> {{ layout.row_count }}
+        </div>
+        <div class="col-md-4">
+          <strong>Number of Columns:</strong> {{ layout.column_count }}
+        </div>
+      </div>
+
+      <div class="table-responsive">
+        <table class="table table-bordered table-sm mb-0">
+          <thead class="thead-light">
+            <tr>
+              {% for header in layout.column_headers %}
+              <th>{{ header }}</th>
+              {% endfor %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in row_range %}
+            <tr>
+              {% for header in layout.column_headers %}
+              <td>&nbsp;</td>
+              {% endfor %}
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <p class="text-muted small mt-3 mb-0">
+        Last updated: {{ layout.updated_at|date:"M d, Y H:i" }}
+      </p>
+    </div>
+  </div>
+</div>
+{% endblock %}

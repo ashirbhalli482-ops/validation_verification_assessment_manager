@@ -15,9 +15,10 @@
       <div class="row">
         <div class="col-md-6">
           <p><strong>Client:</strong> {{ project.company_name }} | <strong>Facility & Jurisdiction:</strong> {{ project.location }}</p>
+          <p><strong>Contact of Client:</strong> {{ project.client_contact|default:"—" }}</p>
           <p><strong>Report Type:</strong> {{ project.report_type }} | <strong>Engagement:</strong> {{ project.engagement_year|default:"—" }} | <strong>Year:</strong> {{ project.year }}</p>
           <p><strong>Phase:</strong> {{ project.get_phase_display|default:"—" }} | <strong>Document Type:</strong> {{ project.get_document_type_display|default:"—" }}</p>
-          <p><strong>Package:</strong> {{ project.package_instance.name }}</p>
+          <p><strong>Project Name:</strong> {{ project.package_instance.name }}</p>
         </div>
         <div class="col-md-6">
           <!-- {% if user.user_type == 'manager' %}
@@ -36,12 +37,13 @@
     <div class="card-header"><strong>{{ group.sub_package.code }} — {{ group.sub_package.name }}</strong></div>
     <div class="card-body table-responsive">
       <table class="table table-sm table-bordered">
-        <thead><tr><th>Form</th><th>Name</th><th>Record</th><th>Action</th></tr></thead>
+        <thead><tr><th>Form</th><th>Name</th><th>Form Type</th><th>Record</th><th>Action</th></tr></thead>
         <tbody>
           {% for row in group.form_rows %}
           <tr>
             <td>{{ row.form_def.code }}</td>
             <td>{{ row.form_def.name }}</td>
+            <td>{{ row.form_def.get_form_type_display }}</td>
             <td>
               {% if row.record %}
                 <span class="badge badge-info">{{ row.record.get_status_display }}</span>

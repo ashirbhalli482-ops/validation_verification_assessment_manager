@@ -12,6 +12,7 @@
           <div class="col-md-4 form-group"><label>Result (A × B)</label><input type="text" name="field_result" id="calcResult" class="form-control" readonly value="{{ record.data.result }}"></div>
         </div>
         <div class="form-group"><label>Notes</label><textarea name="notes" class="form-control" rows="3">{% if record %}{{ record.data.notes }}{% endif %}</textarea></div>
+        {% include 'core/includes/form_table_input.html' %}
         <button type="submit" class="btn btn-primary">Save</button>
         <a href="{% url 'core:project-detail' project.pk %}" class="btn btn-secondary">Cancel</a>
       </form>

@@ -26,6 +26,13 @@
             </div>
           </div>
           <div class="company-field-row">
+            <label class="company-field-label" for="{{ form.client_contact.id_for_label }}">{{ form.client_contact.label }}</label>
+            <div class="company-field-value">
+              {{ form.client_contact }}
+              {% if form.client_contact.errors %}<div class="text-danger small">{{ form.client_contact.errors }}</div>{% endif %}
+            </div>
+          </div>
+          <div class="company-field-row">
             <label class="company-field-label" for="{{ form.location.id_for_label }}">{{ form.location.label }}</label>
             <div class="company-field-value">
               {{ form.location }}

@@ -274,13 +274,33 @@ class ManagerUserEditForm(forms.ModelForm):
 class UserProfileEditForm(forms.ModelForm):
     class Meta:
         model = CustomUser
-        fields = ['first_name', 'last_name', 'designation', 'contact_number']
+        fields = ['username', 'email', 'contact_number']
         widgets = {
-            'first_name': forms.TextInput(attrs={'class': 'form-control'}),
-            'last_name': forms.TextInput(attrs={'class': 'form-control'}),
-            'designation': forms.TextInput(attrs={'class': 'form-control'}),
+            'username': forms.TextInput(attrs={'class': 'form-control'}),
+            'email': forms.EmailInput(attrs={'class': 'form-control'}),
             'contact_number': forms.TextInput(attrs={'class': 'form-control'}),
         }
+        labels = {
+            'contact_number': 'Contact',
+        }
+
+    def clean_email(self):
+        email = self.cleaned_data['email']
+        qs = CustomUser.objects.filter(email=email)
+        if self.instance.pk:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise forms.ValidationError('A user with this email already exists.')
+        return email
+
+    def clean_username(self):
+        username = self.cleaned_data['username']
+        qs = CustomUser.objects.filter(username=username)
+        if self.instance.pk:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise forms.ValidationError('A user with this username already exists.')
+        return username
 
 
 class AdminSetPasswordForm(forms.Form):
@@ -292,6 +312,46 @@ class AdminSetPasswordForm(forms.Form):
         label='Confirm New Password',
         widget=forms.PasswordInput(attrs={'class': 'form-control', 'placeholder': 'Confirm new password'}),
     )
+
+    def clean(self):
+        cleaned = super().clean()
+        if cleaned.get('new_password1') != cleaned.get('new_password2'):
+            raise forms.ValidationError('Passwords do not match.')
+        return cleaned
+
+
+class SelfPasswordChangeForm(forms.Form):
+    old_password = forms.CharField(
+        label='Current Password',
+        widget=forms.PasswordInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Enter current password',
+        }),
+    )
+    new_password1 = forms.CharField(
+        label='New Password',
+        widget=forms.PasswordInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Enter new password',
+        }),
+    )
+    new_password2 = forms.CharField(
+        label='Confirm New Password',
+        widget=forms.PasswordInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Confirm new password',
+        }),
+    )
+
+    def __init__(self, user, *args, **kwargs):
+        self.user = user
+        super().__init__(*args, **kwargs)
+
+    def clean_old_password(self):
+        old_password = self.cleaned_data.get('old_password')
+        if old_password and not self.user.check_password(old_password):
+            raise forms.ValidationError('Current password is incorrect.')
+        return old_password
 
     def clean(self):
         cleaned = super().clean()
@@ -418,6 +478,10 @@ class CompanyCreateForm(forms.Form):
         label='E-mail (Client)',
         widget=forms.EmailInput(attrs=FORM_CONTROL),
     )
+    client_contact = forms.CharField(
+        label='Contact of Client', max_length=200, required=False,
+        widget=forms.TextInput(attrs=FORM_CONTROL),
+    )
 
     def clean(self):
         cleaned = super().clean()
@@ -511,6 +575,7 @@ def company_edit_initial(company, authorization):
         'issue_date': company.issue_date,
         'version': company.version,
         'designated_person': company.designated_person,
+        'client_contact': company.client_contact,
         'client_email': company.client_email or (mgr.email if mgr else ''),
         'manager_username': mgr.username if mgr else '',
         'project_manager_name': pm_name,
@@ -681,7 +746,7 @@ class ProjectForm(forms.ModelForm):
     class Meta:
         model = Project
         fields = [
-            'project_number', 'company_name', 'location', 'report_type',
+            'project_number', 'company_name', 'client_contact', 'location', 'report_type',
             'engagement_year', 'year', 'phase', 'document_type',
         ]
         widgets = {
@@ -690,6 +755,7 @@ class ProjectForm(forms.ModelForm):
                 'class': 'form-control',
                 'placeholder': "Enter your client's name",
             }),
+            'client_contact': forms.TextInput(attrs={'class': 'form-control'}),
             'location': forms.TextInput(attrs={'class': 'form-control'}),
             'report_type': forms.TextInput(attrs={'class': 'form-control'}),
             'engagement_year': forms.TextInput(attrs={'class': 'form-control'}),
@@ -706,6 +772,8 @@ class ProjectForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.fields['project_number'].label = 'Project Number'
         self.fields['company_name'].label = 'Client Name'
+        self.fields['client_contact'].label = 'Contact of Client'
+        self.fields['client_contact'].required = False
         self.fields['location'].label = 'Facility & Jurisdiction'
         self.fields['report_type'].label = 'Report Type'
         self.fields['engagement_year'].label = 'Engagement'
@@ -809,6 +877,15 @@ class CVApprovalForm(forms.ModelForm):
         widgets = {
             'cv_approval_status': forms.Select(attrs={'class': 'form-control'}),
         }
+
+
+class FormTableLayoutForm(forms.Form):
+    row_count = forms.IntegerField(
+        min_value=1,
+        initial=1,
+        label='Number of Rows',
+        widget=forms.NumberInput(attrs={'class': 'form-control', 'min': 1}),
+    )
 
 
 class ViewPackageSearchForm(forms.Form):

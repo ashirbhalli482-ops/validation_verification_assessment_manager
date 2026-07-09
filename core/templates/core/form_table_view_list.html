@@ -1,0 +1,107 @@
+{% extends 'core/base.html' %}
+{% block breadcrumb %}
+<li class="breadcrumb-item">Admin</li>
+<li class="breadcrumb-item active">View Tables In Form</li>
+{% endblock %}
+{% block content %}
+<style>
+  #formTableViewList .form-table-actions {
+    white-space: nowrap;
+  }
+  #formTableViewList .form-table-actions .btn {
+    display: inline-block;
+    margin-bottom: 2px;
+  }
+</style>
+<div class="container-fluid">
+  <div class="card">
+    <div class="card-header">
+      <strong>View Tables In Form</strong>
+    </div>
+    <div class="card-body" id="formTableViewList">
+      <p class="text-muted">View, edit, or delete table layouts for each form. Deleting removes only the table, not the form.</p>
+      {% for group in form_definition_groups %}
+      <section class="mb-4">
+        <h6 class="pkg-form-type-heading">{{ group.label }}</h6>
+        <table class="table table-striped mb-0">
+          <thead>
+            <tr>
+              <th>Form Number</th>
+              <th>Form Name</th>
+              <th>Form Type</th>
+              <th>Description</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for form_def in group.forms %}
+            <tr>
+              <td>{{ form_def.code }}</td>
+              <td>{{ form_def.name }}</td>
+              <td>{{ form_def.get_form_type_display }}</td>
+              <td>{{ form_def.description|truncatechars:60 }}</td>
+              <td class="form-table-actions">
+                {% if form_def.table_layout %}
+                <a href="{% url 'core:form-table-detail' form_def.pk %}" class="btn btn-sm btn-primary">View</a>
+                <a href="{% url 'core:form-table-edit' form_def.pk %}?return=view" class="btn btn-sm btn-info">Edit</a>
+                <form method="post" action="{% url 'core:form-table-delete' form_def.pk %}" class="d-inline"
+                      onsubmit="return confirm('Delete the table for {{ form_def.code }}? The form will not be deleted.');">
+                  {% csrf_token %}
+                  <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                </form>
+                {% else %}
+                <span class="text-muted small">No table</span>
+                <a href="{% url 'core:form-table-edit' form_def.pk %}?return=view" class="btn btn-sm btn-outline-primary">Create Table</a>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </section>
+      {% empty %}
+      <p class="text-muted text-center mb-0">No forms defined yet.</p>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+{% if success_action %}
+<div class="modal fade" id="formTableViewSuccessModal" tabindex="-1" role="dialog" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" role="document">
+    <div class="modal-content">
+      <div class="modal-header bg-success text-white">
+        <h5 class="modal-title">
+          {% if success_action == 'deleted' %}Table Deleted
+          {% elif success_action == 'saved' %}Table Saved
+          {% else %}Success{% endif %}
+        </h5>
+        <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body text-center">
+        <i class="fa fa-check-circle fa-3x text-success mb-3"></i>
+        <p class="lead mb-0">
+          {% if success_action == 'deleted' %}
+            Table for form <strong>{{ success_form }}</strong> has been deleted. The form was kept.
+          {% elif success_action == 'saved' %}
+            Table layout for form <strong>{{ success_form }}</strong> has been saved successfully.
+          {% else %}
+            Action completed successfully.
+          {% endif %}
+        </p>
+      </div>
+      <div class="modal-footer justify-content-center">
+        <button type="button" class="btn btn-success" data-dismiss="modal">OK</button>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    $('#formTableViewSuccessModal').modal('show');
+  });
+</script>
+{% endif %}
+{% endblock %}

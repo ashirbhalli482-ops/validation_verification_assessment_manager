@@ -1,0 +1,84 @@
+{% extends 'core/base.html' %}
+{% block breadcrumb %}
+<li class="breadcrumb-item">Admin</li>
+<li class="breadcrumb-item active">Create Tables In Form</li>
+{% endblock %}
+{% block content %}
+<style>
+  #formTableList .form-table-actions {
+    white-space: nowrap;
+  }
+</style>
+<div class="container-fluid">
+  <div class="card">
+    <div class="card-header">
+      <strong>Create Tables In Form</strong>
+    </div>
+    <div class="card-body" id="formTableList">
+      <p class="text-muted">Select a form to define its table rows and column headings.</p>
+      {% for group in form_definition_groups %}
+      <section class="mb-4">
+        <h6 class="pkg-form-type-heading">{{ group.label }}</h6>
+        <table class="table table-striped mb-0">
+          <thead>
+            <tr>
+              <th>Form Number</th>
+              <th>Form Name</th>
+              <th>Form Type</th>
+              <th>Description</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for form_def in group.forms %}
+            <tr>
+              <td>{{ form_def.code }}</td>
+              <td>{{ form_def.name }}</td>
+              <td>{{ form_def.get_form_type_display }}</td>
+              <td>{{ form_def.description|truncatechars:60 }}</td>
+              <td class="form-table-actions">
+                <a href="{% url 'core:form-table-edit' form_def.pk %}" class="btn btn-sm btn-primary">
+                  {% if form_def.table_layout %}Edit Table{% else %}Create Table{% endif %}
+                </a>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </section>
+      {% empty %}
+      <p class="text-muted text-center mb-0">No forms defined yet. Create forms under Form Details first.</p>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+{% if success_action %}
+<div class="modal fade" id="formTableSuccessModal" tabindex="-1" role="dialog" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" role="document">
+    <div class="modal-content">
+      <div class="modal-header bg-success text-white">
+        <h5 class="modal-title">Table Saved</h5>
+        <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body text-center">
+        <i class="fa fa-check-circle fa-3x text-success mb-3"></i>
+        <p class="lead mb-0">
+          Table layout for form <strong>{{ success_form }}</strong> has been saved successfully.
+        </p>
+      </div>
+      <div class="modal-footer justify-content-center">
+        <button type="button" class="btn btn-success" data-dismiss="modal">OK</button>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    $('#formTableSuccessModal').modal('show');
+  });
+</script>
+{% endif %}
+{% endblock %}

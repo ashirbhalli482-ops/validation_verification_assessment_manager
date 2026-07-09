@@ -23,6 +23,7 @@
           </select>
         </div>
         {% endfor %}
+        {% include 'core/includes/form_table_input.html' %}
         <button type="submit" class="btn btn-primary">Save Form</button>
         <a href="{% url 'core:project-detail' project.pk %}" class="btn btn-secondary">Cancel</a>
       </form>

@@ -1,0 +1,147 @@
+{% extends 'core/base.html' %}
+{% block breadcrumb %}
+<li class="breadcrumb-item">Admin</li>
+{% if request.GET.return == 'view' %}
+<li class="breadcrumb-item"><a href="{% url 'core:form-table-view-list' %}">View Tables In Form</a></li>
+{% else %}
+<li class="breadcrumb-item"><a href="{% url 'core:form-table-list' %}">Create Tables In Form</a></li>
+{% endif %}
+<li class="breadcrumb-item active">{{ form_def.code }}</li>
+{% endblock %}
+{% block content %}
+<div class="container-fluid">
+  <div class="card">
+    <div class="card-header">
+      <strong>{% if layout %}Edit Table{% else %}Create Table{% endif %} — {{ form_def.code }} ({{ form_def.name }})</strong>
+    </div>
+    <div class="card-body">
+      <form method="post" id="formTableBuilder">{% csrf_token %}
+        {% if request.GET.return == 'view' %}
+        <input type="hidden" name="return" value="view">
+        {% endif %}
+        {% if form.non_field_errors %}
+        <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+        {% endif %}
+
+        <div class="row">
+          <div class="col-md-4 mb-3">
+            <label for="{{ form.row_count.id_for_label }}">{{ form.row_count.label }}</label>
+            {{ form.row_count }}
+            {% if form.row_count.errors %}<div class="text-danger small">{{ form.row_count.errors }}</div>{% endif %}
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <label class="d-block">Column Headings</label>
+          <div id="column-headers">
+            {% for header in column_headers %}
+            <div class="input-group mb-2 column-header-row">
+              <input type="text" name="column_headers" class="form-control" placeholder="Column heading" value="{{ header }}">
+              <div class="input-group-append">
+                <button type="button" class="btn btn-outline-danger remove-column" title="Remove column">&times;</button>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+          <button type="button" id="add-column" class="btn btn-outline-primary btn-sm mt-1">
+            <i class="fa fa-plus"></i> Add Column
+          </button>
+        </div>
+
+        <div class="mb-4">
+          <label class="d-block">Preview</label>
+          <div class="table-responsive">
+            <table class="table table-bordered table-sm mb-0" id="table-preview">
+              <thead><tr id="preview-header-row"></tr></thead>
+              <tbody id="preview-body"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Save Table</button>
+        {% if request.GET.return == 'view' %}
+        <a href="{% url 'core:form-table-view-list' %}" class="btn btn-secondary">Cancel</a>
+        {% else %}
+        <a href="{% url 'core:form-table-list' %}" class="btn btn-secondary">Cancel</a>
+        {% endif %}
+      </form>
+    </div>
+  </div>
+</div>
+
+<div id="empty-column-header" style="display:none;">
+  <div class="input-group mb-2 column-header-row">
+    <input type="text" name="column_headers" class="form-control" placeholder="Column heading" value="">
+    <div class="input-group-append">
+      <button type="button" class="btn btn-outline-danger remove-column" title="Remove column">&times;</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    var container = document.getElementById('column-headers');
+    var addBtn = document.getElementById('add-column');
+    var emptyTemplate = document.getElementById('empty-column-header').innerHTML;
+    var rowCountInput = document.getElementById('{{ form.row_count.id_for_label }}');
+
+    function updatePreview() {
+      var headers = [];
+      container.querySelectorAll('input[name="column_headers"]').forEach(function (input) {
+        headers.push(input.value.trim() || 'Column');
+      });
+      if (!headers.length) {
+        headers = ['Column'];
+      }
+      var rows = Math.max(1, parseInt(rowCountInput.value, 10) || 1);
+
+      var headerRow = document.getElementById('preview-header-row');
+      headerRow.innerHTML = '';
+      headers.forEach(function (h) {
+        var th = document.createElement('th');
+        th.textContent = h;
+        headerRow.appendChild(th);
+      });
+
+      var body = document.getElementById('preview-body');
+      body.innerHTML = '';
+      for (var r = 0; r < rows; r++) {
+        var tr = document.createElement('tr');
+        headers.forEach(function () {
+          var td = document.createElement('td');
+          td.innerHTML = '&nbsp;';
+          tr.appendChild(td);
+        });
+        body.appendChild(tr);
+      }
+    }
+
+    function bindRemove(btn) {
+      btn.addEventListener('click', function () {
+        var rows = container.querySelectorAll('.column-header-row');
+        if (rows.length <= 1) {
+          rows[0].querySelector('input').value = '';
+          updatePreview();
+          return;
+        }
+        btn.closest('.column-header-row').remove();
+        updatePreview();
+      });
+    }
+
+    container.querySelectorAll('.remove-column').forEach(bindRemove);
+    container.addEventListener('input', updatePreview);
+    rowCountInput.addEventListener('input', updatePreview);
+
+    addBtn.addEventListener('click', function () {
+      container.insertAdjacentHTML('beforeend', emptyTemplate);
+      var newRow = container.lastElementChild;
+      bindRemove(newRow.querySelector('.remove-column'));
+      newRow.querySelector('input').focus();
+      updatePreview();
+    });
+
+    updatePreview();
+  });
+</script>
+{% endblock %}

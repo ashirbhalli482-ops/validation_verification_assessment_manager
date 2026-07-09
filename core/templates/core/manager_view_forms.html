@@ -1,0 +1,106 @@
+{% extends 'core/base.html' %}
+{% block breadcrumb %}
+<li class="breadcrumb-item">Views</li>
+<li class="breadcrumb-item active">View Forms</li>
+{% endblock %}
+{% block content %}
+<div class="container-fluid">
+  <div class="card mb-3">
+    <div class="card-header d-flex justify-content-between align-items-center flex-wrap">
+      <strong>View Forms</strong>
+      {% if projects|length > 1 %}
+      <form method="get" class="form-inline mt-2 mt-md-0">
+        <label class="mr-2 mb-0" for="projectFilter">Project</label>
+        <select name="project" id="projectFilter" class="form-control form-control-sm mr-2" onchange="this.form.submit()">
+          <option value="">All projects</option>
+          {% for p in projects %}
+          <option value="{{ p.pk }}"{% if selected_project_id == p.pk|stringformat:"s" %} selected{% endif %}>
+            {{ p.project_number }} — {{ p.company_name }}
+          </option>
+          {% endfor %}
+        </select>
+      </form>
+      {% endif %}
+    </div>
+    <div class="card-body">
+      <p class="text-muted mb-0">Project-type forms allocated for your authorized packages. These are the forms you can assign to team users.</p>
+    </div>
+  </div>
+
+  {% for project_group in project_groups %}
+  {% with project=project_group.project %}
+  {% if show_project_heading %}
+  <div class="card mb-3">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <strong>{{ project.project_number }} — {{ project.company_name }}</strong>
+      <a href="{% url 'core:project-detail' project.pk %}" class="btn btn-sm btn-outline-secondary">Open Project</a>
+    </div>
+    <div class="card-body py-2">
+      <p class="mb-0 small text-muted">
+        <strong>Project Name:</strong> {{ project.package_instance.name }}
+        | <strong>Report Type:</strong> {{ project.report_type }}
+        | <strong>Year:</strong> {{ project.year }}
+      </p>
+    </div>
+  </div>
+  {% endif %}
+
+  {% for group in project_group.sub_packages %}
+  <div class="card mb-3">
+    <div class="card-header"><strong>{{ group.sub_package.code }} — {{ group.sub_package.name }}</strong></div>
+    <div class="card-body table-responsive">
+      <table class="table table-sm table-bordered mb-0">
+        <thead>
+          <tr>
+            <th>Form</th>
+            <th>Name</th>
+            <th>Form Type</th>
+            <th>Record</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in group.form_rows %}
+          <tr>
+            <td>{{ row.form_def.code }}</td>
+            <td>{{ row.form_def.name }}</td>
+            <td>{{ row.form_def.get_form_type_display }}</td>
+            <td>
+              {% if row.record %}
+              <span class="badge badge-info">{{ row.record.get_status_display }}</span>
+              {% else %}
+              <span class="text-muted">Not started</span>
+              {% endif %}
+            </td>
+            <td class="text-nowrap">
+              {% if row.record %}
+              <a href="{% url 'core:form-record-detail' row.record.pk %}" class="btn btn-sm btn-info">Open</a>
+              {% else %}
+              <a href="{% url 'core:form-record-create' project.pk row.form_def.pk %}" class="btn btn-sm btn-primary">Create Record</a>
+              {% endif %}
+              {% if row.form_def.is_public %}
+              <a href="{% url 'core:public-form' 'new' %}?project={{ project.pk }}&form={{ row.form_def.pk }}" class="btn btn-sm btn-secondary" target="_blank">Customer Link</a>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endfor %}
+  {% endwith %}
+  {% empty %}
+  <div class="card">
+    <div class="card-body text-center text-muted">
+      No allocated forms found.
+      {% if projects %}
+      <a href="{% url 'core:project-list' %}">Open a project</a> or contact your administrator to authorize forms.
+      {% else %}
+      <a href="{% url 'core:project-create' %}">Create a project</a> to get started.
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

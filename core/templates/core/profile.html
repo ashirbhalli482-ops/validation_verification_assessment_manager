@@ -57,7 +57,7 @@
                                 {% else %}
                                 <small class="text-muted d-block mt-1">
                                     <i class="fa fa-info-circle"></i>
-                                    You can edit your name, designation, and contact number.
+                                    You can edit your username, email, and contact.
                                 </small>
                                 {% endif %}
                             </div>
@@ -88,30 +88,9 @@
                                         {% if form.email.errors %}<div class="text-danger small">{{ form.email.errors }}</div>{% endif %}
                                     </div>
                                     {% endif %}
-                                    {% if form.first_name %}
-                                    <div class="form-group">
-                                        <label for="{{ form.first_name.id_for_label }}">First Name</label>
-                                        {{ form.first_name }}
-                                        {% if form.first_name.errors %}<div class="text-danger small">{{ form.first_name.errors }}</div>{% endif %}
-                                    </div>
-                                    {% endif %}
-                                    {% if form.last_name %}
-                                    <div class="form-group">
-                                        <label for="{{ form.last_name.id_for_label }}">Last Name</label>
-                                        {{ form.last_name }}
-                                        {% if form.last_name.errors %}<div class="text-danger small">{{ form.last_name.errors }}</div>{% endif %}
-                                    </div>
-                                    {% endif %}
-                                    {% if form.designation %}
-                                    <div class="form-group">
-                                        <label for="{{ form.designation.id_for_label }}">Designation</label>
-                                        {{ form.designation }}
-                                        {% if form.designation.errors %}<div class="text-danger small">{{ form.designation.errors }}</div>{% endif %}
-                                    </div>
-                                    {% endif %}
                                     {% if form.contact_number %}
                                     <div class="form-group">
-                                        <label for="{{ form.contact_number.id_for_label }}">Contact Number</label>
+                                        <label for="{{ form.contact_number.id_for_label }}">{{ form.contact_number.label }}</label>
                                         {{ form.contact_number }}
                                         {% if form.contact_number.errors %}<div class="text-danger small">{{ form.contact_number.errors }}</div>{% endif %}
                                     </div>
@@ -120,6 +99,8 @@
                                         <button type="submit" class="btn btn-primary">Update Profile</button>
                                         {% if is_admin_profile %}
                                         <a href="{% url 'core:admin-set-password' logged_user.id %}" class="btn btn-warning">Change Password</a>
+                                        {% else %}
+                                        <a href="{% url 'core:profile-reset-password' %}" class="btn btn-warning">Reset Password</a>
                                         {% endif %}
                                     </div>
                                 </form>

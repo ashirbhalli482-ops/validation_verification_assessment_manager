@@ -26,6 +26,7 @@
           </tbody>
         </table>
         <div class="form-group"><label>Review Notes</label><textarea name="notes" class="form-control" rows="3">{% if record %}{{ record.data.notes }}{% endif %}</textarea></div>
+        {% include 'core/includes/form_table_input.html' %}
         <button type="submit" class="btn btn-primary">Save F-01C-MRC</button>
         <a href="{% url 'core:cv-review' %}" class="btn btn-info">Open CV Review Panel</a>
         <a href="{% url 'core:project-detail' project.pk %}" class="btn btn-secondary">Back</a>

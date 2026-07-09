@@ -80,10 +80,17 @@ def is_form_authorized_for_project(form_definition, project):
     ).exists()
 
 
+def is_form_allocatable_to_team_users(form_definition):
+    """Team members (users) may only work with project-type forms."""
+    return form_definition.form_type == 'project'
+
+
 def can_access_form(user, project, form_definition):
     if not can_access_project(user, project):
         return False
     if not is_form_authorized_for_project(form_definition, project):
+        return False
+    if user.user_type == 'employee' and not is_form_allocatable_to_team_users(form_definition):
         return False
     if user.user_type == 'admin':
         return True
@@ -98,7 +105,9 @@ def can_create_form_record(user, project, form_definition):
     if user.user_type in ('admin', 'manager'):
         return True
     tm = get_team_member(user, project)
-    return tm is not None and tm.role == 'team_member'
+    if tm is None or tm.role != 'team_member':
+        return False
+    return is_form_allocatable_to_team_users(form_definition)
 
 
 def can_access_library_document(user, document):

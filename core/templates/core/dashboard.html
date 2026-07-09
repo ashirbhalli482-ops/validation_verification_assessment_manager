@@ -123,9 +123,9 @@
           <div class="card-body">
             <h6 class="card-title">{{ assignment.project.project_number }}</h6>
             <p class="card-text small text-muted mb-1">{{ assignment.project.company_name }}</p>
-            <p class="card-text small mb-2"><strong>Package:</strong> {{ assignment.project.package_instance.name }}</p>
+            <p class="card-text small mb-2"><strong>Project Name:</strong> {{ assignment.project.package_instance.name }}</p>
             <p class="card-text small mb-3"><strong>Your role:</strong> {{ assignment.get_role_display }}</p>
-            <a href="{% url 'core:project-detail' assignment.project.pk %}" class="btn btn-primary btn-sm btn-block">Open Package</a>
+            <a href="{% url 'core:project-detail' assignment.project.pk %}" class="btn btn-primary btn-sm btn-block">Open Project</a>
           </div>
         </div>
       </div>

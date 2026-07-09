@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 from core.models import (
-    CustomUser, Company, PackageTemplate, SubPackage, FormDefinition,
+    CustomUser, Company, PackageTemplate, SubPackage, FormDefinition, FormTableLayout,
     PackageAuthorization, PackageInstance, AuthorizedForm, AuthorizedLibraryDocument,
     LibraryDocument, DropdownList, DropdownOption, Project, TeamMember, EmployeeRecord,
     FormRecord, FormReview, Notification,
@@ -22,6 +22,12 @@ class FormDefinitionAdmin(admin.ModelAdmin):
     list_filter = ['form_type', 'sub_package']
     search_fields = ['code', 'name', 'description']
     ordering = ['code']
+
+
+@admin.register(FormTableLayout)
+class FormTableLayoutAdmin(admin.ModelAdmin):
+    list_display = ['form_definition', 'row_count', 'column_count', 'updated_at']
+    search_fields = ['form_definition__code', 'form_definition__name']
 
 
 admin.site.register(CustomUser, CustomUserAdmin)
