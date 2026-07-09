@@ -1534,9 +1534,7 @@ class ManagerViewFormsView(ManagerRequiredMixin, View):
 
         project_groups = []
         for project in projects:
-            sub_packages = _build_project_form_groups(
-                project, form_types=['project'],
-            )
+            sub_packages = _build_project_form_groups(project)
             if sub_packages:
                 project_groups.append({
                     'project': project,
@@ -1558,9 +1556,8 @@ class ProjectDetailView(LoginRequiredMixin, View):
             messages.error(request, 'Access denied.')
             return redirect('core:dashboard')
         auth = project.package_instance.authorization
-        manager_form_types = ['project'] if request.user.user_type == 'manager' else None
         sub_packages = _build_project_form_groups(
-            project, request.user, form_types=manager_form_types,
+            project, request.user, form_types=['project'],
         )
         records = FormRecord.objects.filter(project=project).select_related('form_definition')
         report_records = [
