@@ -53,8 +53,8 @@
                                     <div class="tab-pane p-3 active show">
                             <div class="row">
                                 <div class="col-md-6">
-                                    <strong>Username:</strong>
-                                    <p>{{ user_view.username }}</p>
+                                    <strong>Full Name:</strong>
+                                    <p>{{ user_view.get_full_name|default:'-' }}</p>
                                 </div>
                                 <div class="col-md-6">
                                     <strong>Email:</strong>

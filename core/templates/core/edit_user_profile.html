@@ -33,7 +33,11 @@
                                         {% endif %}
                                     </div>
                                     <div class="mt-2">
+                                        {% if editing_admin %}
                                         <strong>Username:</strong> {{ target_user.username }}<br>
+                                        {% else %}
+                                        <strong>Full Name:</strong> {{ target_user.get_full_name|default:'-' }}<br>
+                                        {% endif %}
                                         <strong>Email:</strong> {{ target_user.email }}<br>
                                         <strong>Status:</strong> {% if target_user.is_active %}Active{% else %}Inactive{% endif %}<br>
                                         <strong>Date Joined:</strong> {{ target_user.date_joined|date:"F d, Y" }}
@@ -53,7 +57,13 @@
                                     {% if form.non_field_errors %}
                                     <div class="alert alert-danger">{{ form.non_field_errors }}</div>
                                     {% endif %}
-                                    {% if form.username %}
+                                    {% if form.full_name %}
+                                    <div class="form-group">
+                                        <label for="{{ form.full_name.id_for_label }}">{{ form.full_name.label }}</label>
+                                        {{ form.full_name }}
+                                        {% if form.full_name.errors %}<div class="text-danger small">{{ form.full_name.errors }}</div>{% endif %}
+                                    </div>
+                                    {% elif form.username %}
                                     <div class="form-group">
                                         <label for="{{ form.username.id_for_label }}">Username</label>
                                         {{ form.username }}

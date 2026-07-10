@@ -97,8 +97,8 @@
               {% endif %}
               <a href="{% url 'core:team-member-edit' m.pk %}" class="btn btn-sm btn-warning">Edit</a>
               <form method="post" action="{% url 'core:team-member-remove' m.pk %}" class="d-inline"
-                    onsubmit="return confirm('Remove this member from the project?');">{% csrf_token %}
-                <button class="btn btn-sm btn-danger">Delete</button>
+                    onsubmit="return confirm('Remove {{ m.name }} from this project? The user account will remain in the system.');">{% csrf_token %}
+                <button class="btn btn-sm btn-danger">Remove</button>
               </form>
             </td>
           </tr>

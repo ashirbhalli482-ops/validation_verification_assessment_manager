@@ -78,7 +78,7 @@
                                 <thead class="thead-light">
                                 <tr>
                                     <th class="text-center text-nowrap" style="min-width:60px;"><i class="fa fa-user"></i></th>
-                                    <th class="text-nowrap" style="min-width:120px;">User</th>
+                                    <th class="text-nowrap" style="min-width:120px;">Full Name</th>
                                     <th class="text-nowrap" style="min-width:160px;">Email</th>
                                     {% if not admin_users_only %}
                                     <th class="text-nowrap d-none d-md-table-cell" style="min-width:130px;">User Role</th>
@@ -97,7 +97,7 @@
                                 </div>
                             </td>
                             <td class="text-nowrap" style="min-width:120px;">
-                                <div><strong>{{ user1.username }}</strong></div>
+                                <div><strong>{{ user1.get_full_name|default:user1.username }}</strong></div>
                                 <div class="small text-muted">
                                 Joined: {{ user1.date_joined|date:"F d, Y" }}
                                 </div>

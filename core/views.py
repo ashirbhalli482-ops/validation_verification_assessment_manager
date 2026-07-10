@@ -403,6 +403,9 @@ class EditUserProfileView(LoginRequiredMixin, View):
             if request.user.user_type == 'manager' and updated.user_type == 'employee':
                 updated.under_supervision = request.user
             updated.save()
+            if updated.user_type == 'employee':
+                display_name = updated.get_full_name() or updated.username
+                TeamMember.objects.filter(user=updated, is_active=True).update(name=display_name)
             if request.user.user_type == 'admin' and target.user_type == 'admin':
                 return admin_users_success_redirect('updated', updated.username)
             display_name = updated.get_full_name() or updated.username
@@ -806,7 +809,6 @@ class CompanyDetailView(AdminRequiredMixin, View):
             'company': company,
             'authorization': auth,
             'manager_name': pm_name,
-            'manager_username': mgr.username if mgr else '',
             'active_form_count': active_count,
             'inactive_form_count': inactive_count,
             'activated_form_ids': activated_form_ids,
@@ -1516,37 +1518,93 @@ def _build_project_form_groups(project, user=None, form_types=None):
     return sub_packages
 
 
+def _build_manager_forms_by_type(projects, form_types=None):
+    """Unique allocated forms across all projects, grouped by form type only."""
+    allowed_types = set(form_types) if form_types else None
+    by_type = {key: {} for key, _ in FORM_TYPE_CHOICES}
+    for project in projects.order_by('project_number'):
+        for group in _build_project_form_groups(project):
+            for row in group['form_rows']:
+                form_def = row['form_def']
+                if allowed_types is not None and form_def.form_type not in allowed_types:
+                    continue
+                bucket = by_type.setdefault(form_def.form_type, {})
+                existing = bucket.get(form_def.id)
+                if existing is None:
+                    bucket[form_def.id] = {
+                        'form_def': form_def,
+                        'project': project,
+                        'record': row['record'],
+                    }
+                elif row['record'] and not existing['record']:
+                    existing['record'] = row['record']
+                    existing['project'] = project
+    type_order = (
+        [(key, label) for key, label in FORM_TYPE_CHOICES if key in allowed_types]
+        if allowed_types is not None
+        else list(FORM_TYPE_CHOICES)
+    )
+    return [
+        {
+            'key': key,
+            'label': label,
+            'form_rows': sorted(
+                by_type[key].values(),
+                key=lambda item: item['form_def'].code,
+            ),
+        }
+        for key, label in type_order
+        if by_type.get(key)
+    ]
+
+
+def _manager_view_forms_response(request, form_types=None, page_title='View All Forms', page_description=''):
+    projects = Project.objects.filter(
+        manager=request.user,
+    ).select_related(
+        'package_instance',
+        'package_instance__authorization',
+        'package_instance__authorization__package_template',
+    ).order_by('project_number')
+    if not page_description:
+        page_description = (
+            'All forms allocated by the administrator, grouped by form type. '
+            'Team users only see and can work with Project type forms on project pages.'
+        )
+    return render(request, 'core/manager_view_forms.html', {
+        'form_type_groups': _build_manager_forms_by_type(projects, form_types=form_types),
+        'has_projects': projects.exists(),
+        'page_title': page_title,
+        'page_description': page_description,
+    })
+
+
 class ManagerViewFormsView(ManagerRequiredMixin, View):
-    """Manager: view allocated forms across projects, grouped by sub-package."""
+    """Manager: view all allocated forms grouped by form type."""
     def get(self, request):
-        all_projects = Project.objects.filter(
-            manager=request.user,
-        ).select_related(
-            'package_instance',
-            'package_instance__authorization',
-            'package_instance__authorization__package_template',
-        ).order_by('project_number')
+        return _manager_view_forms_response(request)
 
-        project_id = request.GET.get('project', '').strip()
-        projects = all_projects
-        if project_id:
-            projects = projects.filter(pk=project_id)
 
-        project_groups = []
-        for project in projects:
-            sub_packages = _build_project_form_groups(project)
-            if sub_packages:
-                project_groups.append({
-                    'project': project,
-                    'sub_packages': sub_packages,
-                })
+class ManagerViewMasterRecordView(ManagerRequiredMixin, View):
+    """Manager: view allocated Master Record forms."""
+    def get(self, request):
+        return _manager_view_forms_response(
+            request,
+            form_types=['master_record'],
+            page_title='View Master Record',
+            page_description='Master Record forms allocated by the administrator.',
+        )
 
-        return render(request, 'core/manager_view_forms.html', {
-            'project_groups': project_groups,
-            'projects': all_projects,
-            'selected_project_id': project_id,
-            'show_project_heading': all_projects.count() != 1 or bool(project_id),
-        })
+
+class ManagerViewProposalFormsView(ManagerRequiredMixin, View):
+    """Manager: view allocated Proposal forms."""
+    def get(self, request):
+        return _manager_view_forms_response(
+            request,
+            form_types=['proposal'],
+            page_title='View Proposal Forms',
+            page_description='Proposal forms allocated by the administrator.',
+        )
 
 
 class ProjectDetailView(LoginRequiredMixin, View):
@@ -1709,7 +1767,7 @@ class TeamMemberDeleteView(ManagerRequiredMixin, View):
         project_id = member.project_id
         member.is_active = False
         member.save()
-        messages.success(request, 'Team member removed.')
+        messages.success(request, f'{member.name} was removed from this project. Their user account is still in the system.')
         return redirect('core:project-detail', pk=project_id)
 
 

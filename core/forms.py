@@ -195,13 +195,28 @@ MANAGER_USER_TYPE_CHOICES = [
 ]
 
 
+def _unique_username_from_email(email, exclude_pk=None):
+    """Derive a unique username from an email when managers create users."""
+    base = (email.split('@')[0] if email else 'user').strip()[:150] or 'user'
+    username = base
+    counter = 1
+    while True:
+        qs = CustomUser.objects.filter(username=username)
+        if exclude_pk:
+            qs = qs.exclude(pk=exclude_pk)
+        if not qs.exists():
+            return username
+        suffix = str(counter)
+        username = f"{base[: max(1, 150 - len(suffix))]}{suffix}"
+        counter += 1
+
+
 class ManagerRegistrationForm(UserCreationForm):
     """Managers create team member accounts (role/designation are set per project)."""
-    username = forms.CharField(
-        max_length=150,
+    full_name = forms.CharField(
         required=True,
-        label='User name',
-        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Enter username'}),
+        label='Full Name',
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Enter full name'}),
     )
     email = forms.EmailField(
         required=True,
@@ -218,11 +233,18 @@ class ManagerRegistrationForm(UserCreationForm):
 
     class Meta:
         model = CustomUser
-        fields = ['username', 'email', 'password1', 'password2']
+        fields = ['email', 'password1', 'password2']
 
     def __init__(self, *args, **kwargs):
         self.user = kwargs.pop('user', None)
         super().__init__(*args, **kwargs)
+        self.fields.pop('username', None)
+
+    def clean_full_name(self):
+        full_name = self.cleaned_data.get('full_name', '').strip()
+        if not full_name:
+            raise forms.ValidationError('Full name is required.')
+        return full_name
 
     def clean_email(self):
         email = self.cleaned_data['email']
@@ -232,7 +254,12 @@ class ManagerRegistrationForm(UserCreationForm):
 
     def save(self, commit=True):
         user = super().save(commit=False)
+        full_name = self.cleaned_data['full_name']
+        parts = full_name.split(None, 1)
+        user.first_name = parts[0]
+        user.last_name = parts[1] if len(parts) > 1 else ''
         user.email = self.cleaned_data['email']
+        user.username = _unique_username_from_email(user.email)
         user.user_type = 'employee'
         if self.user:
             user.created_by = self.user
@@ -246,20 +273,30 @@ class ManagerRegistrationForm(UserCreationForm):
 
 class ManagerUserEditForm(forms.ModelForm):
     """Edit manager/employee accounts — managers cannot change users to admin."""
+    full_name = forms.CharField(
+        required=True,
+        label='Full Name',
+        widget=forms.TextInput(attrs={'class': 'form-control'}),
+    )
+
     class Meta:
         model = CustomUser
-        fields = ['username', 'email', 'is_active']
+        fields = ['email', 'is_active']
         widgets = {
-            'username': forms.TextInput(attrs={'class': 'form-control'}),
             'email': forms.EmailInput(attrs={'class': 'form-control'}),
             'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
 
-    def clean_user_type(self):
-        user_type = self.cleaned_data['user_type']
-        if user_type not in ('manager', 'employee'):
-            raise forms.ValidationError('Managers can only assign Manager or Employee type.')
-        return user_type
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance and self.instance.pk:
+            self.fields['full_name'].initial = self.instance.get_full_name()
+
+    def clean_full_name(self):
+        full_name = self.cleaned_data.get('full_name', '').strip()
+        if not full_name:
+            raise forms.ValidationError('Full name is required.')
+        return full_name
 
     def clean_email(self):
         email = self.cleaned_data['email']
@@ -269,6 +306,15 @@ class ManagerUserEditForm(forms.ModelForm):
         if qs.exists():
             raise forms.ValidationError('A user with this email already exists.')
         return email
+
+    def save(self, commit=True):
+        user = super().save(commit=False)
+        parts = self.cleaned_data['full_name'].split(None, 1)
+        user.first_name = parts[0]
+        user.last_name = parts[1] if len(parts) > 1 else ''
+        if commit:
+            user.save()
+        return user
 
 
 class UserProfileEditForm(forms.ModelForm):
@@ -470,10 +516,6 @@ class CompanyCreateForm(forms.Form):
         label='Project Manager (Owner)', max_length=100,
         widget=forms.TextInput(attrs=FORM_CONTROL),
     )
-    manager_username = forms.CharField(
-        label='Username', max_length=150,
-        widget=forms.TextInput(attrs=FORM_CONTROL),
-    )
     client_email = forms.EmailField(
         label='E-mail (Client)',
         widget=forms.EmailInput(attrs=FORM_CONTROL),
@@ -489,16 +531,13 @@ class CompanyCreateForm(forms.Form):
         end = cleaned.get('end_date')
         if start and end and end < start:
             raise forms.ValidationError('End Date must be on or after Start Date.')
-        username = (cleaned.get('manager_username') or '').strip()
-        if username and CustomUser.objects.filter(username=username).exists():
-            raise forms.ValidationError({
-                'manager_username': f'Username "{username}" is already taken.',
-            })
         email = (cleaned.get('client_email') or '').strip()
         if email and CustomUser.objects.filter(email__iexact=email).exists():
             raise forms.ValidationError({
                 'client_email': 'A user with this email already exists.',
             })
+        if email:
+            cleaned['manager_username'] = _unique_username_from_email(email)
         return cleaned
 
     def split_manager_name(self):
@@ -531,25 +570,20 @@ class CompanyEditForm(CompanyCreateForm):
         if start and end and end < start:
             raise forms.ValidationError('End Date must be on or after Start Date.')
 
-        username = (cleaned.get('manager_username') or '').strip()
-        if username:
-            qs = CustomUser.objects.filter(username=username)
-            if self.company and self.company.authorized_manager_id:
-                qs = qs.exclude(pk=self.company.authorized_manager_id)
-            if qs.exists():
-                raise forms.ValidationError({
-                    'manager_username': f'Username "{username}" is already taken.',
-                })
-
+        exclude_pk = self.company.authorized_manager_id if self.company else None
         email = (cleaned.get('client_email') or '').strip()
         if email:
             qs = CustomUser.objects.filter(email__iexact=email)
-            if self.company and self.company.authorized_manager_id:
-                qs = qs.exclude(pk=self.company.authorized_manager_id)
+            if exclude_pk:
+                qs = qs.exclude(pk=exclude_pk)
             if qs.exists():
                 raise forms.ValidationError({
                     'client_email': 'A user with this email already exists.',
                 })
+        if exclude_pk and self.company and self.company.authorized_manager:
+            cleaned['manager_username'] = self.company.authorized_manager.username
+        elif email:
+            cleaned['manager_username'] = _unique_username_from_email(email)
 
         project_limit = cleaned.get('project_limit')
         if self.company and project_limit is not None:
@@ -577,7 +611,6 @@ def company_edit_initial(company, authorization):
         'designated_person': company.designated_person,
         'client_contact': company.client_contact,
         'client_email': company.client_email or (mgr.email if mgr else ''),
-        'manager_username': mgr.username if mgr else '',
         'project_manager_name': pm_name,
         'project_limit': company.project_limit,
     }
