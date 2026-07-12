@@ -20,14 +20,19 @@ from django.urls import include
 from django.contrib.auth import views as auth_views
 from django.conf import settings
 from django.conf.urls.static import static
+from django.views.generic.base import RedirectView
+from django.templatetags.static import static as static_url
 
 urlpatterns = [
     path('', include('core.urls', namespace='core')),
     path('admin/', admin.site.urls),
     path('accounts/login/', auth_views.LoginView.as_view(template_name='core/login.html'), name='login'),
+    path(
+        'favicon.ico',
+        RedirectView.as_view(url=static_url('core/img/logos/logo-opt.png'), permanent=True),
+    ),
 ]
 
-# Serve static files during development
+# Serve uploaded media in development (static files handled by WhiteNoise).
 if settings.DEBUG:
-    urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

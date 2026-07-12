@@ -2,6 +2,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    {% if not IS_DEV %}
     <script async src="https://www.googletagmanager.com/gtag/js?id=UA-147225311-2"></script>
     <script>
       window.dataLayer = window.dataLayer || [];
@@ -9,6 +10,7 @@
       gtag('js', new Date());
       gtag('config', 'UA-147225311-2');
     </script>
+    {% endif %}
   <meta charset="utf-8">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
@@ -17,11 +19,16 @@
   <meta name="keyword" content="Bootstrap,Admin,Template,Open,Source,AngularJS,Angular,Angular2,Angular 2,Angular4,Angular 4,jQuery,CSS,HTML,RWD,Dashboard,React,React.js,Vue,Vue.js">
   <meta name="google-site-verification" content="83fcqoPn-YTkXathQiicW-x3U2RWZh4PaPUzk91wtjY" />
   <title>Validation Verification Assessment Manager</title>
+  <link rel="icon" href="{% static 'core/img/logos/logo-opt.png' %}?v={{ STATIC_VERSION }}" type="image/png">
 
-  <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.0.9/css/all.css" integrity="sha384-5SOiIsAziJl6AWe0HWRKTXlfcSHKmYV4RBF18PPJ173Kzn7jzMyFuTtk8JA7QQG1" crossorigin="anonymous">
-  <link href="{% static 'core/css/simple-line-icons.min.css' %}" rel="stylesheet">
-  <link href="{% static 'core/css/style.css' %}" rel="stylesheet">
+  <link rel="stylesheet" href="{% static 'core/css/font-awesome.min.css' %}?v={{ STATIC_VERSION }}">
+  <link rel="stylesheet" href="{% static 'core/css/fa5-compat.css' %}?v={{ STATIC_VERSION }}">
+  <link href="{% static 'core/css/style.min.css' %}?v={{ STATIC_VERSION }}" rel="stylesheet">
   <link href="{% static 'core/css/estilo.css' %}?v={{ STATIC_VERSION }}" rel="stylesheet">
+  <style>
+    body.nav-loading #app-main { opacity: 0.55; pointer-events: none; transition: opacity 0.15s ease; }
+    .brand-gui { max-height: 40px; width: auto; object-fit: contain; }
+  </style>
 
 </head>
 {% block body %}
@@ -38,13 +45,14 @@
     <ul class="nav navbar-nav d-md-down-none">
       <li class="nav-item px-3">
         <a class="nav-link" href="{% url 'core:dashboard' %}">
+          <i class="fa fa-tachometer-alt"></i>
           {% if user.user_type == 'admin' %}Admin Dashboard
           {% elif user.user_type == 'manager' %}Manager Dashboard
           {% else %}Employee Dashboard{% endif %}
         </a>
       </li>
     </ul>
-    <img src="{% static 'core/img/logos/logo.png' %}" alt="" class="brand-gui d-none d-md-inline">
+    <img src="{% static 'core/img/logos/logo-opt.png' %}?v={{ STATIC_VERSION }}" alt="VVAM" class="brand-gui d-none d-md-inline" width="120" height="40" decoding="async" fetchpriority="high">
     <ul class="nav navbar-nav ml-auto">
       {% if user.is_authenticated %}
       <li class="text-white">Hello, {{ user.username }}</li>
@@ -139,45 +147,45 @@
                 <a class="nav-link" href="{% url 'core:users' %}?user_type=admin"><i class="fa fa-user"></i> View Admins</a>
               </li>
               <li class="nav-item">
-                <a class="nav-link" href="{% url 'core:company-list' %}"><i class="fa fa-building ml-2"></i> View Companies</a>
+                <a class="nav-link" href="{% url 'core:company-list' %}"><i class="fa fa-building"></i> View Companies</a>
               </li>
               <li class="nav-item">
-                <a class="nav-link" href="{% url 'core:form-details-list' %}"><i class="fa fa-box ml-2"></i> View Form Details</a>
+                <a class="nav-link" href="{% url 'core:form-details-list' %}"><i class="fa fa-box"></i> View Form Details</a>
               </li>
               <li class="nav-item">
-                <a class="nav-link" href="{% url 'core:form-table-view-list' %}"><i class="fa fa-table ml-2"></i> View Tables In Form</a>
+                <a class="nav-link" href="{% url 'core:form-table-view-list' %}"><i class="fa fa-table"></i> View Tables In Form</a>
               </li>
               <li class="nav-item">
-                <a class="nav-link" href="{% url 'core:library-list' %}"><i class="fa fa-book ml-2"></i> View Informations</a>
+                <a class="nav-link" href="{% url 'core:library-list' %}"><i class="fa fa-book"></i> View Informations</a>
               </li>
               <li class="nav-item">
-                <a class="nav-link" href="{% url 'core:dropdown-list' %}"><i class="fa fa-list ml-2"></i> View Drop-Down List</a>
+                <a class="nav-link" href="{% url 'core:dropdown-list' %}"><i class="fa fa-list"></i> View Drop-Down List</a>
               </li>
               {% elif user.user_type == 'manager' %}
               <li class="nav-item">
-                <a class="nav-link" href="{% url 'core:project-list'%}"><i class="fa fa-folder ml-2"></i> View Projects</a>
+                <a class="nav-link" href="{% url 'core:project-list'%}"><i class="fa fa-folder"></i> View Projects</a>
               </li>
               <li class="nav-item">
-                <a class="nav-link" href="{% url 'core:manager-view-forms' %}"><i class="fa fa-file-alt ml-2"></i> View All Forms</a>
+                <a class="nav-link" href="{% url 'core:manager-view-forms' %}"><i class="fa fa-files-o"></i> View All Forms</a>
               </li>
               <li class="nav-item">
-                <a class="nav-link" href="{% url 'core:manager-view-master-record' %}"><i class="fa fa-file-alt ml-2"></i> View Master Record</a>
+                <a class="nav-link" href="{% url 'core:manager-view-master-record' %}"><i class="fa fa-archive"></i> View Master Record</a>
               </li>
               <li class="nav-item">
-                <a class="nav-link" href="{% url 'core:manager-view-proposal-forms' %}"><i class="fa fa-file-alt ml-2"></i> View Proposal Forms</a>
+                <a class="nav-link" href="{% url 'core:manager-view-proposal-forms' %}"><i class="fa fa-file-text-o"></i> View Proposal Forms</a>
               </li>
               <li class="nav-item">
                 <a class="nav-link" href="{% url 'core:users'%}"><i class="fa fa-user"></i> View Users</a>
               </li>
               <li class="nav-item">
-                <a class="nav-link" href="{% url 'core:team-member-list' %}"><i class="fa fa-users ml-2"></i> View Authorized Teams</a>
+                <a class="nav-link" href="{% url 'core:team-member-list' %}"><i class="fa fa-users"></i> View Authorized Teams</a>
               </li>
               <li class="nav-item">
-                <a class="nav-link" href="{% url 'core:library-list' %}?view=documents"><i class="fa fa-book ml-2"></i> Documents Library</a>
+                <a class="nav-link" href="{% url 'core:library-list' %}?view=documents"><i class="fa fa-book"></i> Documents Library</a>
               </li>
               {% else %}
               <li class="nav-item">
-                <a class="nav-link" href="{% url 'core:project-list'%}"><i class="fa fa-folder ml-2"></i> View Projects</a>
+                <a class="nav-link" href="{% url 'core:project-list'%}"><i class="fa fa-folder"></i> View Projects</a>
               </li>
               {% endif %}
             </ul>
@@ -188,28 +196,28 @@
             <a class="nav-link nav-dropdown-toggle" href="#"><i class="fa fa-shield-alt"></i> Administration</a>
             <ul class="nav-dropdown-items">
               <li class="nav-item">
-                <a class="nav-link" href="{% url 'core:new-user' %}"><i class="fa fa-user-plus ml-2"></i> Create Admin</a>
+                <a class="nav-link" href="{% url 'core:new-user' %}"><i class="fa fa-user-plus"></i> Create Admin</a>
               </li>
               <li class="nav-item">
-                <a class="nav-link" href="{% url 'core:company-create' %}"><i class="fa fa-building ml-2"></i> Create Company</a>
+                <a class="nav-link" href="{% url 'core:company-create' %}"><i class="fa fa-building"></i> Create Company</a>
               </li>
               <li class="nav-item">
-                <a class="nav-link" href="{% url 'core:form-details-create' %}"><i class="fa fa-box ml-2"></i> Create Form Details</a>
+                <a class="nav-link" href="{% url 'core:form-details-create' %}"><i class="fa fa-box"></i> Create Form Details</a>
               </li>
               <li class="nav-item">
-                <a class="nav-link" href="{% url 'core:form-table-list' %}"><i class="fa fa-table ml-2"></i> Create Tables In Form</a>
+                <a class="nav-link" href="{% url 'core:form-table-list' %}"><i class="fa fa-table"></i> Create Tables In Form</a>
               </li>
               <li class="nav-item">
                 <a class="nav-link" href="{% url 'core:package-authorization-create' %}"><i class="fa fa-key"></i> Authorize Packages</a>
               </li>
               <li class="nav-item">
-                <a class="nav-link" href="{% url 'core:dropdown-create' %}"><i class="fa fa-list ml-2"></i> Create Drop-Down List</a>
+                <a class="nav-link" href="{% url 'core:dropdown-create' %}"><i class="fa fa-list"></i> Create Drop-Down List</a>
               </li>
               <li class="nav-item">
                 <a class="nav-link" href="{% url 'core:library-upload' %}"><i class="fa fa-upload"></i> Upload Documents</a>
               </li>
               <li class="nav-item">
-                <a class="nav-link" href="{% url 'core:library-list' %}?view=documents"><i class="fa fa-book ml-2"></i> Documents Library</a>
+                <a class="nav-link" href="{% url 'core:library-list' %}?view=documents"><i class="fa fa-book"></i> Documents Library</a>
               </li>
             </ul>
           </li>
@@ -221,10 +229,10 @@
                 <a class="nav-link" href="{% url 'core:project-create' %}"><i class="fa fa-plus"></i> New Project</a>
               </li>
               <li class="nav-item">
-                <a class="nav-link" href="{% url 'core:new-user' %}"><i class="fa fa-user-plus ml-2"></i> Create User</a>
+                <a class="nav-link" href="{% url 'core:new-user' %}"><i class="fa fa-user-plus"></i> Create User</a>
               </li>
               <li class="nav-item">
-                <a class="nav-link" href="{% url 'core:project-list' %}"><i class="fa fa-users ml-2"></i> Edit Authorize Team</a>
+                <a class="nav-link" href="{% url 'core:project-list' %}"><i class="fa fa-pencil-square-o"></i> Edit Authorize Team</a>
               </li>
             </ul>
           </li>
@@ -257,7 +265,7 @@
       <!-- <button class="sidebar-minimizer brand-minimizer" type="button"></button> -->
     </div>
 
-    <main class="main">
+    <main class="main" id="app-main">
       <ol class="breadcrumb">
         {% block breadcrumb %}
         <li class="breadcrumb-item active">Home</li>
@@ -279,14 +287,16 @@
     <span><a href="#">Copyright</a> © EHSS & Carbon Management And Consultancy Inc.</span>
   </footer>
 
-    <script src="{% static 'core/vendors/js/jquery.min.js'%}"></script>
-    <script src="{% static 'core/vendors/js/popper.min.js'%}"></script>
-    <script src="{% static 'core/vendors/js/bootstrap.min.js'%}"></script>
-    <script src="{% static 'core/vendors/js/pace.min.js'%}"></script>
-    <script src="{% static 'core/vendors/js/Chart.min.js'%}"></script>
-    <script src="{% static 'core/js/app.js'%}"></script>
-    <script src="{% static 'core/js/main.js'%}"></script>
-    <script src="{% static 'core/js/notifications.js'%}"></script>
+    <script src="{% static 'core/vendors/js/jquery.min.js' %}?v={{ STATIC_VERSION }}" defer></script>
+    <script src="{% static 'core/vendors/js/popper.min.js' %}?v={{ STATIC_VERSION }}" defer></script>
+    <script src="{% static 'core/vendors/js/bootstrap.min.js' %}?v={{ STATIC_VERSION }}" defer></script>
+    {% if not IS_DEV %}
+    <script src="{% static 'core/vendors/js/pace.min.js' %}?v={{ STATIC_VERSION }}" defer></script>
+    {% endif %}
+    <script src="{% static 'core/js/app.js' %}?v={{ STATIC_VERSION }}" defer></script>
+    {% block chart_scripts %}{% endblock %}
+    <script src="{% static 'core/js/partial-nav.js' %}?v={{ STATIC_VERSION }}" defer></script>
+    {% block extra_scripts %}{% endblock %}
 
 </body>
 {% endblock body %}

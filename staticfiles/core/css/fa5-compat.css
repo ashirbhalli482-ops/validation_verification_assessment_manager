@@ -1,0 +1,46 @@
+/**
+ * Font Awesome 5 class names used in templates, mapped to FA 4.7 glyphs.
+ * Keeps local font files while restoring icons after the CDN -> local switch.
+ */
+
+/* FA5 prefix classes used with the FA 4.7 webfont */
+.fas, .far, .fab {
+  display: inline-block;
+  font: normal normal normal 14px/1 FontAwesome;
+  font-size: inherit;
+  text-rendering: auto;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.fa-tachometer-alt:before { content: "\f0e4"; }
+.fa-shield-alt:before { content: "\f132"; }
+.fa-file-alt:before { content: "\f0f6"; }
+.fa-chart-bar:before { content: "\f080"; }
+.fa-edit:before { content: "\f040"; }
+.fa-trash:before { content: "\f1f8"; }
+.fa-box:before { content: "\f1b2"; }
+.fa-user-shield:before { content: "\f21b"; }
+.fa-check-double:before { content: "\f046"; }
+.fa-sign-in-alt:before { content: "\f090"; }
+.fa-sign-out-alt:before { content: "\f08b"; }
+.fa-envelope:before { content: "\f0e0"; }
+.fa-lock:before { content: "\f023"; }
+.fa-key:before { content: "\f084"; }
+.fa-book:before { content: "\f02d"; }
+.fa-exclamation-circle:before { content: "\f06a"; }
+.fa-spinner:before { content: "\f110"; }
+
+/* Distinct manager form views */
+.fa-files-o:before { content: "\f0c5"; }
+.fa-archive:before { content: "\f187"; }
+.fa-file-text-o:before { content: "\f0f6"; }
+
+/* Sidebar icon spacing */
+.sidebar-nav .nav-link > .fa,
+.sidebar-nav .nav-link > i.fa {
+  display: inline-block;
+  width: 1.25rem;
+  margin-right: 0.35rem;
+  text-align: center;
+}

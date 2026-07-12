@@ -93,7 +93,7 @@
                             <td class="text-center text-nowrap" style="min-width:60px;">
                                 <div class="avatar">
                                 <img src="{{ user1.avatar_url }}" class="img-avatar" alt="img">
-                                <span class="avatar-status badge-success"></span>
+                                <span class="avatar-status badge-{% if user1.is_active %}success{% else %}danger{% endif %}"></span>
                                 </div>
                             </td>
                             <td class="text-nowrap" style="min-width:120px;">
@@ -115,20 +115,40 @@
                                     <a href="{% url 'core:user' user1.id %}" class="btn btn-sm btn-info" title="View">
                                         <i class="fa fa-eye"></i> View
                                     </a>
-                                    {% if admin_users_only or logged_user|can_manage_user:user1 %}
+                                    {% if admin_users_only or can_manage_all_listed or logged_user|can_manage_user:user1 %}
                                     <a href="{% url 'core:edit-user-profile' user1.id %}" class="btn btn-sm btn-warning" title="Edit">
                                         <i class="fa fa-edit"></i> Edit
                                     </a>
-                                    {% if user1 == logged_user %}
-                                    <a href="{% url 'core:delete-user' user1.id %}" class="btn btn-sm btn-danger" title="Delete"
-                                       onclick="alert('You cannot delete your own account.'); return false;">
-                                        <i class="fa fa-trash"></i> Delete
-                                    </a>
-                                    {% else %}
-                                    <a href="{% url 'core:delete-user' user1.id %}" class="btn btn-sm btn-danger" title="Delete"
-                                       onclick="return confirm('Delete this {% if admin_users_only %}admin{% else %}user{% endif %}?');">
-                                        <i class="fa fa-trash"></i> Delete
-                                    </a>
+                                    {% if admin_users_only %}
+                                        {% if user1 == logged_user %}
+                                        <a href="{% url 'core:delete-user' user1.id %}" class="btn btn-sm btn-danger" title="Delete"
+                                           onclick="alert('You cannot delete your own account.'); return false;">
+                                            <i class="fa fa-trash"></i> Delete
+                                        </a>
+                                        {% else %}
+                                        <a href="{% url 'core:delete-user' user1.id %}" class="btn btn-sm btn-danger" title="Delete"
+                                           onclick="return confirm('Delete this admin?');">
+                                            <i class="fa fa-trash"></i> Delete
+                                        </a>
+                                        {% endif %}
+                                    {% elif logged_user.user_type == 'manager' %}
+                                        {% if user1 == logged_user %}
+                                        <button type="button" class="btn btn-sm btn-secondary" title="Cannot change your own status"
+                                                onclick="alert('You cannot change your own account status.');">
+                                            {% if user1.is_active %}Deactivate{% else %}Activate{% endif %}
+                                        </button>
+                                        {% else %}
+                                        <form method="post" action="{% url 'core:toggle-user-active' user1.id %}" class="d-inline">
+                                            {% csrf_token %}
+                                            <button type="submit"
+                                                    class="btn btn-sm {% if user1.is_active %}btn-outline-danger{% else %}btn-outline-success{% endif %}"
+                                                    title="{% if user1.is_active %}Deactivate{% else %}Activate{% endif %}"
+                                                    onclick="return confirm('{% if user1.is_active %}Deactivate{% else %}Activate{% endif %} this user?');">
+                                                <i class="fa {% if user1.is_active %}fa-ban{% else %}fa-check{% endif %}"></i>
+                                                {% if user1.is_active %}Deactivate{% else %}Activate{% endif %}
+                                            </button>
+                                        </form>
+                                        {% endif %}
                                     {% endif %}
                                     {% endif %}
                                 </div>
@@ -194,6 +214,8 @@
             {% if success_action == 'created' %}User Created
             {% elif success_action == 'updated' %}User Updated
             {% elif success_action == 'deleted' %}User Deleted
+            {% elif success_action == 'activated' %}User Activated
+            {% elif success_action == 'deactivated' %}User Deactivated
             {% else %}Success{% endif %}
           {% endif %}
         </h5>
@@ -223,6 +245,10 @@
               User <strong>{{ success_user }}</strong> has been updated successfully.
             {% elif success_action == 'deleted' %}
               User <strong>{{ success_user }}</strong> has been deleted successfully.
+            {% elif success_action == 'activated' %}
+              User <strong>{{ success_user }}</strong> has been activated successfully.
+            {% elif success_action == 'deactivated' %}
+              User <strong>{{ success_user }}</strong> has been deactivated successfully.
             {% else %}
               Action has been completed successfully.
             {% endif %}

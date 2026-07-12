@@ -1,25 +1,38 @@
-{% if table_layout and table_cells %}
+{% for section in table_sections %}
+{% with table_layout=section.layout table_headers=section.table_headers table_rows=section.table_rows %}
 <div class="form-group mt-4">
-  <label class="d-block font-weight-bold">Form Table</label>
+  <label class="d-block font-weight-bold">
+    {% if table_layout.table_name %}{{ table_layout.table_name }} — {% endif %}{{ form_def.code }} ({{ form_def.name }})
+    {% if table_layout.table_number %}<span class="text-muted small">(Table {{ table_layout.table_number }})</span>{% endif %}
+  </label>
   <p class="text-muted small">Column headings are set by the administrator. Enter data in the cells below.</p>
   <div class="table-responsive">
     <table class="table table-bordered table-sm mb-0">
       <thead class="thead-light">
         <tr>
-          {% for header in table_layout.column_headers %}
+          {% for header in table_headers %}
           <th>{{ header }}</th>
           {% endfor %}
         </tr>
       </thead>
       <tbody>
-        {% for row in table_cells %}
+        {% for row in table_rows %}
         <tr>
           {% for cell in row %}
           <td>
+            {% if cell.dropdown %}
+            <select name="table_cell_{{ table_layout.pk }}_{{ cell.row }}_{{ cell.col }}" class="form-control form-control-sm">
+              <option value="">— Select —</option>
+              {% for opt in cell.dropdown.options %}
+              <option value="{{ opt }}" {% if cell.value == opt %}selected{% endif %}>{{ opt }}</option>
+              {% endfor %}
+            </select>
+            {% else %}
             <input type="text"
-                   name="table_cell_{{ forloop.parentloop.counter0 }}_{{ forloop.counter0 }}"
+                   name="table_cell_{{ table_layout.pk }}_{{ cell.row }}_{{ cell.col }}"
                    class="form-control form-control-sm"
-                   value="{{ cell }}">
+                   value="{{ cell.value }}">
+            {% endif %}
           </td>
           {% endfor %}
         </tr>
@@ -27,5 +40,9 @@
       </tbody>
     </table>
   </div>
+  {% if table_layout.notes %}
+  <p class="small mt-2 mb-0"><strong>Note:</strong> {{ table_layout.notes|linebreaksbr }}</p>
+  {% endif %}
 </div>
-{% endif %}
+{% endwith %}
+{% endfor %}

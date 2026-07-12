@@ -37,6 +37,8 @@ ALLOWED_HOSTS = [
     if host.strip()
 ]
 
+INTERNAL_IPS = ['127.0.0.1', 'localhost']
+
 RENDER_EXTERNAL_HOSTNAME = os.environ.get('RENDER_EXTERNAL_HOSTNAME')
 if RENDER_EXTERNAL_HOSTNAME:
     ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
@@ -79,6 +81,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'core.middleware.PartialNavMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -92,7 +95,6 @@ TEMPLATES = [
         'APP_DIRS': True,
         'OPTIONS': {
                     'context_processors': [
-            'django.template.context_processors.debug',
             'django.template.context_processors.request',
             'django.contrib.auth.context_processors.auth',
             'django.contrib.messages.context_processors.messages',
@@ -116,6 +118,15 @@ DATABASES = {
         conn_max_age=600,
     )
 }
+
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'vvam-local',
+    }
+}
+
+SESSION_ENGINE = 'django.contrib.sessions.backends.cached_db'
 
 
 # Password validation
@@ -157,7 +168,7 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 STATICFILES_DIRS = [
     os.path.join(BASE_DIR, 'core/static'),
 ]
-STATIC_VERSION = os.environ.get('STATIC_VERSION', '2')
+STATIC_VERSION = os.environ.get('STATIC_VERSION', '8')
 
 STORAGES = {
     'default': {
@@ -167,6 +178,15 @@ STORAGES = {
         'BACKEND': 'whitenoise.storage.CompressedStaticFilesStorage',
     },
 }
+
+# Cache static assets in the browser (1 week in dev, 1 year in production).
+WHITENOISE_MAX_AGE = 604800 if DEBUG else 31536000
+# Serve collected + gzip-compressed files by default (fast F5). Set WHITENOISE_USE_FINDERS=1
+# in the environment while editing static source files under core/static/.
+WHITENOISE_USE_FINDERS = os.environ.get('WHITENOISE_USE_FINDERS', '') == '1'
+WHITENOISE_AUTOREFRESH = WHITENOISE_USE_FINDERS
+
+SESSION_SAVE_EVERY_REQUEST = False
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'core/media')

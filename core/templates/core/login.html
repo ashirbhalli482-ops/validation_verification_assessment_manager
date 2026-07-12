@@ -8,15 +8,11 @@
     <title>VVAM — Sign In</title>
     <meta name="description" content="Sign in to the Validation Verification Assessment Manager">
 
-    <!-- Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.0.9/css/all.css" integrity="sha384-5SOiIsAziJl6AWe0HWRKTXlfcSHKmYV4RBF18PPJ173Kzn7jzMyFuTtk8JA7QQG1" crossorigin="anonymous">
-
-    <!-- Bootstrap CSS -->
-    <link href="{% static 'core/css/bootstrap.css' %}" rel="stylesheet">
-
-    <!-- Custom CSS -->
-    <link href="{% static 'core/css/style.css' %}" rel="stylesheet">
+    <link rel="icon" href="{% static 'core/img/logos/logo-opt.png' %}?v={{ STATIC_VERSION }}" type="image/png">
+    <link rel="stylesheet" href="{% static 'core/css/font-awesome.min.css' %}?v={{ STATIC_VERSION }}">
+    <link rel="stylesheet" href="{% static 'core/css/fa5-compat.css' %}?v={{ STATIC_VERSION }}">
+    <link href="{% static 'core/css/bootstrap.css' %}?v={{ STATIC_VERSION }}" rel="stylesheet">
+    <link href="{% static 'core/css/style.min.css' %}?v={{ STATIC_VERSION }}" rel="stylesheet">
     <link href="{% static 'core/css/estilo.css' %}?v={{ STATIC_VERSION }}" rel="stylesheet">
 </head>
 <body class="login-page">
@@ -30,7 +26,7 @@
                     <p class="login-subtitle">Enter your credentials to access VVAM</p>
                 </div>
 
-                <form method="post" action="{% url 'core:login' %}">
+                <form method="post" action="{% url 'core:login' %}" id="loginForm">
                     {% csrf_token %}
                     
                     <!-- Messages Display -->
@@ -76,11 +72,17 @@
                                placeholder="Enter your password"
                                id="id_password"
                                required>
-                        <i class="fas fa-lock input-icon"></i>
+                        <button type="button"
+                                class="password-toggle input-icon"
+                                id="passwordToggle"
+                                aria-label="Show password"
+                                title="Show password">
+                            <i class="fas fa-lock" aria-hidden="true"></i>
+                        </button>
                     </div>
 
                     <!-- Login Button -->
-                    <button type="submit" class="btn-login">
+                    <button type="submit" class="btn-login" id="loginBtn">
                         <i class="fas fa-sign-in-alt"></i> Sign In
                     </button>
                 </form>
@@ -92,7 +94,7 @@
             <div class="login-left">
                 <div class="login-left-content">
                     <div class="brand-logo" aria-hidden="true">
-                        <img src="{% static 'core/img/logos/logo1.png' %}" alt="Logo">
+                        <img src="{% static 'core/img/logos/logo-opt.png' %}?v={{ STATIC_VERSION }}" alt="Logo">
                     </div>
                     <h1 class="welcome-title">Validation Verification Assessment Manager</h1>
                     <p class="welcome-subtitle">
@@ -114,5 +116,55 @@
     <script src="{% static 'core/vendors/js/jquery.min.js' %}"></script>
     <script src="{% static 'core/vendors/js/bootstrap.min.js' %}"></script>
     <script src="{% static 'core/js/index.js' %}"></script>
+    <script>
+    (function () {
+      var form = document.getElementById('loginForm');
+      var btn = document.getElementById('loginBtn');
+      var passwordInput = document.getElementById('id_password');
+      var passwordToggle = document.getElementById('passwordToggle');
+      if (passwordToggle && passwordInput) {
+        passwordToggle.addEventListener('click', function () {
+          var icon = passwordToggle.querySelector('i');
+          var showPassword = passwordInput.type === 'password';
+          passwordInput.type = showPassword ? 'text' : 'password';
+          icon.classList.toggle('fa-lock', !showPassword);
+          icon.classList.toggle('fa-unlock', showPassword);
+          passwordToggle.setAttribute('aria-label', showPassword ? 'Hide password' : 'Show password');
+          passwordToggle.setAttribute('title', showPassword ? 'Hide password' : 'Show password');
+        });
+      }
+      if (!form) return;
+      form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Signing in…';
+        fetch(form.action, {
+          method: 'POST',
+          body: new FormData(form),
+          credentials: 'same-origin',
+          redirect: 'follow',
+        })
+          .then(function (response) {
+            return response.text().then(function (html) {
+              return { html: html, url: response.url };
+            });
+          })
+          .then(function (result) {
+            if (result.url.indexOf('/accounts/login') !== -1) {
+              document.open();
+              document.write(result.html);
+              document.close();
+              return;
+            }
+            document.open();
+            document.write(result.html);
+            document.close();
+          })
+          .catch(function () {
+            form.submit();
+          });
+      });
+    })();
+    </script>
 </body>
 </html>

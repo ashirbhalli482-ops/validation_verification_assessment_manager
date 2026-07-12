@@ -1,0 +1,118 @@
+<div class="card mb-4 table-block{% if block.error %} border-danger{% endif %}" data-key="{{ block.key }}" data-form-label="{{ form_def.code }} ({{ form_def.name }})" data-next-dropdown-index="{{ block.next_dropdown_index|default:0 }}">
+  <div class="card-header d-flex justify-content-between align-items-center py-2">
+    <strong class="table-block-title">Table {{ block.table_number|default:'New' }}</strong>
+    <button type="button" class="btn btn-sm btn-outline-danger remove-table-btn" title="Remove this table from the form">Remove Table</button>
+  </div>
+  <div class="card-body">
+    {% if block.error %}
+    <div class="alert alert-danger py-2">{{ block.error }}</div>
+    {% endif %}
+    <input type="hidden" name="tbl_{{ block.key }}_id" value="{% if block.layout_id %}{{ block.layout_id }}{% endif %}">
+
+    <div class="row">
+      <div class="col-md-3 mb-3">
+        <label class="d-block">Number of Table</label>
+        <input type="number" name="tbl_{{ block.key }}_number" class="form-control table-number" min="1" value="{{ block.table_number|default:1 }}">
+      </div>
+      <div class="col-md-5 mb-3">
+        <label class="d-block">Name of Table</label>
+        <input type="text" name="tbl_{{ block.key }}_name" class="form-control table-name" placeholder="Table name" value="{{ block.table_name }}">
+      </div>
+      <div class="col-md-4 mb-3">
+        <label class="d-block">Number of Rows</label>
+        <input type="number" name="tbl_{{ block.key }}_row_count" class="form-control row-count" min="1" max="500" value="{{ block.row_count|default:100 }}">
+        <small class="text-muted">Preview shows 1 row only.</small>
+      </div>
+    </div>
+
+    <div class="mb-3">
+      <label class="d-block">Column Headings</label>
+      <p class="text-muted small mb-2">Columns cannot be deleted. Use Activate / Deactivate to control which columns appear in the form.</p>
+      <div class="column-headers">
+        {% for column in block.column_rows %}
+        <div class="input-group mb-2 column-header-row">
+          <input type="text" name="tbl_{{ block.key }}_column_headers" class="form-control column-header-input{% if not column.is_active %} bg-light text-muted{% endif %}" placeholder="Column heading" value="{{ column.label }}">
+          <input type="hidden" name="tbl_{{ block.key }}_column_active" class="column-active-input" value="{% if column.is_active %}1{% else %}0{% endif %}">
+          <div class="input-group-append">
+            <button type="button" class="btn {% if column.is_active %}btn-outline-danger{% else %}btn-outline-success{% endif %} toggle-column">
+              {% if column.is_active %}Deactivate{% else %}Activate{% endif %}
+            </button>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      <button type="button" class="btn btn-outline-primary btn-sm mt-1 add-column">
+        <i class="fa fa-plus"></i> Add Column
+      </button>
+    </div>
+
+    <div class="mb-3">
+      <label class="d-block">Column Dropdowns</label>
+      <p class="text-muted small mb-2">Apply a dropdown to an entire column. All rows in that column will show the dropdown when users fill the form.</p>
+      <div class="column-dropdowns">
+        {% for dd in block.dropdown_rows %}
+        <div class="card mb-2 column-dropdown-row{% if not dd.is_active %} border-secondary{% endif %}" data-index="{{ dd.index }}">
+          <div class="card-body py-2">
+            <div class="form-row align-items-end">
+              <div class="col-md-4 mb-2">
+                <label class="small mb-1">Column</label>
+                <select name="tbl_{{ block.key }}_col_dd_{{ dd.index }}_col" class="form-control form-control-sm column-select">
+                  {% for column in block.column_rows %}
+                  {% if column.is_active %}
+                  <option value="{{ forloop.counter0 }}" {% if dd.col == forloop.counter0 %}selected{% endif %}>Column {{ forloop.counter }}: {{ column.label }}</option>
+                  {% endif %}
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="col-md-6 mb-2">
+                <label class="small mb-1">Dropdown Values</label>
+                <div class="dropdown-options">
+                  {% for opt in dd.options %}
+                  <div class="input-group input-group-sm mb-1 option-row">
+                    <input type="text" name="tbl_{{ block.key }}_col_dd_{{ dd.index }}_options" class="form-control option-input" placeholder="Value" value="{{ opt }}">
+                    <div class="input-group-append">
+                      <button type="button" class="btn btn-outline-secondary remove-option" title="Remove value">&times;</button>
+                    </div>
+                  </div>
+                  {% empty %}
+                  <div class="input-group input-group-sm mb-1 option-row">
+                    <input type="text" name="tbl_{{ block.key }}_col_dd_{{ dd.index }}_options" class="form-control option-input" placeholder="Value" value="">
+                    <div class="input-group-append">
+                      <button type="button" class="btn btn-outline-secondary remove-option" title="Remove value">&times;</button>
+                    </div>
+                  </div>
+                  {% endfor %}
+                </div>
+                <button type="button" class="btn btn-outline-primary btn-sm add-option mt-1">+ Add Value</button>
+              </div>
+              <div class="col-md-2 mb-2 text-right">
+                <input type="hidden" name="tbl_{{ block.key }}_col_dd_{{ dd.index }}_active" class="dropdown-active-input" value="{% if dd.is_active %}1{% else %}0{% endif %}">
+                <button type="button" class="btn btn-sm {% if dd.is_active %}btn-outline-danger{% else %}btn-outline-success{% endif %} toggle-dropdown">
+                  {% if dd.is_active %}Deactivate{% else %}Activate{% endif %}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      <button type="button" class="btn btn-outline-primary btn-sm mt-1 add-dropdown">
+        <i class="fa fa-plus"></i> Add Column Dropdown
+      </button>
+    </div>
+
+    <div class="mb-2">
+      <label class="d-block font-weight-bold preview-title"></label>
+      <div class="table-responsive">
+        <table class="table table-bordered table-sm mb-0 table-preview">
+          <thead><tr class="preview-header-row"></tr></thead>
+          <tbody class="preview-body"></tbody>
+        </table>
+      </div>
+      <div class="mt-3">
+        <label class="d-block">Table Notes</label>
+        <textarea name="tbl_{{ block.key }}_notes" class="form-control table-notes" rows="3" placeholder="Notes related to this table">{{ block.notes }}</textarea>
+      </div>
+    </div>
+  </div>
+</div>

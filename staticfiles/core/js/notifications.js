@@ -160,11 +160,11 @@ $(document).ready(function() {
         }, 3000);
     }
 
-    // Auto-refresh notifications every 30 seconds (optional)
-    setInterval(function() {
-        if ($('.notifications-list').length > 0) {
-            // Only refresh if we're on the notifications page
-            location.reload();
-        }
-    }, 30000);
+    // Auto-refresh notifications every 30 seconds (notifications page only).
+    // Disabled: full reload is slow; use mark-read AJAX instead.
+    // setInterval(function() {
+    //     if ($('.notifications-list').length > 0) {
+    //         location.reload();
+    //     }
+    // }, 30000);
 }); 

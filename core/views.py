@@ -9,10 +9,12 @@ from django.urls import reverse_lazy, reverse
 from django.views import View
 from django.utils import timezone
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Count, Q
+from django.core.cache import cache
 from django.forms import formset_factory
 import json
 import mimetypes
+import time
 from urllib.parse import quote
 
 from .models import (
@@ -38,6 +40,10 @@ from .access import (
     company_for_project,
 )
 from .permissions import AdminRequiredMixin, ManagerRequiredMixin, EmployeeBlockedMixin, ManagerOrAdminMixin
+from .context_processors import invalidate_notification_cache
+from .form_table_utils import (
+    build_table_block, block_from_post, table_block_keys, stored_cells_for_layout,
+)
 from .package_seed import get_active_package_template
 
 
@@ -158,51 +164,83 @@ class IndexView(View):
 
 
 class DashboardView(LoginRequiredMixin, View):
+    _CACHE_TTL = 60
+
     def get(self, request):
         user = request.user
         ctx = {'user': user}
         if user.user_type == 'admin':
+            cache_key = f'dashboard_stats_admin_{user.pk}'
+            cached = cache.get(cache_key)
+            if cached is not None:
+                ctx.update(cached)
+                return render(request, 'core/dashboard.html', ctx)
+
+            user_stats = CustomUser.objects.aggregate(
+                admin_count=Count('id', filter=Q(user_type='admin')),
+                manager_count=Count('id', filter=Q(user_type='manager')),
+                employee_count=Count('id', filter=Q(user_type='employee')),
+            )
+            ctx.update(user_stats)
             ctx.update({
-                'admin_count': CustomUser.objects.filter(user_type='admin').count(),
-                'manager_count': CustomUser.objects.filter(user_type='manager').count(),
-                'employee_count': CustomUser.objects.filter(user_type='employee').count(),
                 'company_count': Company.objects.count(),
                 'authorization_count': PackageAuthorization.objects.count(),
                 'form_details_count': _admin_form_definitions().count(),
                 'library_count': LibraryDocument.objects.count(),
             })
+            cache.set(cache_key, {k: v for k, v in ctx.items() if k != 'user'}, self._CACHE_TTL)
         elif user.user_type == 'manager':
-            projects = Project.objects.filter(manager=user)
+            manager_cache_key = f'dashboard_stats_manager_{user.pk}'
+            cached = cache.get(manager_cache_key)
+            if cached is not None:
+                ctx.update(cached)
+                return render(request, 'core/dashboard.html', ctx)
+
+            project_count = Project.objects.filter(manager=user).count()
+            projects = list(Project.objects.filter(manager=user).order_by('-pk')[:5])
             company = _manager_company(user)
             auth = PackageAuthorization.objects.filter(manager=user).order_by('-created_at').first()
-            ctx.update({
-                'projects': projects[:5],
-                'project_count': projects.count(),
+            manager_stats = TeamMember.objects.filter(
+                project__manager=user, is_active=True,
+            ).aggregate(team_member_count=Count('id'))
+            manager_ctx = {
+                'projects': projects,
+                'project_count': project_count,
                 'total_projects_allocated': company.project_limit if company else 0,
-                'remaining_projects': company.projects_remaining() if company else 0,
+                'remaining_projects': max(0, company.project_limit - project_count) if company else 0,
                 'allocated_forms_count': (
                     AuthorizedForm.objects.filter(authorization=auth, is_active=True).count()
                     if auth else 0
                 ),
-                'team_member_count': TeamMember.objects.filter(
-                    project__manager=user, is_active=True
-                ).count(),
+                'team_member_count': manager_stats['team_member_count'],
                 'pending_reviews': FormRecord.objects.filter(
                     project__manager=user, status='submitted'
                 ).count(),
-            })
+            }
+            ctx.update(manager_ctx)
+            cache.set(manager_cache_key, manager_ctx, self._CACHE_TTL)
         else:
+            employee_cache_key = f'dashboard_stats_employee_{user.pk}'
+            cached = cache.get(employee_cache_key)
+            if cached is not None:
+                ctx.update(cached)
+                return render(request, 'core/dashboard.html', ctx)
+
             assignments = get_employee_projects(user)
             team_projects = [a.project for a in assignments]
-            ctx.update({
+            form_stats = FormRecord.objects.filter(created_by_user=user).aggregate(
+                form_count=Count('id'),
+                pending_forms=Count('id', filter=Q(status__in=['draft', 'returned'])),
+            )
+            employee_ctx = {
                 'projects': team_projects,
                 'assignments': assignments,
-                'form_count': FormRecord.objects.filter(created_by_user=user).count(),
-                'pending_forms': FormRecord.objects.filter(
-                    created_by_user=user, status__in=['draft', 'returned']
-                ).count(),
+                'form_count': form_stats['form_count'],
+                'pending_forms': form_stats['pending_forms'],
                 'library_count': get_authorized_library_documents(user).count(),
-            })
+            }
+            ctx.update(employee_ctx)
+            cache.set(employee_cache_key, employee_ctx, self._CACHE_TTL)
         return render(request, 'core/dashboard.html', ctx)
 
 
@@ -281,6 +319,7 @@ class UsersView(ManagerOrAdminMixin, View):
             'user_role_choices': USER_ROLE_CHOICES,
             'search_query': search,
             'admin_users_only': user.user_type == 'admin',
+            'can_manage_all_listed': user.user_type in ('admin', 'manager'),
             'success_action': request.GET.get('success', ''),
             'success_user': request.GET.get('user', ''),
         })
@@ -419,22 +458,21 @@ class EditUserProfileView(LoginRequiredMixin, View):
 
 class UserDeleteView(LoginRequiredMixin, View):
     def get(self, request, pk):
+        if request.user.user_type == 'manager':
+            messages.error(request, 'Managers cannot delete users. Use Activate/Deactivate instead.')
+            return redirect('core:users')
         target = get_object_or_404(CustomUser, id=pk)
         if not request.user.can_manage_user(target) or target == request.user:
             messages.error(request, 'Cannot delete this user.')
             return redirect('core:users')
-        if request.user.user_type == 'manager' and target.user_type == 'admin':
-            messages.error(request, 'Managers cannot delete admin accounts.')
-            return redirect('core:users')
         return render(request, 'core/delete_user.html', {'target_user': target})
 
     def post(self, request, pk):
+        if request.user.user_type == 'manager':
+            messages.error(request, 'Managers cannot delete users. Use Activate/Deactivate instead.')
+            return redirect('core:users')
         target = get_object_or_404(CustomUser, id=pk)
-        if (
-            request.user.can_manage_user(target)
-            and target != request.user
-            and not (request.user.user_type == 'manager' and target.user_type == 'admin')
-        ):
+        if request.user.can_manage_user(target) and target != request.user:
             username = target.get_full_name() or target.username
             is_admin = target.user_type == 'admin'
             target.delete()
@@ -442,6 +480,27 @@ class UserDeleteView(LoginRequiredMixin, View):
                 return admin_users_success_redirect('deleted', username)
             return manager_users_success_redirect('deleted', username)
         return redirect('core:users')
+
+
+class UserToggleActiveView(LoginRequiredMixin, View):
+    """Managers activate/deactivate their users instead of deleting them."""
+
+    def post(self, request, pk):
+        if request.user.user_type != 'manager':
+            messages.error(request, 'Only managers can use this action here.')
+            return redirect('core:users')
+        target = get_object_or_404(CustomUser, id=pk)
+        if target == request.user:
+            messages.error(request, 'You cannot change your own account status.')
+            return redirect('core:users')
+        if not request.user.can_manage_user(target):
+            messages.error(request, 'Access denied.')
+            return redirect('core:users')
+        target.is_active = not target.is_active
+        target.save(update_fields=['is_active'])
+        username = target.get_full_name() or target.username
+        action = 'activated' if target.is_active else 'deactivated'
+        return manager_users_success_redirect(action, username)
 
 
 class AdminSetPasswordView(ManagerOrAdminMixin, View):
@@ -969,7 +1028,7 @@ class FormTableInFormListView(AdminRequiredMixin, ListView):
 
     def get_queryset(self):
         return _admin_form_definitions(
-            FormDefinition.objects.select_related('table_layout', 'created_by')
+            FormDefinition.objects.prefetch_related('table_layouts').select_related('created_by')
         ).order_by('code')
 
     def get_context_data(self, **kwargs):
@@ -981,50 +1040,90 @@ class FormTableInFormListView(AdminRequiredMixin, ListView):
 
 
 class FormTableLayoutEditView(AdminRequiredMixin, View):
-    """Define row count and column headings for a form table."""
+    """Define one or more table layouts for a form."""
+
     def _form_def(self, pk):
         return get_object_or_404(_admin_form_definitions(), pk=pk)
 
+    def _table_blocks(self, form_def, post=None):
+        if post is not None:
+            keys = table_block_keys(post)
+            if not keys:
+                return [build_table_block(key='new0')]
+            return [block_from_post(post, key) for key in keys]
+        layouts = list(form_def.table_layouts.all())
+        if layouts:
+            return [build_table_block(layout=layout) for layout in layouts]
+        return [build_table_block(key='new0')]
+
     def get(self, request, pk):
         form_def = self._form_def(pk)
-        layout = FormTableLayout.objects.filter(form_definition=form_def).first()
-        headers = list(layout.column_headers) if layout and layout.column_headers else ['']
-        form = FormTableLayoutForm(initial={'row_count': layout.row_count if layout else 1})
+        table_blocks = self._table_blocks(form_def)
+        has_tables = any(block.get('layout_id') for block in table_blocks)
         return render(request, 'core/form_table_edit.html', {
             'form_def': form_def,
-            'layout': layout,
-            'form': form,
-            'column_headers': headers,
+            'table_blocks': table_blocks,
+            'empty_block': build_table_block(key='new0'),
+            'has_tables': has_tables,
         })
 
     def post(self, request, pk):
         form_def = self._form_def(pk)
-        layout = FormTableLayout.objects.filter(form_definition=form_def).first()
-        form = FormTableLayoutForm(request.POST)
-        headers = [h.strip() for h in request.POST.getlist('column_headers') if h.strip()]
-        if not form.is_valid():
+        blocks = self._table_blocks(form_def, request.POST)
+        valid_blocks = []
+        has_error = False
+        seen_numbers = set()
+        for block in blocks:
+            if not block:
+                has_error = True
+                continue
+            if not block.get('columns'):
+                has_error = True
+                block['error'] = 'Add at least one column heading.'
+            num = block.get('table_number')
+            if num in seen_numbers:
+                has_error = True
+                block['error'] = f'Table number {num} is already used in this form.'
+            seen_numbers.add(num)
+            valid_blocks.append(block)
+        if has_error:
             return render(request, 'core/form_table_edit.html', {
                 'form_def': form_def,
-                'layout': layout,
-                'form': form,
-                'column_headers': headers or [''],
+                'table_blocks': valid_blocks or [build_table_block(key='new0')],
+                'empty_block': build_table_block(key='new0'),
+                'has_tables': any(block.get('layout_id') for block in valid_blocks),
+                'form_error': 'Fix the highlighted table blocks before saving.',
             })
-        if not headers:
-            form.add_error(None, 'Add at least one column heading.')
-            return render(request, 'core/form_table_edit.html', {
-                'form_def': form_def,
-                'layout': layout,
-                'form': form,
-                'column_headers': [''],
-            })
-        FormTableLayout.objects.update_or_create(
-            form_definition=form_def,
-            defaults={
-                'row_count': form.cleaned_data['row_count'],
-                'column_headers': headers,
+
+        removed_ids = {
+            int(value) for value in request.POST.get('removed_table_ids', '').split(',')
+            if value.strip().isdigit()
+        }
+        kept_ids = set()
+        for block in valid_blocks:
+            defaults = {
+                'table_number': block['table_number'],
+                'table_name': block['table_name'],
+                'notes': block['notes'],
+                'row_count': block['row_count'],
+                'column_headers': block['columns'],
+                'cell_dropdowns': block['cell_dropdowns'],
                 'created_by': request.user,
-            },
-        )
+            }
+            if block['layout_id']:
+                layout, _ = FormTableLayout.objects.update_or_create(
+                    pk=block['layout_id'],
+                    form_definition=form_def,
+                    defaults=defaults,
+                )
+            else:
+                layout = FormTableLayout.objects.create(
+                    form_definition=form_def,
+                    **defaults,
+                )
+            kept_ids.add(layout.pk)
+
+        form_def.table_layouts.filter(pk__in=removed_ids - kept_ids).delete()
         if request.GET.get('return') == 'view' or request.POST.get('return') == 'view':
             return form_table_view_list_success_redirect('saved', form_def.code)
         return form_table_list_success_redirect('saved', form_def.code)
@@ -1038,7 +1137,7 @@ class FormTableViewInFormListView(AdminRequiredMixin, ListView):
 
     def get_queryset(self):
         return _admin_form_definitions(
-            FormDefinition.objects.select_related('table_layout', 'created_by')
+            FormDefinition.objects.prefetch_related('table_layouts').select_related('created_by')
         ).order_by('code')
 
     def get_context_data(self, **kwargs):
@@ -1050,30 +1149,44 @@ class FormTableViewInFormListView(AdminRequiredMixin, ListView):
 
 
 class FormTableLayoutDetailView(AdminRequiredMixin, View):
-    """Read-only view of a form table layout."""
+    """Read-only view of all table layouts for a form."""
     def get(self, request, pk):
         form_def = get_object_or_404(_admin_form_definitions(), pk=pk)
-        layout = FormTableLayout.objects.filter(form_definition=form_def).first()
-        if not layout:
+        layouts = list(form_def.table_layouts.all())
+        if not layouts:
             messages.error(request, 'No table has been created for this form yet.')
             return redirect('core:form-table-view-list')
+        table_blocks = []
+        for layout in layouts:
+            dropdown_map = layout.active_column_dropdown_map()
+            preview_row_cells = [
+                {
+                    'col': col_idx,
+                    'label': column['label'],
+                    'dropdown': dropdown_map.get(col_idx),
+                }
+                for col_idx, column in layout.active_columns()
+            ]
+            table_blocks.append({
+                'layout': layout,
+                'preview_row_cells': preview_row_cells,
+                'column_dropdowns': layout.normalized_column_dropdowns(),
+            })
         return render(request, 'core/form_table_detail.html', {
             'form_def': form_def,
-            'layout': layout,
-            'row_range': range(layout.row_count),
+            'table_blocks': table_blocks,
         })
 
 
 class FormTableLayoutDeleteView(AdminRequiredMixin, View):
-    """Delete only the table layout, not the form definition."""
+    """Delete all table layouts for a form, not the form definition."""
     def post(self, request, pk):
         form_def = get_object_or_404(_admin_form_definitions(), pk=pk)
-        layout = FormTableLayout.objects.filter(form_definition=form_def).first()
-        if not layout:
+        if not form_def.table_layouts.exists():
             messages.error(request, 'No table exists for this form.')
             return redirect('core:form-table-view-list')
         form_code = form_def.code
-        layout.delete()
+        form_def.table_layouts.all().delete()
         return form_table_view_list_success_redirect('deleted', form_code)
 
 
@@ -1373,6 +1486,8 @@ class CVApprovalView(ManagerRequiredMixin, View):
         employees = EmployeeRecord.objects.filter(manager=request.user)
         return render(request, 'core/cv_review.html', {'employees': employees})
 
+
+class CVApprovalUpdateView(ManagerRequiredMixin, View):
     def post(self, request, pk):
         rec = get_object_or_404(EmployeeRecord, pk=pk, manager=request.user)
         form = CVApprovalForm(request.POST, instance=rec)
@@ -1797,6 +1912,7 @@ class FormRecordCreateView(LoginRequiredMixin, View):
             record.project = project
             record.form_definition = form_def
             record.created_by_user = request.user
+            record.created_by_name = request.user.get_full_name() or request.user.username
             record.data = _build_record_data(request.POST, project=project, form_def=form_def)
             record.save()
             messages.success(request, 'Form record created.')
@@ -1810,12 +1926,9 @@ class FormRecordDetailView(LoginRequiredMixin, View):
         record = get_object_or_404(FormRecord, pk=pk)
         if not can_access_form(request.user, record.project, record.form_definition):
             return redirect('core:dashboard')
-        layout = FormTableLayout.objects.filter(
-            form_definition=record.form_definition
-        ).first()
-        stored_cells = (record.data or {}).get('table_cells')
         other_data = dict(record.data or {})
         other_data.pop('table_cells', None)
+        display_sections = _table_sections_for_record(record.form_definition, record)
         return render(request, 'core/form_record_detail.html', {
             'record': record,
             'company': company_for_project(record.project),
@@ -1825,8 +1938,7 @@ class FormRecordDetailView(LoginRequiredMixin, View):
             'can_submit': record.can_submit(request.user),
             'can_review': record.can_review(request.user),
             'can_finalize': record.can_finalize(request.user),
-            'table_layout': layout,
-            'display_table_cells': _default_table_cells(layout, stored_cells) if layout else None,
+            'table_sections': display_sections,
             'other_data': other_data,
         })
 
@@ -2026,7 +2138,8 @@ class MarkNotificationReadView(LoginRequiredMixin, View):
     def post(self, request, notification_id):
         n = get_object_or_404(Notification, pk=notification_id, recipient=request.user)
         n.read = True
-        n.save()
+        n.save(update_fields=['read'])
+        invalidate_notification_cache(request.user.pk)
         if n.link:
             return redirect(n.link)
         return redirect('core:notifications-list')
@@ -2035,6 +2148,7 @@ class MarkNotificationReadView(LoginRequiredMixin, View):
 class MarkAllNotificationsReadView(LoginRequiredMixin, View):
     def post(self, request):
         Notification.objects.filter(recipient=request.user, read=False).update(read=True)
+        invalidate_notification_cache(request.user.pk)
         return redirect('core:notifications-list')
 
 
@@ -2091,16 +2205,27 @@ def _form_owner_label(company, project):
     return 'VVB'
 
 
+def _table_sections_for_record(form_def, record=None):
+    layouts = list(FormTableLayout.objects.filter(form_definition=form_def).order_by('table_number', 'pk'))
+    data = (record.data or {}) if record else {}
+    sections = []
+    for layout in layouts:
+        stored = stored_cells_for_layout(data, layout, layouts)
+        cells = _default_table_cells(layout, stored)
+        headers, rows = _active_table_render(layout, cells)
+        sections.append({
+            'layout': layout,
+            'table_headers': headers,
+            'table_rows': rows,
+        })
+    return sections
+
+
 def _form_record_context(request, project, form_def, record, form=None):
     company = company_for_project(project)
-    layout = FormTableLayout.objects.filter(form_definition=form_def).first()
-    stored_cells = (record.data or {}).get('table_cells') if record else None
-    table_cells = _default_table_cells(layout, stored_cells) if layout else None
-    return {
-        'form': form or FormRecordForm(
-            instance=record,
-            initial=None if record else {'created_by_name': request.user.get_full_name()},
-        ),
+    table_sections = _table_sections_for_record(form_def, record)
+    ctx = {
+        'form': form or FormRecordForm(instance=record),
         'project': project,
         'form_def': form_def,
         'record': record,
@@ -2108,9 +2233,11 @@ def _form_record_context(request, project, form_def, record, form=None):
         'form_owner': _form_owner_label(company, project),
         'dropdown_lists': DropdownList.objects.prefetch_related('options'),
         'reviews': record.reviews.filter(approved=True) if record else [],
-        'table_layout': layout,
-        'table_cells': table_cells,
+        'table_sections': table_sections,
     }
+    if form_def.code == 'F-01C-MRC':
+        ctx['employees'] = EmployeeRecord.objects.filter(manager=project.manager)
+    return ctx
 
 
 def _can_access_project(user, project, session=None):
@@ -2139,9 +2266,29 @@ def _project_header_data(project):
     }
 
 
+def _active_table_render(layout, cells):
+    """Prepare active-only headers and rows (with original column indices) for templates."""
+    active = layout.active_columns()
+    headers = [column['label'] for _, column in active]
+    dropdown_map = layout.active_column_dropdown_map()
+    rows = []
+    for row_idx, row in enumerate(cells or []):
+        row_cells = []
+        for col_idx, _ in active:
+            dropdown = dropdown_map.get(col_idx)
+            row_cells.append({
+                'row': row_idx,
+                'col': col_idx,
+                'value': row[col_idx] if col_idx < len(row) else '',
+                'dropdown': dropdown,
+            })
+        rows.append(row_cells)
+    return headers, rows
+
+
 def _default_table_cells(layout, stored=None):
     """Build a row/column grid for a table layout, optionally from saved data."""
-    cols = len(layout.column_headers)
+    cols = len(layout.normalized_columns())
     rows = layout.row_count
     cells = [['' for _ in range(cols)] for _ in range(rows)]
     if stored:
@@ -2154,21 +2301,33 @@ def _default_table_cells(layout, stored=None):
     return cells
 
 
-def _parse_table_cells_from_post(post, layout):
+def _parse_table_cells_from_post(post, layout, allow_legacy=False):
     """Read editable table cell values submitted by managers."""
     cells = _default_table_cells(layout)
+    prefix = f'table_cell_{layout.pk}_'
+    legacy_prefix = 'table_cell_'
     for key, value in post.items():
-        if not key.startswith('table_cell_'):
+        if key.startswith(prefix):
+            parts = key.split('_')
+            if len(parts) < 5:
+                continue
+            try:
+                row_idx = int(parts[3])
+                col_idx = int(parts[4])
+            except ValueError:
+                continue
+        elif allow_legacy and key.startswith(legacy_prefix):
+            parts = key.split('_')
+            if len(parts) < 4:
+                continue
+            try:
+                row_idx = int(parts[2])
+                col_idx = int(parts[3])
+            except ValueError:
+                continue
+        else:
             continue
-        parts = key.split('_')
-        if len(parts) < 4:
-            continue
-        try:
-            row_idx = int(parts[2])
-            col_idx = int(parts[3])
-        except ValueError:
-            continue
-        if 0 <= row_idx < layout.row_count and 0 <= col_idx < len(layout.column_headers):
+        if 0 <= row_idx < layout.row_count and 0 <= col_idx < len(layout.normalized_columns()):
             cells[row_idx][col_idx] = value
     return cells
 
@@ -2180,9 +2339,14 @@ def _build_record_data(post, project=None, form_def=None, existing_data=None):
         data.update(_project_header_data(project))
     data.update(_parse_form_data(post))
     if form_def:
-        layout = FormTableLayout.objects.filter(form_definition=form_def).first()
-        if layout:
-            data['table_cells'] = _parse_table_cells_from_post(post, layout)
+        layouts = list(FormTableLayout.objects.filter(form_definition=form_def).order_by('table_number', 'pk'))
+        if layouts:
+            allow_legacy = len(layouts) == 1
+            table_cells = {
+                str(layout.pk): _parse_table_cells_from_post(post, layout, allow_legacy=allow_legacy)
+                for layout in layouts
+            }
+            data['table_cells'] = table_cells
     return data
 
 

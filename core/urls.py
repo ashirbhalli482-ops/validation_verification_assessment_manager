@@ -20,6 +20,7 @@ urlpatterns = [
     path('users/<int:profile_id>/', views.UserProfileView.as_view(), name='user'),
     path('users/<int:user_id>/edit/', views.EditUserProfileView.as_view(), name='edit-user-profile'),
     path('users/<int:pk>/delete/', views.UserDeleteView.as_view(), name='delete-user'),
+    path('users/<int:pk>/toggle-active/', views.UserToggleActiveView.as_view(), name='toggle-user-active'),
     path('users/<int:user_id>/set-password/', views.AdminSetPasswordView.as_view(), name='admin-set-password'),
 
     # Admin: Companies
@@ -80,6 +81,14 @@ urlpatterns = [
     path('projects/<int:project_id>/team/add/', views.TeamMemberCreateView.as_view(), name='team-member-create'),
     path('team/<int:pk>/edit/', views.TeamMemberEditView.as_view(), name='team-member-edit'),
     path('team/<int:pk>/remove/', views.TeamMemberDeleteView.as_view(), name='team-member-remove'),
+
+    # Manager: Employee Records & CV Review
+    path('employee-records/', views.EmployeeRecordListView.as_view(), name='employee-record-list'),
+    path('employee-records/create/', views.EmployeeRecordCreateView.as_view(), name='employee-record-create'),
+    path('employee-records/<int:pk>/edit/', views.EmployeeRecordUpdateView.as_view(), name='employee-record-edit'),
+    path('employee-records/<int:pk>/delete/', views.EmployeeRecordDeleteView.as_view(), name='employee-record-delete'),
+    path('cv-review/', views.CVApprovalView.as_view(), name='cv-review'),
+    path('cv-review/<int:pk>/', views.CVApprovalUpdateView.as_view(), name='cv-approval'),
 
     # Form Records & Workflow
     path('projects/<int:project_id>/forms/<int:form_id>/create/', views.FormRecordCreateView.as_view(), name='form-record-create'),

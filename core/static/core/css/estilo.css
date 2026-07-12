@@ -533,6 +533,23 @@
 	color: var(--brand-blue) !important;
 }
 
+.password-toggle {
+	background: none;
+	border: none;
+	padding: 0;
+	cursor: pointer;
+	line-height: 1;
+}
+
+.password-toggle:focus {
+	outline: 2px solid var(--brand-blue);
+	outline-offset: 2px;
+}
+
+.password-toggle:hover {
+	color: var(--brand-blue) !important;
+}
+
 .btn-login {
 	background: linear-gradient(135deg, var(--brand-blue) 0%, #0099d6 100%) !important;
 }

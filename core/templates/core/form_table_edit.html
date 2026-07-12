@@ -11,137 +11,424 @@
 {% block content %}
 <div class="container-fluid">
   <div class="card">
-    <div class="card-header">
-      <strong>{% if layout %}Edit Table{% else %}Create Table{% endif %} — {{ form_def.code }} ({{ form_def.name }})</strong>
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <strong>{% if has_tables %}Edit Tables{% else %}Create Tables{% endif %} — {{ form_def.code }} ({{ form_def.name }})</strong>
+      <button type="button" id="add-table" class="btn btn-outline-primary btn-sm">
+        <i class="fa fa-plus"></i> Add Table
+      </button>
     </div>
     <div class="card-body">
       <form method="post" id="formTableBuilder">{% csrf_token %}
         {% if request.GET.return == 'view' %}
         <input type="hidden" name="return" value="view">
         {% endif %}
-        {% if form.non_field_errors %}
-        <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+        <input type="hidden" name="removed_table_ids" id="removed-table-ids" value="">
+        {% if form_error %}
+        <div class="alert alert-danger">{{ form_error }}</div>
         {% endif %}
 
-        <div class="row">
-          <div class="col-md-4 mb-3">
-            <label for="{{ form.row_count.id_for_label }}">{{ form.row_count.label }}</label>
-            {{ form.row_count }}
-            {% if form.row_count.errors %}<div class="text-danger small">{{ form.row_count.errors }}</div>{% endif %}
-          </div>
+        <div id="table-blocks">
+          {% for block in table_blocks %}
+          {% include 'core/includes/form_table_block.html' with block=block form_def=form_def %}
+          {% endfor %}
         </div>
 
-        <div class="mb-3">
-          <label class="d-block">Column Headings</label>
-          <div id="column-headers">
-            {% for header in column_headers %}
-            <div class="input-group mb-2 column-header-row">
-              <input type="text" name="column_headers" class="form-control" placeholder="Column heading" value="{{ header }}">
-              <div class="input-group-append">
-                <button type="button" class="btn btn-outline-danger remove-column" title="Remove column">&times;</button>
-              </div>
-            </div>
-            {% endfor %}
-          </div>
-          <button type="button" id="add-column" class="btn btn-outline-primary btn-sm mt-1">
-            <i class="fa fa-plus"></i> Add Column
+        <div class="mt-3">
+          <button type="button" id="add-table-bottom" class="btn btn-outline-primary btn-sm mr-2">
+            <i class="fa fa-plus"></i> Add Table
           </button>
+          <button type="submit" class="btn btn-primary">Save Tables</button>
+          {% if request.GET.return == 'view' %}
+          <a href="{% url 'core:form-table-view-list' %}" class="btn btn-secondary">Cancel</a>
+          {% else %}
+          <a href="{% url 'core:form-table-list' %}" class="btn btn-secondary">Cancel</a>
+          {% endif %}
         </div>
-
-        <div class="mb-4">
-          <label class="d-block">Preview</label>
-          <div class="table-responsive">
-            <table class="table table-bordered table-sm mb-0" id="table-preview">
-              <thead><tr id="preview-header-row"></tr></thead>
-              <tbody id="preview-body"></tbody>
-            </table>
-          </div>
-        </div>
-
-        <button type="submit" class="btn btn-primary">Save Table</button>
-        {% if request.GET.return == 'view' %}
-        <a href="{% url 'core:form-table-view-list' %}" class="btn btn-secondary">Cancel</a>
-        {% else %}
-        <a href="{% url 'core:form-table-list' %}" class="btn btn-secondary">Cancel</a>
-        {% endif %}
       </form>
     </div>
   </div>
 </div>
 
+<div id="empty-table-block" style="display:none;">
+  {% include 'core/includes/form_table_block.html' with block=empty_block form_def=form_def %}
+</div>
+
 <div id="empty-column-header" style="display:none;">
   <div class="input-group mb-2 column-header-row">
-    <input type="text" name="column_headers" class="form-control" placeholder="Column heading" value="">
+    <input type="text" class="form-control column-header-input" placeholder="Column heading" value="">
+    <input type="hidden" class="column-active-input" value="1">
     <div class="input-group-append">
-      <button type="button" class="btn btn-outline-danger remove-column" title="Remove column">&times;</button>
+      <button type="button" class="btn btn-outline-danger toggle-column">Deactivate</button>
+    </div>
+  </div>
+</div>
+
+<div id="empty-option-row" style="display:none;">
+  <div class="input-group input-group-sm mb-1 option-row">
+    <input type="text" class="form-control option-input" placeholder="Value" value="">
+    <div class="input-group-append">
+      <button type="button" class="btn btn-outline-secondary remove-option" title="Remove value">&times;</button>
+    </div>
+  </div>
+</div>
+
+<div id="empty-column-dropdown" style="display:none;">
+  <div class="card mb-2 column-dropdown-row" data-index="__INDEX__">
+    <div class="card-body py-2">
+      <div class="form-row align-items-end">
+        <div class="col-md-4 mb-2">
+          <label class="small mb-1">Column</label>
+          <select class="form-control form-control-sm column-select"></select>
+        </div>
+        <div class="col-md-6 mb-2">
+          <label class="small mb-1">Dropdown Values</label>
+          <div class="dropdown-options">
+            <div class="input-group input-group-sm mb-1 option-row">
+              <input type="text" class="form-control option-input" placeholder="Value" value="">
+              <div class="input-group-append">
+                <button type="button" class="btn btn-outline-secondary remove-option" title="Remove value">&times;</button>
+              </div>
+            </div>
+          </div>
+          <button type="button" class="btn btn-outline-primary btn-sm add-option mt-1">+ Add Value</button>
+        </div>
+        <div class="col-md-2 mb-2 text-right">
+          <input type="hidden" class="dropdown-active-input" value="1">
+          <button type="button" class="btn btn-sm btn-outline-danger toggle-dropdown">Deactivate</button>
+        </div>
+      </div>
     </div>
   </div>
 </div>
 
 <script>
   document.addEventListener('DOMContentLoaded', function () {
-    var container = document.getElementById('column-headers');
-    var addBtn = document.getElementById('add-column');
-    var emptyTemplate = document.getElementById('empty-column-header').innerHTML;
-    var rowCountInput = document.getElementById('{{ form.row_count.id_for_label }}');
+    var blocksContainer = document.getElementById('table-blocks');
+    var removedInput = document.getElementById('removed-table-ids');
+    var emptyColumnTemplate = document.getElementById('empty-column-header').innerHTML;
+    var emptyOptionTemplate = document.getElementById('empty-option-row').innerHTML;
+    var emptyDropdownTemplate = document.getElementById('empty-column-dropdown').innerHTML;
+    var emptyBlockTemplate = document.getElementById('empty-table-block').innerHTML;
+    var nextNewKeyIndex = {{ table_blocks|length|default:1 }};
 
-    function updatePreview() {
-      var headers = [];
-      container.querySelectorAll('input[name="column_headers"]').forEach(function (input) {
-        headers.push(input.value.trim() || 'Column');
+    function prefixFor(block) {
+      return 'tbl_' + block.getAttribute('data-key');
+    }
+
+    function getActiveColumns(block) {
+      var columns = [];
+      block.querySelectorAll('.column-header-row').forEach(function (row, index) {
+        var active = row.querySelector('.column-active-input').value === '1';
+        if (!active) return;
+        var label = row.querySelector('.column-header-input').value.trim() || ('Column ' + (index + 1));
+        columns.push({ index: index, label: label });
       });
-      if (!headers.length) {
-        headers = ['Column'];
-      }
-      var rows = Math.max(1, parseInt(rowCountInput.value, 10) || 1);
+      return columns;
+    }
 
-      var headerRow = document.getElementById('preview-header-row');
+    function buildColumnSelect(block, selectedCol) {
+      var select = document.createElement('select');
+      select.className = 'form-control form-control-sm column-select';
+      getActiveColumns(block).forEach(function (col) {
+        var option = document.createElement('option');
+        option.value = col.index;
+        option.textContent = 'Column ' + (col.index + 1) + ': ' + col.label;
+        if (String(col.index) === String(selectedCol)) {
+          option.selected = true;
+        }
+        select.appendChild(option);
+      });
+      return select;
+    }
+
+    function refreshColumnSelects(block) {
+      block.querySelectorAll('.column-dropdown-row').forEach(function (row) {
+        var current = row.querySelector('.column-select');
+        var selected = current ? current.value : '0';
+        var newSelect = buildColumnSelect(block, selected);
+        if (current) {
+          newSelect.name = current.name;
+          current.replaceWith(newSelect);
+          newSelect.addEventListener('change', function () { updatePreview(block); });
+        }
+      });
+    }
+
+    function syncDropdownFieldNames(block) {
+      var prefix = prefixFor(block);
+      block.querySelectorAll('.column-dropdown-row').forEach(function (row) {
+        var index = row.getAttribute('data-index');
+        row.querySelector('.column-select').name = prefix + '_col_dd_' + index + '_col';
+        row.querySelector('.dropdown-active-input').name = prefix + '_col_dd_' + index + '_active';
+        row.querySelectorAll('.option-input').forEach(function (input) {
+          input.name = prefix + '_col_dd_' + index + '_options';
+        });
+      });
+    }
+
+    function getDropdownConfigs(block) {
+      var configs = [];
+      block.querySelectorAll('.column-dropdown-row').forEach(function (row) {
+        var active = row.querySelector('.dropdown-active-input').value === '1';
+        if (!active) return;
+        var colNum = parseInt(row.querySelector('.column-select').value, 10) || 0;
+        var options = [];
+        row.querySelectorAll('.option-input').forEach(function (input) {
+          var value = input.value.trim();
+          if (value) options.push(value);
+        });
+        if (options.length) {
+          configs.push({ col: colNum, options: options });
+        }
+      });
+      return configs;
+    }
+
+    function updateBlockTitle(block) {
+      var numInput = block.querySelector('.table-number');
+      var title = block.querySelector('.table-block-title');
+      var num = numInput ? numInput.value : '';
+      title.textContent = num ? ('Table ' + num) : 'New Table';
+    }
+
+    function updatePreviewTitle(block) {
+      var tableNameInput = block.querySelector('.table-name');
+      var previewTitle = block.querySelector('.preview-title');
+      var formLabel = block.getAttribute('data-form-label') || '';
+      var tableName = tableNameInput ? tableNameInput.value.trim() : '';
+      previewTitle.textContent = tableName ? (tableName + ' — ' + formLabel) : formLabel;
+    }
+
+    function updatePreview(block) {
+      var headers = getActiveColumns(block);
+      if (!headers.length) {
+        headers = [{ index: 0, label: 'Column' }];
+      }
+      var dropdownConfigs = getDropdownConfigs(block);
+      var headerRow = block.querySelector('.preview-header-row');
       headerRow.innerHTML = '';
       headers.forEach(function (h) {
         var th = document.createElement('th');
-        th.textContent = h;
+        th.textContent = h.label;
         headerRow.appendChild(th);
       });
-
-      var body = document.getElementById('preview-body');
+      var body = block.querySelector('.preview-body');
       body.innerHTML = '';
-      for (var r = 0; r < rows; r++) {
-        var tr = document.createElement('tr');
-        headers.forEach(function () {
-          var td = document.createElement('td');
+      var tr = document.createElement('tr');
+      headers.forEach(function (h) {
+        var td = document.createElement('td');
+        var match = dropdownConfigs.find(function (cfg) { return cfg.col === h.index; });
+        if (match) {
+          var select = document.createElement('select');
+          select.className = 'form-control form-control-sm';
+          select.disabled = true;
+          var blank = document.createElement('option');
+          blank.textContent = '— Select —';
+          select.appendChild(blank);
+          match.options.forEach(function (opt) {
+            var option = document.createElement('option');
+            option.textContent = opt;
+            select.appendChild(option);
+          });
+          td.appendChild(select);
+        } else {
           td.innerHTML = '&nbsp;';
-          tr.appendChild(td);
-        });
-        body.appendChild(tr);
-      }
+        }
+        tr.appendChild(td);
+      });
+      body.appendChild(tr);
     }
 
-    function bindRemove(btn) {
+    function bindRemoveOption(block, btn) {
       btn.addEventListener('click', function () {
-        var rows = container.querySelectorAll('.column-header-row');
+        var options = btn.closest('.dropdown-options');
+        var rows = options.querySelectorAll('.option-row');
         if (rows.length <= 1) {
-          rows[0].querySelector('input').value = '';
-          updatePreview();
+          rows[0].querySelector('.option-input').value = '';
+          updatePreview(block);
           return;
         }
-        btn.closest('.column-header-row').remove();
-        updatePreview();
+        btn.closest('.option-row').remove();
+        updatePreview(block);
       });
     }
 
-    container.querySelectorAll('.remove-column').forEach(bindRemove);
-    container.addEventListener('input', updatePreview);
-    rowCountInput.addEventListener('input', updatePreview);
+    function bindAddOption(block, btn) {
+      btn.addEventListener('click', function () {
+        var options = btn.closest('.col-md-6').querySelector('.dropdown-options');
+        options.insertAdjacentHTML('beforeend', emptyOptionTemplate);
+        var newRow = options.lastElementChild;
+        bindRemoveOption(block, newRow.querySelector('.remove-option'));
+        var dropdownRow = btn.closest('.column-dropdown-row');
+        var index = dropdownRow.getAttribute('data-index');
+        var prefix = prefixFor(block);
+        newRow.querySelector('.option-input').name = prefix + '_col_dd_' + index + '_options';
+        newRow.querySelector('.option-input').focus();
+        updatePreview(block);
+      });
+    }
 
-    addBtn.addEventListener('click', function () {
-      container.insertAdjacentHTML('beforeend', emptyTemplate);
-      var newRow = container.lastElementChild;
-      bindRemove(newRow.querySelector('.remove-column'));
-      newRow.querySelector('input').focus();
-      updatePreview();
-    });
+    function bindToggleDropdown(block, btn) {
+      btn.addEventListener('click', function () {
+        var row = btn.closest('.column-dropdown-row');
+        var activeInput = row.querySelector('.dropdown-active-input');
+        if (activeInput.value === '1') {
+          activeInput.value = '0';
+          btn.textContent = 'Activate';
+          btn.classList.remove('btn-outline-danger');
+          btn.classList.add('btn-outline-success');
+          row.classList.add('border-secondary');
+        } else {
+          activeInput.value = '1';
+          btn.textContent = 'Deactivate';
+          btn.classList.remove('btn-outline-success');
+          btn.classList.add('btn-outline-danger');
+          row.classList.remove('border-secondary');
+        }
+        updatePreview(block);
+      });
+    }
 
-    updatePreview();
+    function bindDropdownRow(block, row) {
+      bindToggleDropdown(block, row.querySelector('.toggle-dropdown'));
+      bindAddOption(block, row.querySelector('.add-option'));
+      row.querySelectorAll('.remove-option').forEach(function (btn) { bindRemoveOption(block, btn); });
+      row.querySelector('.column-select').addEventListener('change', function () { updatePreview(block); });
+      row.querySelectorAll('.option-input').forEach(function (input) {
+        input.addEventListener('input', function () { updatePreview(block); });
+      });
+    }
+
+    function bindToggleColumn(block, btn) {
+      btn.addEventListener('click', function () {
+        var row = btn.closest('.column-header-row');
+        var activeInput = row.querySelector('.column-active-input');
+        var textInput = row.querySelector('.column-header-input');
+        if (activeInput.value === '1') {
+          activeInput.value = '0';
+          btn.textContent = 'Activate';
+          btn.classList.remove('btn-outline-danger');
+          btn.classList.add('btn-outline-success');
+          textInput.classList.add('bg-light', 'text-muted');
+        } else {
+          activeInput.value = '1';
+          btn.textContent = 'Deactivate';
+          btn.classList.remove('btn-outline-success');
+          btn.classList.add('btn-outline-danger');
+          textInput.classList.remove('bg-light', 'text-muted');
+        }
+        refreshColumnSelects(block);
+        updatePreview(block);
+      });
+    }
+
+    function syncColumnFieldNames(block) {
+      var prefix = prefixFor(block);
+      block.querySelectorAll('.column-header-row').forEach(function (row) {
+        row.querySelector('.column-header-input').name = prefix + '_column_headers';
+        row.querySelector('.column-active-input').name = prefix + '_column_active';
+      });
+    }
+
+    function initTableBlock(block) {
+      var prefix = prefixFor(block);
+      block.querySelector('.table-number').name = prefix + '_number';
+      block.querySelector('.table-name').name = prefix + '_name';
+      block.querySelector('.row-count').name = prefix + '_row_count';
+      block.querySelector('.table-notes').name = prefix + '_notes';
+      var idInput = block.querySelector('input[type="hidden"][name$="_id"]');
+      if (idInput) idInput.name = prefix + '_id';
+
+      syncColumnFieldNames(block);
+      syncDropdownFieldNames(block);
+
+      block.querySelectorAll('.toggle-column').forEach(function (btn) { bindToggleColumn(block, btn); });
+      block.querySelector('.column-headers').addEventListener('input', function () {
+        refreshColumnSelects(block);
+        updatePreview(block);
+      });
+
+      block.querySelectorAll('.column-dropdown-row').forEach(function (row) { bindDropdownRow(block, row); });
+
+      block.querySelector('.add-column').addEventListener('click', function () {
+        block.querySelector('.column-headers').insertAdjacentHTML('beforeend', emptyColumnTemplate);
+        var newRow = block.querySelector('.column-headers').lastElementChild;
+        bindToggleColumn(block, newRow.querySelector('.toggle-column'));
+        syncColumnFieldNames(block);
+        newRow.querySelector('.column-header-input').focus();
+        refreshColumnSelects(block);
+        updatePreview(block);
+      });
+
+      block.querySelector('.add-dropdown').addEventListener('click', function () {
+        var nextIndex = parseInt(block.getAttribute('data-next-dropdown-index') || '0', 10);
+        var html = emptyDropdownTemplate.replace(/__INDEX__/g, String(nextIndex));
+        block.querySelector('.column-dropdowns').insertAdjacentHTML('beforeend', html);
+        var newRow = block.querySelector('.column-dropdowns').lastElementChild;
+        newRow.setAttribute('data-index', String(nextIndex));
+        var activeInput = newRow.querySelector('.dropdown-active-input');
+        activeInput.name = prefix + '_col_dd_' + nextIndex + '_active';
+        var optionInput = newRow.querySelector('.option-input');
+        optionInput.name = prefix + '_col_dd_' + nextIndex + '_options';
+        var select = buildColumnSelect(block, 0);
+        select.name = prefix + '_col_dd_' + nextIndex + '_col';
+        newRow.querySelector('.column-select').replaceWith(select);
+        bindDropdownRow(block, newRow);
+        block.setAttribute('data-next-dropdown-index', String(nextIndex + 1));
+        select.focus();
+        updatePreview(block);
+      });
+
+      block.querySelector('.table-name').addEventListener('input', function () { updatePreviewTitle(block); });
+      block.querySelector('.table-number').addEventListener('input', function () { updateBlockTitle(block); });
+
+      block.querySelector('.remove-table-btn').addEventListener('click', function () {
+        var blocks = blocksContainer.querySelectorAll('.table-block');
+        if (blocks.length <= 1) {
+          alert('At least one table is required.');
+          return;
+        }
+        var layoutId = block.querySelector('input[type="hidden"][name$="_id"]').value;
+        if (layoutId) {
+          var removed = removedInput.value ? removedInput.value.split(',') : [];
+          removed.push(layoutId);
+          removedInput.value = removed.filter(Boolean).join(',');
+        }
+        block.remove();
+      });
+
+      refreshColumnSelects(block);
+      updateBlockTitle(block);
+      updatePreviewTitle(block);
+      updatePreview(block);
+    }
+
+    function suggestedTableNumber() {
+      var max = 0;
+      blocksContainer.querySelectorAll('.table-number').forEach(function (input) {
+        var n = parseInt(input.value, 10);
+        if (!isNaN(n) && n > max) max = n;
+      });
+      return max + 1;
+    }
+
+    function addTableBlock() {
+      var key = 'new' + nextNewKeyIndex;
+      nextNewKeyIndex += 1;
+      var html = emptyBlockTemplate.replace(/new0/g, key);
+      blocksContainer.insertAdjacentHTML('beforeend', html);
+      var block = blocksContainer.lastElementChild;
+      block.setAttribute('data-key', key);
+      block.querySelector('.table-number').value = suggestedTableNumber();
+      initTableBlock(block);
+      block.querySelector('.table-name').focus();
+      block.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    document.getElementById('add-table').addEventListener('click', addTableBlock);
+    document.getElementById('add-table-bottom').addEventListener('click', addTableBlock);
+
+    blocksContainer.querySelectorAll('.table-block').forEach(initTableBlock);
   });
 </script>
 {% endblock %}

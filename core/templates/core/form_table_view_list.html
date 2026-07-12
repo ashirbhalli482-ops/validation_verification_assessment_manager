@@ -41,17 +41,17 @@
               <td>{{ form_def.get_form_type_display }}</td>
               <td>{{ form_def.description|truncatechars:60 }}</td>
               <td class="form-table-actions">
-                {% if form_def.table_layout %}
+                {% if form_def.table_layouts.all %}
                 <a href="{% url 'core:form-table-detail' form_def.pk %}" class="btn btn-sm btn-primary">View</a>
                 <a href="{% url 'core:form-table-edit' form_def.pk %}?return=view" class="btn btn-sm btn-info">Edit</a>
                 <form method="post" action="{% url 'core:form-table-delete' form_def.pk %}" class="d-inline"
-                      onsubmit="return confirm('Delete the table for {{ form_def.code }}? The form will not be deleted.');">
+                      onsubmit="return confirm('Delete all tables for {{ form_def.code }}? The form will not be deleted.');">
                   {% csrf_token %}
                   <button type="submit" class="btn btn-sm btn-danger">Delete</button>
                 </form>
                 {% else %}
-                <span class="text-muted small">No table</span>
-                <a href="{% url 'core:form-table-edit' form_def.pk %}?return=view" class="btn btn-sm btn-outline-primary">Create Table</a>
+                <span class="text-muted small">No tables</span>
+                <a href="{% url 'core:form-table-edit' form_def.pk %}?return=view" class="btn btn-sm btn-outline-primary">Create Tables</a>
                 {% endif %}
               </td>
             </tr>

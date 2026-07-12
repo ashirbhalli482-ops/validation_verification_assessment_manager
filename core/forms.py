@@ -847,10 +847,16 @@ class TeamMemberForm(forms.Form):
 
     def __init__(self, *args, manager=None, **kwargs):
         super().__init__(*args, **kwargs)
-        queryset = CustomUser.objects.filter(user_type='employee')
+        queryset = CustomUser.objects.filter(user_type='employee', is_active=True)
         if manager is not None:
             queryset = queryset.filter(created_by=manager)
         self.fields['user'].queryset = queryset.order_by('first_name', 'last_name', 'username')
+
+    def clean_user(self):
+        user = self.cleaned_data.get('user')
+        if user and not user.is_active:
+            raise forms.ValidationError('This user is inactive and cannot be authorized.')
+        return user
 
 
 class TeamMemberEditForm(forms.ModelForm):
@@ -892,15 +898,11 @@ class EmployeeRecordForm(forms.ModelForm):
 
 
 class FormRecordForm(forms.ModelForm):
-    """Generic form record - data stored as JSON via hidden field or dynamic fields."""
-    form_data_json = forms.CharField(required=False, widget=forms.HiddenInput())
+    """Generic form record — creator name is set automatically from the logged-in user."""
 
     class Meta:
         model = FormRecord
-        fields = ['created_by_name']
-        widgets = {
-            'created_by_name': forms.TextInput(attrs={'class': 'form-control'}),
-        }
+        fields = []
 
 
 class CVApprovalForm(forms.ModelForm):
@@ -913,9 +915,25 @@ class CVApprovalForm(forms.ModelForm):
 
 
 class FormTableLayoutForm(forms.Form):
-    row_count = forms.IntegerField(
+    table_number = forms.IntegerField(
         min_value=1,
         initial=1,
+        label='Number of Table',
+        widget=forms.NumberInput(attrs={'class': 'form-control', 'min': 1}),
+    )
+    table_name = forms.CharField(
+        required=False,
+        label='Name of Table',
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Enter table name'}),
+    )
+    notes = forms.CharField(
+        required=False,
+        label='Table Notes',
+        widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': 'Notes related to this table'}),
+    )
+    row_count = forms.IntegerField(
+        min_value=1,
+        initial=100,
         label='Number of Rows',
         widget=forms.NumberInput(attrs={'class': 'form-control', 'min': 1}),
     )

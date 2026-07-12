@@ -210,6 +210,8 @@
         </div>
     </div>
 </div>
+{% endblock %}
 
-<script src="{% static 'core/js/notifications.js' %}"></script>
+{% block extra_scripts %}
+<script src="{% static 'core/js/notifications.js' %}?v={{ STATIC_VERSION }}" defer></script>
 {% endblock %} 

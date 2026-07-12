@@ -38,7 +38,7 @@
               <td>{{ form_def.description|truncatechars:60 }}</td>
               <td class="form-table-actions">
                 <a href="{% url 'core:form-table-edit' form_def.pk %}" class="btn btn-sm btn-primary">
-                  {% if form_def.table_layout %}Edit Table{% else %}Create Table{% endif %}
+                  {% if form_def.table_layouts.all %}Edit Tables{% else %}Create Tables{% endif %}
                 </a>
               </td>
             </tr>

@@ -1,9 +1,9 @@
 from django.db import models
+from django.db.models import Count, Q
 from django.contrib.auth.models import AbstractUser
 from django.core.validators import MinValueValidator
 from django.templatetags.static import static
 from django.utils import timezone
-import os
 import secrets
 
 
@@ -116,16 +116,30 @@ class CustomUser(AbstractUser):
         return False
 
     def save(self, *args, **kwargs):
+        update_fields = kwargs.get('update_fields')
+        was_active = None
+        if self.pk and (update_fields is None or 'is_active' in update_fields):
+            was_active = (
+                type(self).objects.filter(pk=self.pk)
+                .values_list('is_active', flat=True)
+                .first()
+            )
         if not self.pk:
             self.is_active = True
         super().save(*args, **kwargs)
+        if was_active is True and not self.is_active:
+            TeamMember.objects.filter(
+                Q(user=self) | Q(email__iexact=self.email),
+                is_active=True,
+            ).update(is_active=False)
 
     @property
     def avatar_url(self):
-        if self.avatar and hasattr(self.avatar, 'url'):
-            avatar_path = self.avatar.path if hasattr(self.avatar, 'path') else None
-            if avatar_path and os.path.isfile(avatar_path):
+        if self.avatar:
+            try:
                 return self.avatar.url
+            except ValueError:
+                pass
         return static('core/img/avatar/blank_profile.png')
 
 
@@ -266,15 +280,25 @@ class FormDefinition(models.Model):
 
 class FormTableLayout(models.Model):
     """Admin-defined table structure (rows and column headings) for a form."""
-    form_definition = models.OneToOneField(
-        FormDefinition, on_delete=models.CASCADE, related_name='table_layout',
+    form_definition = models.ForeignKey(
+        FormDefinition, on_delete=models.CASCADE, related_name='table_layouts',
     )
+    table_number = models.PositiveIntegerField(
+        default=1, validators=[MinValueValidator(1)], verbose_name='Number of Table',
+    )
+    table_name = models.CharField(max_length=200, blank=True, verbose_name='Name of Table')
+    notes = models.TextField(blank=True, verbose_name='Table Notes')
     row_count = models.PositiveIntegerField(
-        default=1, validators=[MinValueValidator(1)],
+        default=100, validators=[MinValueValidator(1)],
     )
     column_headers = models.JSONField(
         default=list,
-        help_text='Ordered list of column heading labels.',
+        help_text='Ordered list of column objects: {label, is_active}.',
+    )
+    cell_dropdowns = models.JSONField(
+        default=list,
+        blank=True,
+        help_text='Column dropdown configs: {col, options, is_active}.',
     )
     created_by = models.ForeignKey(
         CustomUser, on_delete=models.SET_NULL, null=True, blank=True,
@@ -286,13 +310,86 @@ class FormTableLayout(models.Model):
     class Meta:
         verbose_name = 'Form Table Layout'
         verbose_name_plural = 'Form Table Layouts'
+        ordering = ['table_number', 'pk']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['form_definition', 'table_number'],
+                name='unique_table_number_per_form',
+            ),
+        ]
 
     def __str__(self):
-        return f'Table layout for {self.form_definition.code}'
+        label = self.table_name or f'Table {self.table_number}'
+        return f'{label} — {self.form_definition.code}'
+
+    @staticmethod
+    def normalize_column_entry(entry):
+        if isinstance(entry, dict):
+            label = (entry.get('label') or '').strip() or 'Column'
+            return {'label': label, 'is_active': bool(entry.get('is_active', True))}
+        if isinstance(entry, str):
+            return {'label': entry.strip() or 'Column', 'is_active': True}
+        return {'label': 'Column', 'is_active': True}
+
+    def normalized_columns(self):
+        return [self.normalize_column_entry(entry) for entry in (self.column_headers or [])]
+
+    def active_columns(self):
+        return [
+            (index, column)
+            for index, column in enumerate(self.normalized_columns())
+            if column['is_active']
+        ]
 
     @property
     def column_count(self):
-        return len(self.column_headers or [])
+        return len(self.normalized_columns())
+
+    @property
+    def active_column_count(self):
+        return len(self.active_columns())
+
+    @staticmethod
+    def normalize_column_dropdown(entry):
+        if not isinstance(entry, dict):
+            return None
+        try:
+            col = int(entry.get('col', 0))
+        except (TypeError, ValueError):
+            return None
+        options = [
+            str(option).strip()
+            for option in entry.get('options', [])
+            if str(option).strip()
+        ]
+        if not options:
+            return None
+        return {
+            'col': max(0, col),
+            'options': options,
+            'is_active': bool(entry.get('is_active', True)),
+        }
+
+    def normalized_column_dropdowns(self):
+        dropdowns = []
+        for entry in self.cell_dropdowns or []:
+            normalized = self.normalize_column_dropdown(entry)
+            if normalized:
+                dropdowns.append(normalized)
+        return dropdowns
+
+    def active_column_dropdown_map(self):
+        return {
+            dropdown['col']: dropdown
+            for dropdown in self.normalized_column_dropdowns()
+            if dropdown['is_active']
+        }
+
+    def normalized_cell_dropdowns(self):
+        return self.normalized_column_dropdowns()
+
+    def active_cell_dropdown_map(self):
+        return self.active_column_dropdown_map()
 
 
 class PackageAuthorization(models.Model):
@@ -709,6 +806,9 @@ class Notification(models.Model):
 
     class Meta:
         ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['recipient', 'read', '-created_at']),
+        ]
 
     def __str__(self):
         return f'To: {self.recipient.get_full_name()} | {self.message[:40]}...'
@@ -720,3 +820,5 @@ def notify_user(recipient, message, sender=None, link=''):
         Notification.objects.create(
             recipient=recipient, sender=sender, message=message, link=link
         )
+        from core.context_processors import invalidate_notification_cache
+        invalidate_notification_cache(recipient.pk)
