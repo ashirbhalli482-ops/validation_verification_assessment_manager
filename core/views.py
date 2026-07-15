@@ -1050,7 +1050,10 @@ class FormTableLayoutEditView(AdminRequiredMixin, View):
             keys = table_block_keys(post)
             if not keys:
                 return [build_table_block(key='new0')]
-            return [block_from_post(post, key) for key in keys]
+            return [
+                block_from_post(post, key, table_number=index)
+                for index, key in enumerate(keys, start=1)
+            ]
         layouts = list(form_def.table_layouts.all())
         if layouts:
             return [build_table_block(layout=layout) for layout in layouts]
@@ -1072,7 +1075,6 @@ class FormTableLayoutEditView(AdminRequiredMixin, View):
         blocks = self._table_blocks(form_def, request.POST)
         valid_blocks = []
         has_error = False
-        seen_numbers = set()
         for block in blocks:
             if not block:
                 has_error = True
@@ -1080,11 +1082,6 @@ class FormTableLayoutEditView(AdminRequiredMixin, View):
             if not block.get('columns'):
                 has_error = True
                 block['error'] = 'Add at least one column heading.'
-            num = block.get('table_number')
-            if num in seen_numbers:
-                has_error = True
-                block['error'] = f'Table number {num} is already used in this form.'
-            seen_numbers.add(num)
             valid_blocks.append(block)
         if has_error:
             return render(request, 'core/form_table_edit.html', {
@@ -1100,30 +1097,43 @@ class FormTableLayoutEditView(AdminRequiredMixin, View):
             if value.strip().isdigit()
         }
         kept_ids = set()
-        for block in valid_blocks:
-            defaults = {
-                'table_number': block['table_number'],
-                'table_name': block['table_name'],
-                'notes': block['notes'],
-                'row_count': block['row_count'],
-                'column_headers': block['columns'],
-                'cell_dropdowns': block['cell_dropdowns'],
-                'created_by': request.user,
-            }
-            if block['layout_id']:
-                layout, _ = FormTableLayout.objects.update_or_create(
-                    pk=block['layout_id'],
-                    form_definition=form_def,
-                    defaults=defaults,
-                )
-            else:
-                layout = FormTableLayout.objects.create(
-                    form_definition=form_def,
-                    **defaults,
-                )
-            kept_ids.add(layout.pk)
+        # Free unique table_number slots before rewriting order.
+        with transaction.atomic():
+            existing_ids = [
+                block['layout_id'] for block in valid_blocks if block.get('layout_id')
+            ]
+            if existing_ids:
+                for offset, layout_id in enumerate(existing_ids, start=1):
+                    FormTableLayout.objects.filter(
+                        pk=layout_id, form_definition=form_def,
+                    ).update(table_number=10000 + offset)
 
-        form_def.table_layouts.filter(pk__in=removed_ids - kept_ids).delete()
+            for block in valid_blocks:
+                defaults = {
+                    'table_number': block['table_number'],
+                    'table_name': block['table_name'],
+                    'table_heading': block['table_heading'],
+                    'notes': block['notes'],
+                    'table_note': block['table_note'],
+                    'row_count': block['row_count'],
+                    'column_headers': block['columns'],
+                    'cell_dropdowns': block['cell_dropdowns'],
+                    'created_by': request.user,
+                }
+                if block['layout_id']:
+                    layout, _ = FormTableLayout.objects.update_or_create(
+                        pk=block['layout_id'],
+                        form_definition=form_def,
+                        defaults=defaults,
+                    )
+                else:
+                    layout = FormTableLayout.objects.create(
+                        form_definition=form_def,
+                        **defaults,
+                    )
+                kept_ids.add(layout.pk)
+
+            form_def.table_layouts.filter(pk__in=removed_ids - kept_ids).delete()
         if request.GET.get('return') == 'view' or request.POST.get('return') == 'view':
             return form_table_view_list_success_redirect('saved', form_def.code)
         return form_table_list_success_redirect('saved', form_def.code)
@@ -1158,12 +1168,11 @@ class FormTableLayoutDetailView(AdminRequiredMixin, View):
             return redirect('core:form-table-view-list')
         table_blocks = []
         for layout in layouts:
-            dropdown_map = layout.active_column_dropdown_map()
             preview_row_cells = [
                 {
                     'col': col_idx,
                     'label': column['label'],
-                    'dropdown': dropdown_map.get(col_idx),
+                    'dropdown': layout.dropdown_for_cell(0, col_idx),
                 }
                 for col_idx, column in layout.active_columns()
             ]
@@ -2270,17 +2279,15 @@ def _active_table_render(layout, cells):
     """Prepare active-only headers and rows (with original column indices) for templates."""
     active = layout.active_columns()
     headers = [column['label'] for _, column in active]
-    dropdown_map = layout.active_column_dropdown_map()
     rows = []
     for row_idx, row in enumerate(cells or []):
         row_cells = []
         for col_idx, _ in active:
-            dropdown = dropdown_map.get(col_idx)
             row_cells.append({
                 'row': row_idx,
                 'col': col_idx,
                 'value': row[col_idx] if col_idx < len(row) else '',
-                'dropdown': dropdown,
+                'dropdown': layout.dropdown_for_cell(row_idx, col_idx),
             })
         rows.append(row_cells)
     return headers, rows

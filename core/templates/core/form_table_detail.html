@@ -20,10 +20,10 @@
       <div class="{% if not forloop.first %}border-top pt-4 mt-4{% endif %}">
         <div class="row mb-3">
           <div class="col-md-3">
-            <strong>Number of Table:</strong> {{ layout.table_number }}
+            <strong>Name of Table:</strong> {{ layout.table_name|default:'—' }}
           </div>
           <div class="col-md-3">
-            <strong>Name of Table:</strong> {{ layout.table_name|default:'—' }}
+            <strong>Table Heading:</strong> {{ layout.table_heading|default:'—' }}
           </div>
           <div class="col-md-3">
             <strong>Number of Rows:</strong> {{ layout.row_count }}
@@ -32,6 +32,9 @@
             <strong>Active Columns:</strong> {{ layout.active_column_count }} / {{ layout.column_count }}
           </div>
         </div>
+        {% if layout.notes %}
+        <p class="mb-3"><strong>Table Description:</strong> {{ layout.notes|linebreaksbr }}</p>
+        {% endif %}
         <p class="text-muted small mb-2">Preview shows 1 row only. The form will provide {{ layout.row_count }} rows for data entry.</p>
         {% if column_dropdowns %}
         <div class="mb-3">
@@ -39,7 +42,12 @@
           <ul class="small mb-0">
             {% for dd in column_dropdowns %}
             <li>
-              Column {{ dd.col|add:1 }}:
+              Column {{ dd.col|add:1 }}
+              {% if dd.rows %}
+              (rows {% for r in dd.rows %}{{ r|add:1 }}{% if not forloop.last %}, {% endif %}{% endfor %})
+              {% else %}
+              (all rows)
+              {% endif %}:
               {{ dd.options|join:", " }}
               {% if not dd.is_active %}<span class="text-muted">(inactive)</span>{% endif %}
             </li>
@@ -47,9 +55,12 @@
           </ul>
         </div>
         {% endif %}
-        <h6 class="font-weight-bold mb-2">
-          {% if layout.table_name %}{{ layout.table_name }} — {% endif %}{{ form_def.code }} ({{ form_def.name }})
-        </h6>
+        {% if layout.table_name %}
+        <h6 class="font-weight-bold mb-2">{{ layout.table_name }}</h6>
+        {% endif %}
+        {% if layout.table_heading %}
+        <div class="font-weight-bold mb-2">{{ layout.table_heading }}</div>
+        {% endif %}
         <div class="table-responsive">
           <table class="table table-bordered table-sm mb-0">
             <thead class="thead-light">
@@ -79,8 +90,8 @@
             </tbody>
           </table>
         </div>
-        {% if layout.notes %}
-        <p class="small mt-3 mb-0"><strong>Note:</strong> {{ layout.notes|linebreaksbr }}</p>
+        {% if layout.table_note %}
+        <p class="small mt-3 mb-0"><strong>Note:</strong> {{ layout.table_note|linebreaksbr }}</p>
         {% endif %}
         <p class="text-muted small mt-2 mb-0">
           Last updated: {{ layout.updated_at|date:"M d, Y H:i" }}

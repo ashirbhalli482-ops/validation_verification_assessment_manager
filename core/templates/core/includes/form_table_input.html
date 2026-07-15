@@ -1,11 +1,15 @@
 {% for section in table_sections %}
 {% with table_layout=section.layout table_headers=section.table_headers table_rows=section.table_rows %}
 <div class="form-group mt-4">
-  <label class="d-block font-weight-bold">
-    {% if table_layout.table_name %}{{ table_layout.table_name }} — {% endif %}{{ form_def.code }} ({{ form_def.name }})
-    {% if table_layout.table_number %}<span class="text-muted small">(Table {{ table_layout.table_number }})</span>{% endif %}
-  </label>
-  <p class="text-muted small">Column headings are set by the administrator. Enter data in the cells below.</p>
+  {% if table_layout.table_name %}
+  <label class="d-block font-weight-bold">{{ table_layout.table_name }}</label>
+  {% endif %}
+  {% if table_layout.table_heading %}
+  <div class="font-weight-bold mb-1">{{ table_layout.table_heading }}</div>
+  {% endif %}
+  {% if table_layout.notes %}
+  <p class="text-muted small mb-2">{{ table_layout.notes|linebreaksbr }}</p>
+  {% endif %}
   <div class="table-responsive">
     <table class="table table-bordered table-sm mb-0">
       <thead class="thead-light">
@@ -40,8 +44,8 @@
       </tbody>
     </table>
   </div>
-  {% if table_layout.notes %}
-  <p class="small mt-2 mb-0"><strong>Note:</strong> {{ table_layout.notes|linebreaksbr }}</p>
+  {% if table_layout.table_note %}
+  <p class="small mt-2 mb-0"><strong>Note:</strong> {{ table_layout.table_note|linebreaksbr }}</p>
   {% endif %}
 </div>
 {% endwith %}

@@ -284,10 +284,13 @@ class FormTableLayout(models.Model):
         FormDefinition, on_delete=models.CASCADE, related_name='table_layouts',
     )
     table_number = models.PositiveIntegerField(
-        default=1, validators=[MinValueValidator(1)], verbose_name='Number of Table',
+        default=1, validators=[MinValueValidator(1)],
+        help_text='Internal order index; assigned automatically.',
     )
     table_name = models.CharField(max_length=200, blank=True, verbose_name='Name of Table')
-    notes = models.TextField(blank=True, verbose_name='Table Notes')
+    table_heading = models.CharField(max_length=200, blank=True, verbose_name='Table Heading')
+    notes = models.TextField(blank=True, verbose_name='Table Description')
+    table_note = models.TextField(blank=True, verbose_name='Note')
     row_count = models.PositiveIntegerField(
         default=100, validators=[MinValueValidator(1)],
     )
@@ -298,7 +301,7 @@ class FormTableLayout(models.Model):
     cell_dropdowns = models.JSONField(
         default=list,
         blank=True,
-        help_text='Column dropdown configs: {col, options, is_active}.',
+        help_text='Dropdown configs: {col, rows, options, is_active}. Empty rows = all rows.',
     )
     created_by = models.ForeignKey(
         CustomUser, on_delete=models.SET_NULL, null=True, blank=True,
@@ -364,8 +367,22 @@ class FormTableLayout(models.Model):
         ]
         if not options:
             return None
+        rows = []
+        raw_rows = entry.get('rows')
+        if isinstance(raw_rows, str):
+            raw_rows = [part.strip() for part in raw_rows.replace(';', ',').split(',') if part.strip()]
+        if isinstance(raw_rows, (list, tuple)):
+            for item in raw_rows:
+                try:
+                    row_idx = int(item)
+                except (TypeError, ValueError):
+                    continue
+                if row_idx >= 0:
+                    rows.append(row_idx)
+            rows = sorted(set(rows))
         return {
             'col': max(0, col),
+            'rows': rows,
             'options': options,
             'is_active': bool(entry.get('is_active', True)),
         }
@@ -379,11 +396,28 @@ class FormTableLayout(models.Model):
         return dropdowns
 
     def active_column_dropdown_map(self):
+        """Map column -> dropdown for configs that apply to all rows (legacy preview)."""
         return {
             dropdown['col']: dropdown
             for dropdown in self.normalized_column_dropdowns()
-            if dropdown['is_active']
+            if dropdown['is_active'] and not dropdown['rows']
         }
+
+    def dropdown_for_cell(self, row_idx, col_idx):
+        """Return the active dropdown for a cell, or None."""
+        for dropdown in self.normalized_column_dropdowns():
+            if not dropdown['is_active'] or dropdown['col'] != col_idx:
+                continue
+            if not dropdown['rows'] or row_idx in dropdown['rows']:
+                return dropdown
+        return None
+
+    @staticmethod
+    def rows_display(rows):
+        """Format 0-based row indices as 1-based comma-separated text."""
+        if not rows:
+            return ''
+        return ','.join(str(idx + 1) for idx in rows)
 
     def normalized_cell_dropdowns(self):
         return self.normalized_column_dropdowns()

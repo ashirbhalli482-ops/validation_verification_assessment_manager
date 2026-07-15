@@ -76,11 +76,16 @@
   <div class="card mb-2 column-dropdown-row" data-index="__INDEX__">
     <div class="card-body py-2">
       <div class="form-row align-items-end">
-        <div class="col-md-4 mb-2">
+        <div class="col-md-3 mb-2">
           <label class="small mb-1">Column</label>
           <select class="form-control form-control-sm column-select"></select>
         </div>
-        <div class="col-md-6 mb-2">
+        <div class="col-md-3 mb-2">
+          <label class="small mb-1">Rows</label>
+          <input type="text" class="form-control form-control-sm rows-input" placeholder="All rows" value="">
+          <small class="text-muted">Blank = all rows</small>
+        </div>
+        <div class="col-md-4 mb-2">
           <label class="small mb-1">Dropdown Values</label>
           <div class="dropdown-options">
             <div class="input-group input-group-sm mb-1 option-row">
@@ -159,11 +164,41 @@
       block.querySelectorAll('.column-dropdown-row').forEach(function (row) {
         var index = row.getAttribute('data-index');
         row.querySelector('.column-select').name = prefix + '_col_dd_' + index + '_col';
+        var rowsInput = row.querySelector('.rows-input');
+        if (rowsInput) rowsInput.name = prefix + '_col_dd_' + index + '_rows';
         row.querySelector('.dropdown-active-input').name = prefix + '_col_dd_' + index + '_active';
         row.querySelectorAll('.option-input').forEach(function (input) {
           input.name = prefix + '_col_dd_' + index + '_options';
         });
       });
+    }
+
+    function parseRowsSpec(value) {
+      value = (value || '').trim();
+      if (!value) return null;
+      var rows = [];
+      value.replace(/;/g, ',').split(',').forEach(function (part) {
+        part = part.trim();
+        if (!part) return;
+        if (part.indexOf('-') !== -1) {
+          var ends = part.split('-');
+          var start = parseInt(ends[0], 10);
+          var end = parseInt(ends[1], 10);
+          if (isNaN(start) || isNaN(end)) return;
+          if (start > end) {
+            var tmp = start;
+            start = end;
+            end = tmp;
+          }
+          for (var n = start; n <= end; n += 1) {
+            if (n >= 1) rows.push(n - 1);
+          }
+          return;
+        }
+        var number = parseInt(part, 10);
+        if (!isNaN(number) && number >= 1) rows.push(number - 1);
+      });
+      return rows;
     }
 
     function getDropdownConfigs(block) {
@@ -172,31 +207,32 @@
         var active = row.querySelector('.dropdown-active-input').value === '1';
         if (!active) return;
         var colNum = parseInt(row.querySelector('.column-select').value, 10) || 0;
+        var rowsInput = row.querySelector('.rows-input');
+        var rows = parseRowsSpec(rowsInput ? rowsInput.value : '');
         var options = [];
         row.querySelectorAll('.option-input').forEach(function (input) {
           var value = input.value.trim();
           if (value) options.push(value);
         });
         if (options.length) {
-          configs.push({ col: colNum, options: options });
+          configs.push({ col: colNum, rows: rows, options: options });
         }
       });
       return configs;
     }
 
     function updateBlockTitle(block) {
-      var numInput = block.querySelector('.table-number');
+      var tableNameInput = block.querySelector('.table-name');
       var title = block.querySelector('.table-block-title');
-      var num = numInput ? numInput.value : '';
-      title.textContent = num ? ('Table ' + num) : 'New Table';
+      var tableName = tableNameInput ? tableNameInput.value.trim() : '';
+      title.textContent = tableName || 'New Table';
     }
 
     function updatePreviewTitle(block) {
       var tableNameInput = block.querySelector('.table-name');
       var previewTitle = block.querySelector('.preview-title');
-      var formLabel = block.getAttribute('data-form-label') || '';
       var tableName = tableNameInput ? tableNameInput.value.trim() : '';
-      previewTitle.textContent = tableName ? (tableName + ' — ' + formLabel) : formLabel;
+      previewTitle.textContent = tableName;
     }
 
     function updatePreview(block) {
@@ -217,7 +253,11 @@
       var tr = document.createElement('tr');
       headers.forEach(function (h) {
         var td = document.createElement('td');
-        var match = dropdownConfigs.find(function (cfg) { return cfg.col === h.index; });
+        var match = dropdownConfigs.find(function (cfg) {
+          if (cfg.col !== h.index) return false;
+          if (cfg.rows === null) return true;
+          return cfg.rows.indexOf(0) !== -1;
+        });
         if (match) {
           var select = document.createElement('select');
           select.className = 'form-control form-control-sm';
@@ -241,6 +281,9 @@
 
     function bindRemoveOption(block, btn) {
       btn.addEventListener('click', function () {
+        if (!window.confirm('Remove this dropdown value?')) {
+          return;
+        }
         var options = btn.closest('.dropdown-options');
         var rows = options.querySelectorAll('.option-row');
         if (rows.length <= 1) {
@@ -255,7 +298,7 @@
 
     function bindAddOption(block, btn) {
       btn.addEventListener('click', function () {
-        var options = btn.closest('.col-md-6').querySelector('.dropdown-options');
+        var options = btn.closest('.col-md-4, .col-md-6').querySelector('.dropdown-options');
         options.insertAdjacentHTML('beforeend', emptyOptionTemplate);
         var newRow = options.lastElementChild;
         bindRemoveOption(block, newRow.querySelector('.remove-option'));
@@ -294,6 +337,10 @@
       bindAddOption(block, row.querySelector('.add-option'));
       row.querySelectorAll('.remove-option').forEach(function (btn) { bindRemoveOption(block, btn); });
       row.querySelector('.column-select').addEventListener('change', function () { updatePreview(block); });
+      var rowsInput = row.querySelector('.rows-input');
+      if (rowsInput) {
+        rowsInput.addEventListener('input', function () { updatePreview(block); });
+      }
       row.querySelectorAll('.option-input').forEach(function (input) {
         input.addEventListener('input', function () { updatePreview(block); });
       });
@@ -332,10 +379,11 @@
 
     function initTableBlock(block) {
       var prefix = prefixFor(block);
-      block.querySelector('.table-number').name = prefix + '_number';
       block.querySelector('.table-name').name = prefix + '_name';
+      block.querySelector('.table-heading').name = prefix + '_heading';
       block.querySelector('.row-count').name = prefix + '_row_count';
       block.querySelector('.table-notes').name = prefix + '_notes';
+      block.querySelector('.table-note').name = prefix + '_note';
       var idInput = block.querySelector('input[type="hidden"][name$="_id"]');
       if (idInput) idInput.name = prefix + '_id';
 
@@ -370,6 +418,8 @@
         activeInput.name = prefix + '_col_dd_' + nextIndex + '_active';
         var optionInput = newRow.querySelector('.option-input');
         optionInput.name = prefix + '_col_dd_' + nextIndex + '_options';
+        var rowsInput = newRow.querySelector('.rows-input');
+        if (rowsInput) rowsInput.name = prefix + '_col_dd_' + nextIndex + '_rows';
         var select = buildColumnSelect(block, 0);
         select.name = prefix + '_col_dd_' + nextIndex + '_col';
         newRow.querySelector('.column-select').replaceWith(select);
@@ -379,8 +429,10 @@
         updatePreview(block);
       });
 
-      block.querySelector('.table-name').addEventListener('input', function () { updatePreviewTitle(block); });
-      block.querySelector('.table-number').addEventListener('input', function () { updateBlockTitle(block); });
+      block.querySelector('.table-name').addEventListener('input', function () {
+        updateBlockTitle(block);
+        updatePreviewTitle(block);
+      });
 
       block.querySelector('.remove-table-btn').addEventListener('click', function () {
         var blocks = blocksContainer.querySelectorAll('.table-block');
@@ -403,15 +455,6 @@
       updatePreview(block);
     }
 
-    function suggestedTableNumber() {
-      var max = 0;
-      blocksContainer.querySelectorAll('.table-number').forEach(function (input) {
-        var n = parseInt(input.value, 10);
-        if (!isNaN(n) && n > max) max = n;
-      });
-      return max + 1;
-    }
-
     function addTableBlock() {
       var key = 'new' + nextNewKeyIndex;
       nextNewKeyIndex += 1;
@@ -419,7 +462,6 @@
       blocksContainer.insertAdjacentHTML('beforeend', html);
       var block = blocksContainer.lastElementChild;
       block.setAttribute('data-key', key);
-      block.querySelector('.table-number').value = suggestedTableNumber();
       initTableBlock(block);
       block.querySelector('.table-name').focus();
       block.scrollIntoView({ behavior: 'smooth', block: 'start' });

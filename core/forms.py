@@ -915,21 +915,25 @@ class CVApprovalForm(forms.ModelForm):
 
 
 class FormTableLayoutForm(forms.Form):
-    table_number = forms.IntegerField(
-        min_value=1,
-        initial=1,
-        label='Number of Table',
-        widget=forms.NumberInput(attrs={'class': 'form-control', 'min': 1}),
-    )
     table_name = forms.CharField(
         required=False,
         label='Name of Table',
-        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Enter table name'}),
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Name of table'}),
+    )
+    table_heading = forms.CharField(
+        required=False,
+        label='Table Heading',
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Table heading'}),
     )
     notes = forms.CharField(
         required=False,
-        label='Table Notes',
-        widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': 'Notes related to this table'}),
+        label='Table Description',
+        widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': 'Table description'}),
+    )
+    table_note = forms.CharField(
+        required=False,
+        label='Note',
+        widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 2, 'placeholder': 'Note related to this table'}),
     )
     row_count = forms.IntegerField(
         min_value=1,
