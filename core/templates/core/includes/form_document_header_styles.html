@@ -33,31 +33,47 @@
   color: #5c6670;
 }
 .form-doc-meta-bar {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto minmax(0, 1.4fr) auto minmax(0, 1.2fr) auto minmax(0, 1fr);
+  align-items: stretch;
   background: #8bc34a;
-  color: #1f2d3d;
+  color: #fff;
   margin-top: 0.75rem;
   margin-bottom: 0;
   border: 1px solid #6fa032;
   border-radius: 2px;
+  overflow: hidden;
 }
-.form-doc-meta-item {
-  flex: 1 1 220px;
-  padding: 0.55rem 0.85rem;
-  border-right: 1px solid rgba(0, 0, 0, 0.12);
+.form-doc-meta-cell {
+  display: flex;
+  align-items: center;
+  padding: 0.45rem 0.65rem;
+  border-right: 1px solid rgba(255, 255, 255, 0.55);
+  font-style: italic;
+  font-size: 0.9rem;
+  line-height: 1.2;
+  min-width: 0;
+  word-break: break-word;
 }
-.form-doc-meta-item:last-child {
+.form-doc-meta-cell:last-child {
   border-right: none;
 }
-.form-doc-meta-label {
+.form-doc-meta-label-cell {
+  font-weight: 600;
+  white-space: nowrap;
+}
+.form-doc-meta-value-cell {
+  font-weight: 500;
+}
+/* Keep older class names harmless if referenced elsewhere */
+.form-doc-meta-item {
+  display: none;
+}
+.form-doc-meta-label,
+.form-doc-meta-value {
   display: block;
   font-size: 0.78rem;
   font-weight: 600;
-}
-.form-doc-meta-value {
-  display: block;
-  font-size: 0.92rem;
 }
 .form-doc-project-control-title {
   font-style: italic;
@@ -70,44 +86,42 @@
   background: #00AEEF;
   color: #fff;
   margin-top: 0;
-  border: 1px solid #0099d6;
+  border: 1px solid #fff;
   border-radius: 2px;
   overflow: hidden;
 }
 .form-doc-project-row {
   display: grid;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.45);
+  grid-template-columns: auto minmax(3.5rem, 0.55fr) auto minmax(0, 2.2fr) auto minmax(0, 0.9fr);
+  align-items: stretch;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.85);
 }
 .form-doc-project-row:last-child {
   border-bottom: none;
 }
-.form-doc-project-row-3 {
-  grid-template-columns: repeat(3, 1fr);
+.form-doc-project-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 0.45rem 0.55rem;
+  border-right: 1px solid rgba(255, 255, 255, 0.85);
+  font-style: italic;
+  font-weight: 700;
+  font-size: 0.9rem;
+  line-height: 1.2;
+  color: #fff;
+  min-width: 0;
+  word-break: break-word;
 }
-.form-doc-project-row-4 {
-  grid-template-columns: repeat(4, 1fr);
-}
-.form-doc-project-bar .form-doc-project-item {
-  padding: 0.5rem 0.75rem;
-  border-right: 1px solid rgba(255, 255, 255, 0.45);
-}
-.form-doc-project-bar .form-doc-project-item:last-child {
+.form-doc-project-cell:last-child {
   border-right: none;
 }
-.form-doc-project-bar .form-doc-meta-label,
-.form-doc-project-bar .form-doc-meta-value {
-  display: block;
-  font-style: italic;
-  color: #fff;
+.form-doc-project-label {
+  white-space: nowrap;
 }
-.form-doc-project-bar .form-doc-meta-label {
-  font-size: 0.78rem;
-  font-weight: 600;
-  margin-bottom: 0.1rem;
-}
-.form-doc-project-bar .form-doc-meta-value {
-  font-size: 0.92rem;
-  font-weight: 500;
+.form-doc-project-value {
+  font-weight: 700;
 }
 .form-doc-record-meta,
 .form-doc-reviews,
@@ -115,14 +129,16 @@
   color: #5c6670;
 }
 @media (max-width: 992px) {
-  .form-doc-project-row-3,
-  .form-doc-project-row-4 {
-    grid-template-columns: 1fr 1fr;
+  .form-doc-meta-bar {
+    grid-template-columns: auto minmax(0, 1fr);
   }
-  .form-doc-project-bar .form-doc-project-item:nth-child(2n) {
-    border-right: none;
+  .form-doc-meta-cell {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.35);
   }
-  .form-doc-project-bar .form-doc-project-item {
+  .form-doc-project-row {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .form-doc-project-cell {
     border-bottom: 1px solid rgba(255, 255, 255, 0.45);
   }
 }

@@ -13,62 +13,39 @@
     </div>
   </div>
   <div class="form-doc-meta-bar">
-    <div class="form-doc-meta-item">
-      <span class="form-doc-meta-label">Issue Date</span>
-      <span class="form-doc-meta-value">{% if company and company.issue_date %}{{ company.issue_date|date:"Y-m-d" }}{% else %}-{% endif %}</span>
-    </div>
-    <div class="form-doc-meta-item">
-      <span class="form-doc-meta-label">Document Name</span>
-      <span class="form-doc-meta-value"><strong>{{ form_def.code }}</strong> ({{ form_def.name }})</span>
-    </div>
-    <div class="form-doc-meta-item">
-      <span class="form-doc-meta-label">Owner</span>
-      <span class="form-doc-meta-value">{{ form_owner|default:"VVB" }}</span>
-    </div>
-    <div class="form-doc-meta-item">
-      <span class="form-doc-meta-label">Version</span>
-      <span class="form-doc-meta-value">{% if company and company.version %}{{ company.version }}{% else %}-{% endif %}</span>
-    </div>
+    <div class="form-doc-meta-cell form-doc-meta-label-cell">Issue Date:</div>
+    <div class="form-doc-meta-cell form-doc-meta-value-cell">{% if company and company.issue_date %}{{ company.issue_date|date:"Y-m-d" }}{% else %}-{% endif %}</div>
+    <div class="form-doc-meta-cell form-doc-meta-label-cell">Document<br>Name:</div>
+    <div class="form-doc-meta-cell form-doc-meta-value-cell">{{ form_def.code }}</div>
+    <div class="form-doc-meta-cell form-doc-meta-value-cell">({{ form_def.name }})</div>
+    <div class="form-doc-meta-cell form-doc-meta-label-cell">Owner:</div>
+    <div class="form-doc-meta-cell form-doc-meta-value-cell">{{ form_owner|default:"VVB" }}</div>
+    <div class="form-doc-meta-cell form-doc-meta-label-cell">Version:</div>
+    <div class="form-doc-meta-cell form-doc-meta-value-cell">{% if company and company.version %}{{ company.version }}{% else %}-{% endif %}</div>
   </div>
   {% if project %}
   <div class="form-doc-project-control-title">Project Control</div>
   <div class="form-doc-project-bar">
-    <div class="form-doc-project-row form-doc-project-row-3">
-      <div class="form-doc-project-item">
-        <span class="form-doc-meta-label">Project #:</span>
-        <span class="form-doc-meta-value">{{ project.project_number|default:"-" }}</span>
-      </div>
-      <div class="form-doc-project-item">
-        <span class="form-doc-meta-label">Client:</span>
-        <span class="form-doc-meta-value">{{ project.company_name|default:"-" }}</span>
-      </div>
-      <div class="form-doc-project-item">
-        <span class="form-doc-meta-label">Phase:</span>
-        <span class="form-doc-meta-value">{{ project.get_phase_display|default:"-" }}</span>
-      </div>
+    <div class="form-doc-project-row">
+      <div class="form-doc-project-cell form-doc-project-label">Project #:</div>
+      <div class="form-doc-project-cell form-doc-project-value">{{ project.project_number|default:"-" }}</div>
+      <div class="form-doc-project-cell form-doc-project-label">Client:</div>
+      <div class="form-doc-project-cell form-doc-project-value">{{ project.company_name|default:"-" }}</div>
+      <div class="form-doc-project-cell form-doc-project-label">Phase:</div>
+      <div class="form-doc-project-cell form-doc-project-value">{{ project.get_phase_display|default:"-" }}</div>
     </div>
-    <div class="form-doc-project-row form-doc-project-row-4">
-      <div class="form-doc-project-item">
-        <span class="form-doc-meta-label">Report Type / Year:</span>
-        <span class="form-doc-meta-value">
-          {% if project.report_type and project.year %}{{ project.report_type }}-{{ project.year }}
-          {% elif project.report_type %}{{ project.report_type }}
-          {% elif project.year %}{{ project.year }}
-          {% else %}-{% endif %}
-        </span>
+    <div class="form-doc-project-row">
+      <div class="form-doc-project-cell form-doc-project-label">Report Type:</div>
+      <div class="form-doc-project-cell form-doc-project-value">
+        {% if project.report_type and project.year %}{{ project.report_type }}-{{ project.year }}
+        {% elif project.report_type %}{{ project.report_type }}
+        {% elif project.year %}{{ project.year }}
+        {% else %}-{% endif %}
       </div>
-      <div class="form-doc-project-item">
-        <span class="form-doc-meta-label">Engagement Type:</span>
-        <span class="form-doc-meta-value">{{ project.engagement_year|default:"-" }}</span>
-      </div>
-      <div class="form-doc-project-item">
-        <span class="form-doc-meta-label">Facility &amp; Jurisdiction:</span>
-        <span class="form-doc-meta-value">{{ project.location|default:"-" }}</span>
-      </div>
-      <div class="form-doc-project-item">
-        <span class="form-doc-meta-label">Document Type:</span>
-        <span class="form-doc-meta-value">{{ project.get_document_type_display|default:"-" }}</span>
-      </div>
+      <div class="form-doc-project-cell form-doc-project-label">Facility:</div>
+      <div class="form-doc-project-cell form-doc-project-value">{{ project.location|default:"-" }}</div>
+      <div class="form-doc-project-cell form-doc-project-label">Document Type:</div>
+      <div class="form-doc-project-cell form-doc-project-value">{{ project.get_document_type_display|default:"-" }}</div>
     </div>
   </div>
   {% endif %}

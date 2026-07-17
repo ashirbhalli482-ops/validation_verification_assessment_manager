@@ -1,17 +1,17 @@
 {% for section in table_sections %}
 {% with table_layout=section.layout table_headers=section.table_headers table_rows=section.table_rows %}
-<div class="form-group mt-4">
-  {% if table_layout.table_name %}
-  <label class="d-block font-weight-bold">{{ table_layout.table_name }}</label>
-  {% endif %}
+<div class="form-group mt-4 form-fill-table-wrap">
   {% if table_layout.table_heading %}
   <div class="font-weight-bold mb-1">{{ table_layout.table_heading }}</div>
+  {% endif %}
+  {% if table_layout.table_name %}
+  <label class="d-block font-weight-bold">{{ table_layout.table_name }}</label>
   {% endif %}
   {% if table_layout.notes %}
   <p class="text-muted small mb-2">{{ table_layout.notes|linebreaksbr }}</p>
   {% endif %}
   <div class="table-responsive">
-    <table class="table table-bordered table-sm mb-0">
+    <table class="table table-bordered table-sm mb-0 form-fill-table" data-layout-id="{{ table_layout.pk }}">
       <thead class="thead-light">
         <tr>
           {% for header in table_headers %}
@@ -21,21 +21,32 @@
       </thead>
       <tbody>
         {% for row in table_rows %}
-        <tr>
+        <tr data-table-row="{{ forloop.counter0 }}">
           {% for cell in row %}
           <td>
             {% if cell.dropdown %}
-            <select name="table_cell_{{ table_layout.pk }}_{{ cell.row }}_{{ cell.col }}" class="form-control form-control-sm">
+            <select name="table_cell_{{ table_layout.pk }}_{{ cell.row }}_{{ cell.col }}"
+                    class="form-control form-control-sm form-table-cell-select"
+                    data-fit-select
+                    data-table-col="{{ cell.col }}"
+                    data-table-row="{{ cell.row }}"
+                    {% if cell.dropdown.depends_on_col != None %}
+                    data-depends-on-col="{{ cell.dropdown.depends_on_col }}"
+                    data-option-map="{{ cell.dropdown.option_map_json|escape }}"
+                    data-selected-value="{{ cell.value|escape }}"
+                    {% endif %}>
               <option value="">— Select —</option>
-              {% for opt in cell.dropdown.options %}
-              <option value="{{ opt }}" {% if cell.value == opt %}selected{% endif %}>{{ opt }}</option>
-              {% endfor %}
+              {% if cell.dropdown.depends_on_col == None %}
+                {% for opt in cell.dropdown.options %}
+                <option value="{{ opt }}" {% if cell.value == opt %}selected{% endif %}>{{ opt }}</option>
+                {% endfor %}
+              {% endif %}
             </select>
             {% else %}
-            <input type="text"
-                   name="table_cell_{{ table_layout.pk }}_{{ cell.row }}_{{ cell.col }}"
-                   class="form-control form-control-sm"
-                   value="{{ cell.value }}">
+            <textarea name="table_cell_{{ table_layout.pk }}_{{ cell.row }}_{{ cell.col }}"
+                      class="form-control form-control-sm form-table-cell-input"
+                      rows="1"
+                      data-fit-textarea>{{ cell.value }}</textarea>
             {% endif %}
           </td>
           {% endfor %}
@@ -45,8 +56,160 @@
     </table>
   </div>
   {% if table_layout.table_note %}
-  <p class="small mt-2 mb-0"><strong>Note:</strong> {{ table_layout.table_note|linebreaksbr }}</p>
+  <p class="small mt-2 mb-0">{{ table_layout.table_note|linebreaksbr }}</p>
   {% endif %}
 </div>
 {% endwith %}
 {% endfor %}
+
+<script>
+(function () {
+  function measureTextWidth(text, styleSource) {
+    var probe = document.createElement('span');
+    probe.style.cssText = 'position:absolute;visibility:hidden;white-space:pre;';
+    var style = window.getComputedStyle(styleSource);
+    probe.style.fontFamily = style.fontFamily;
+    probe.style.fontSize = style.fontSize;
+    probe.style.fontWeight = style.fontWeight;
+    probe.style.letterSpacing = style.letterSpacing;
+    probe.textContent = text || ' ';
+    document.body.appendChild(probe);
+    var width = probe.offsetWidth;
+    document.body.removeChild(probe);
+    return width;
+  }
+
+  function fitTextarea(el) {
+    if (!el) return;
+    var value = el.value || '';
+    var lines = value.split('\n');
+    var maxLineWidth = 0;
+    for (var i = 0; i < lines.length; i++) {
+      maxLineWidth = Math.max(maxLineWidth, measureTextWidth(lines[i], el));
+    }
+    var padding = 24;
+    var minWidth = 120;
+    var maxWidth = Math.min(window.innerWidth * 0.55, 640);
+    var width = Math.max(minWidth, Math.min(maxLineWidth + padding, maxWidth));
+    el.style.width = width + 'px';
+    el.style.minWidth = width + 'px';
+
+    el.style.height = 'auto';
+    el.style.height = Math.max(el.scrollHeight, 31) + 'px';
+  }
+
+  function fitSelect(el) {
+    if (!el) return;
+    var maxWidth = 0;
+    for (var i = 0; i < el.options.length; i++) {
+      if (el.options[i].hidden) continue;
+      maxWidth = Math.max(maxWidth, measureTextWidth(el.options[i].text || '', el));
+    }
+    var padding = 40;
+    var minWidth = 120;
+    var maxCap = Math.min(window.innerWidth * 0.55, 640);
+    var width = Math.max(minWidth, Math.min(maxWidth + padding, maxCap));
+    el.style.width = width + 'px';
+    el.style.minWidth = width + 'px';
+  }
+
+  function parseOptionMap(el) {
+    var raw = el.getAttribute('data-option-map') || '{}';
+    try {
+      return JSON.parse(raw);
+    } catch (e) {
+      return {};
+    }
+  }
+
+  function findParentSelect(childSelect) {
+    var parentCol = childSelect.getAttribute('data-depends-on-col');
+    if (parentCol === null || parentCol === '') return null;
+    var row = childSelect.closest('tr');
+    if (!row) return null;
+    return row.querySelector('select[data-table-col="' + parentCol + '"]');
+  }
+
+  function setDependentOptions(childSelect, parentValue, keepValue) {
+    var map = parseOptionMap(childSelect);
+    var allowed = (parentValue && map[parentValue]) ? map[parentValue].slice() : [];
+    var current = keepValue !== undefined ? keepValue : childSelect.value;
+    var hasParent = Boolean(parentValue);
+
+    while (childSelect.options.length > 1) {
+      childSelect.remove(1);
+    }
+
+    allowed.forEach(function (opt) {
+      var option = document.createElement('option');
+      option.value = opt;
+      option.textContent = opt;
+      if (opt === current) option.selected = true;
+      childSelect.appendChild(option);
+    });
+
+    if (allowed.indexOf(current) === -1) {
+      childSelect.value = '';
+    }
+    childSelect.disabled = !hasParent;
+    if (!hasParent) {
+      childSelect.title = 'Select the parent column value first';
+    } else {
+      childSelect.removeAttribute('title');
+    }
+    fitSelect(childSelect);
+  }
+
+  function refreshDependents(parentSelect) {
+    var row = parentSelect.closest('tr');
+    if (!row) return;
+    var parentCol = parentSelect.getAttribute('data-table-col');
+    row.querySelectorAll('select[data-depends-on-col="' + parentCol + '"]').forEach(function (child) {
+      setDependentOptions(child, parentSelect.value);
+      refreshDependents(child);
+    });
+  }
+
+  function initDependentDropdowns() {
+    document.querySelectorAll('select[data-depends-on-col]').forEach(function (child) {
+      var parent = findParentSelect(child);
+      var initial = child.getAttribute('data-selected-value') || child.value;
+      setDependentOptions(child, parent ? parent.value : '', initial);
+    });
+
+    document.querySelectorAll('.form-fill-table select[data-table-col]').forEach(function (select) {
+      select.addEventListener('change', function () {
+        refreshDependents(select);
+        fitSelect(select);
+      });
+    });
+  }
+
+  function fitAll(root) {
+    (root || document).querySelectorAll('[data-fit-textarea]').forEach(fitTextarea);
+    (root || document).querySelectorAll('[data-fit-select]').forEach(fitSelect);
+  }
+
+  function bind(root) {
+    (root || document).querySelectorAll('[data-fit-textarea]').forEach(function (el) {
+      el.addEventListener('input', function () { fitTextarea(el); });
+    });
+    (root || document).querySelectorAll('[data-fit-select]').forEach(function (el) {
+      el.addEventListener('change', function () { fitSelect(el); });
+    });
+  }
+
+  function init() {
+    initDependentDropdowns();
+    fitAll(document);
+    bind(document);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+  window.addEventListener('resize', function () { fitAll(document); });
+})();
+</script>

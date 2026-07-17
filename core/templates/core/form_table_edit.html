@@ -18,7 +18,7 @@
       </button>
     </div>
     <div class="card-body">
-      <form method="post" id="formTableBuilder">{% csrf_token %}
+      <form method="post" id="formTableBuilder" data-next-new-key="{{ table_blocks|length|default:1 }}">{% csrf_token %}
         {% if request.GET.return == 'view' %}
         <input type="hidden" name="return" value="view">
         {% endif %}
@@ -72,6 +72,41 @@
   </div>
 </div>
 
+<div id="empty-map-option-row" style="display:none;">
+  <div class="input-group input-group-sm mb-1 option-row">
+    <input type="text" class="form-control map-option-input" placeholder="Value" value="">
+    <div class="input-group-append">
+      <button type="button" class="btn btn-outline-secondary remove-map-option" title="Remove value">&times;</button>
+    </div>
+  </div>
+</div>
+
+<div id="empty-map-group" style="display:none;">
+  <div class="border rounded p-2 mb-2 option-map-group" data-map-index="__MAP__">
+    <div class="form-row align-items-end">
+      <div class="col-md-4 mb-2">
+        <label class="small mb-1">When parent value is</label>
+        <input type="text" class="form-control form-control-sm map-parent-input" placeholder="Parent value" value="">
+      </div>
+      <div class="col-md-6 mb-2">
+        <label class="small mb-1">Show these values</label>
+        <div class="map-child-options">
+          <div class="input-group input-group-sm mb-1 option-row">
+            <input type="text" class="form-control map-option-input" placeholder="Value" value="">
+            <div class="input-group-append">
+              <button type="button" class="btn btn-outline-secondary remove-map-option" title="Remove value">&times;</button>
+            </div>
+          </div>
+        </div>
+        <button type="button" class="btn btn-outline-primary btn-sm add-map-option mt-1">+ Add Value</button>
+      </div>
+      <div class="col-md-2 mb-2 text-right">
+        <button type="button" class="btn btn-sm btn-outline-danger remove-map-group">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div id="empty-column-dropdown" style="display:none;">
   <div class="card mb-2 column-dropdown-row" data-index="__INDEX__">
     <div class="card-body py-2">
@@ -81,26 +116,38 @@
           <select class="form-control form-control-sm column-select"></select>
         </div>
         <div class="col-md-3 mb-2">
+          <label class="small mb-1">Depends on</label>
+          <select class="form-control form-control-sm depends-on-select">
+            <option value="">— None —</option>
+          </select>
+        </div>
+        <div class="col-md-2 mb-2">
           <label class="small mb-1">Rows</label>
           <input type="text" class="form-control form-control-sm rows-input" placeholder="All rows" value="">
-          <small class="text-muted">Blank = all rows</small>
         </div>
-        <div class="col-md-4 mb-2">
-          <label class="small mb-1">Dropdown Values</label>
-          <div class="dropdown-options">
-            <div class="input-group input-group-sm mb-1 option-row">
-              <input type="text" class="form-control option-input" placeholder="Value" value="">
-              <div class="input-group-append">
-                <button type="button" class="btn btn-outline-secondary remove-option" title="Remove value">&times;</button>
-              </div>
-            </div>
-          </div>
-          <button type="button" class="btn btn-outline-primary btn-sm add-option mt-1">+ Add Value</button>
-        </div>
-        <div class="col-md-2 mb-2 text-right">
+        <div class="col-md-2 mb-2 text-right ml-auto">
           <input type="hidden" class="dropdown-active-input" value="1">
           <button type="button" class="btn btn-sm btn-outline-danger toggle-dropdown">Deactivate</button>
         </div>
+      </div>
+      <div class="independent-options mt-2">
+        <label class="small mb-1">Dropdown Values</label>
+        <div class="dropdown-options">
+          <div class="input-group input-group-sm mb-1 option-row">
+            <input type="text" class="form-control option-input" placeholder="Value" value="">
+            <div class="input-group-append">
+              <button type="button" class="btn btn-outline-secondary remove-option" title="Remove value">&times;</button>
+            </div>
+          </div>
+        </div>
+        <button type="button" class="btn btn-outline-primary btn-sm add-option mt-1">+ Add Value</button>
+      </div>
+      <div class="dependent-options mt-2" style="display:none">
+        <label class="small mb-1 d-block">Child values by parent selection</label>
+        <p class="text-muted small mb-2">For each parent dropdown value, list the options this column should show.</p>
+        <div class="option-map-groups"></div>
+        <button type="button" class="btn btn-outline-primary btn-sm add-map-group mt-1">+ Add Parent Value Mapping</button>
+        <button type="button" class="btn btn-outline-secondary btn-sm sync-parent-values mt-1 ml-1">Fill from parent options</button>
       </div>
     </div>
   </div>
@@ -112,9 +159,12 @@
     var removedInput = document.getElementById('removed-table-ids');
     var emptyColumnTemplate = document.getElementById('empty-column-header').innerHTML;
     var emptyOptionTemplate = document.getElementById('empty-option-row').innerHTML;
+    var emptyMapOptionTemplate = document.getElementById('empty-map-option-row').innerHTML;
+    var emptyMapGroupTemplate = document.getElementById('empty-map-group').innerHTML;
     var emptyDropdownTemplate = document.getElementById('empty-column-dropdown').innerHTML;
     var emptyBlockTemplate = document.getElementById('empty-table-block').innerHTML;
-    var nextNewKeyIndex = {{ table_blocks|length|default:1 }};
+    var formBuilder = document.getElementById('formTableBuilder');
+    var nextNewKeyIndex = parseInt(formBuilder.getAttribute('data-next-new-key') || '1', 10) || 1;
 
     function prefixFor(block) {
       return 'tbl_' + block.getAttribute('data-key');
@@ -146,6 +196,26 @@
       return select;
     }
 
+    function buildDependsOnSelect(block, selectedCol, excludeCol) {
+      var select = document.createElement('select');
+      select.className = 'form-control form-control-sm depends-on-select';
+      var none = document.createElement('option');
+      none.value = '';
+      none.textContent = '— None —';
+      select.appendChild(none);
+      getActiveColumns(block).forEach(function (col) {
+        if (String(col.index) === String(excludeCol)) return;
+        var option = document.createElement('option');
+        option.value = col.index;
+        option.textContent = 'Column ' + (col.index + 1) + ': ' + col.label;
+        if (selectedCol !== null && selectedCol !== undefined && String(col.index) === String(selectedCol)) {
+          option.selected = true;
+        }
+        select.appendChild(option);
+      });
+      return select;
+    }
+
     function refreshColumnSelects(block) {
       block.querySelectorAll('.column-dropdown-row').forEach(function (row) {
         var current = row.querySelector('.column-select');
@@ -154,8 +224,43 @@
         if (current) {
           newSelect.name = current.name;
           current.replaceWith(newSelect);
-          newSelect.addEventListener('change', function () { updatePreview(block); });
+          newSelect.addEventListener('change', function () {
+            refreshDependsOnSelect(block, row);
+            toggleDependencyMode(block, row);
+            updatePreview(block);
+          });
         }
+        refreshDependsOnSelect(block, row);
+      });
+    }
+
+    function refreshDependsOnSelect(block, row) {
+      var current = row.querySelector('.depends-on-select');
+      if (!current) return;
+      var colSelect = row.querySelector('.column-select');
+      var excludeCol = colSelect ? colSelect.value : '0';
+      var selected = current.value;
+      var newSelect = buildDependsOnSelect(block, selected, excludeCol);
+      newSelect.name = current.name;
+      current.replaceWith(newSelect);
+      newSelect.addEventListener('change', function () {
+        toggleDependencyMode(block, row);
+        updatePreview(block);
+      });
+    }
+
+    function syncMapGroupNames(block, row) {
+      var prefix = prefixFor(block);
+      var index = row.getAttribute('data-index');
+      row.querySelectorAll('.option-map-group').forEach(function (group, mapIndex) {
+        group.setAttribute('data-map-index', String(mapIndex));
+        var parentInput = group.querySelector('.map-parent-input');
+        if (parentInput) {
+          parentInput.name = prefix + '_col_dd_' + index + '_map_parent';
+        }
+        group.querySelectorAll('.map-option-input').forEach(function (input) {
+          input.name = prefix + '_col_dd_' + index + '_map_opts_' + mapIndex;
+        });
       });
     }
 
@@ -164,18 +269,165 @@
       block.querySelectorAll('.column-dropdown-row').forEach(function (row) {
         var index = row.getAttribute('data-index');
         row.querySelector('.column-select').name = prefix + '_col_dd_' + index + '_col';
+        var depends = row.querySelector('.depends-on-select');
+        if (depends) depends.name = prefix + '_col_dd_' + index + '_depends_on';
         var rowsInput = row.querySelector('.rows-input');
         if (rowsInput) rowsInput.name = prefix + '_col_dd_' + index + '_rows';
         row.querySelector('.dropdown-active-input').name = prefix + '_col_dd_' + index + '_active';
-        row.querySelectorAll('.option-input').forEach(function (input) {
+        row.querySelectorAll('.independent-options .option-input').forEach(function (input) {
           input.name = prefix + '_col_dd_' + index + '_options';
         });
+        syncMapGroupNames(block, row);
+      });
+    }
+
+    function toggleDependencyMode(block, row) {
+      var depends = row.querySelector('.depends-on-select');
+      var isDependent = depends && depends.value !== '';
+      var independent = row.querySelector('.independent-options');
+      var dependent = row.querySelector('.dependent-options');
+      if (independent) independent.style.display = isDependent ? 'none' : '';
+      if (dependent) dependent.style.display = isDependent ? '' : 'none';
+      if (isDependent) {
+        var groups = row.querySelector('.option-map-groups');
+        if (groups && !groups.querySelector('.option-map-group')) {
+          syncParentValues(block, row);
+        }
+      }
+    }
+
+    function getOptionsForColumn(block, colIndex) {
+      var options = [];
+      block.querySelectorAll('.column-dropdown-row').forEach(function (row) {
+        var active = row.querySelector('.dropdown-active-input').value === '1';
+        if (!active) return;
+        var colNum = parseInt(row.querySelector('.column-select').value, 10);
+        if (colNum !== colIndex) return;
+        var depends = row.querySelector('.depends-on-select');
+        if (depends && depends.value !== '') {
+          row.querySelectorAll('.map-option-input').forEach(function (input) {
+            var value = input.value.trim();
+            if (value && options.indexOf(value) === -1) options.push(value);
+          });
+        } else {
+          row.querySelectorAll('.independent-options .option-input').forEach(function (input) {
+            var value = input.value.trim();
+            if (value && options.indexOf(value) === -1) options.push(value);
+          });
+        }
+      });
+      return options;
+    }
+
+    function syncParentValues(block, row) {
+      var depends = row.querySelector('.depends-on-select');
+      if (!depends || depends.value === '') return;
+      var parentCol = parseInt(depends.value, 10);
+      var parentOptions = getOptionsForColumn(block, parentCol);
+      var groups = row.querySelector('.option-map-groups');
+      if (!groups) return;
+
+      var existing = {};
+      groups.querySelectorAll('.option-map-group').forEach(function (group) {
+        var key = (group.querySelector('.map-parent-input').value || '').trim();
+        if (!key) return;
+        var childOpts = [];
+        group.querySelectorAll('.map-option-input').forEach(function (input) {
+          var value = input.value.trim();
+          if (value) childOpts.push(value);
+        });
+        existing[key] = childOpts;
+      });
+
+      groups.innerHTML = '';
+      if (!parentOptions.length) {
+        addMapGroup(block, row, '', []);
+        return;
+      }
+      parentOptions.forEach(function (parentValue) {
+        addMapGroup(block, row, parentValue, existing[parentValue] || []);
+      });
+      syncMapGroupNames(block, row);
+      updatePreview(block);
+    }
+
+    function addMapGroup(block, row, parentValue, childOptions) {
+      var groups = row.querySelector('.option-map-groups');
+      var mapIndex = groups.querySelectorAll('.option-map-group').length;
+      var html = emptyMapGroupTemplate.replace(/__MAP__/g, String(mapIndex));
+      groups.insertAdjacentHTML('beforeend', html);
+      var group = groups.lastElementChild;
+      group.querySelector('.map-parent-input').value = parentValue || '';
+      var childContainer = group.querySelector('.map-child-options');
+      childContainer.innerHTML = '';
+      var opts = (childOptions && childOptions.length) ? childOptions : [''];
+      opts.forEach(function (opt) {
+        childContainer.insertAdjacentHTML('beforeend', emptyMapOptionTemplate);
+        childContainer.lastElementChild.querySelector('.map-option-input').value = opt || '';
+      });
+      bindMapGroup(block, row, group);
+      syncMapGroupNames(block, row);
+    }
+
+    function bindMapGroup(block, row, group) {
+      group.querySelector('.remove-map-group').addEventListener('click', function () {
+        var groups = row.querySelectorAll('.option-map-group');
+        if (groups.length <= 1) {
+          group.querySelector('.map-parent-input').value = '';
+          group.querySelectorAll('.map-option-input').forEach(function (input, i) {
+            if (i === 0) input.value = '';
+            else input.closest('.option-row').remove();
+          });
+          updatePreview(block);
+          return;
+        }
+        group.remove();
+        syncMapGroupNames(block, row);
+        updatePreview(block);
+      });
+      group.querySelector('.add-map-option').addEventListener('click', function () {
+        var container = group.querySelector('.map-child-options');
+        container.insertAdjacentHTML('beforeend', emptyMapOptionTemplate);
+        var newRow = container.lastElementChild;
+        bindRemoveMapOption(block, row, newRow.querySelector('.remove-map-option'));
+        syncMapGroupNames(block, row);
+        newRow.querySelector('.map-option-input').focus();
+        updatePreview(block);
+      });
+      group.querySelectorAll('.remove-map-option').forEach(function (btn) {
+        bindRemoveMapOption(block, row, btn);
+      });
+      group.querySelectorAll('.map-parent-input, .map-option-input').forEach(function (input) {
+        input.addEventListener('input', function () { updatePreview(block); });
+      });
+    }
+
+    function bindRemoveMapOption(block, row, btn) {
+      btn.addEventListener('click', function () {
+        if (!window.confirm('Remove this dropdown value?')) return;
+        var container = btn.closest('.map-child-options');
+        var rows = container.querySelectorAll('.option-row');
+        if (rows.length <= 1) {
+          rows[0].querySelector('.map-option-input').value = '';
+          updatePreview(block);
+          return;
+        }
+        btn.closest('.option-row').remove();
+        syncMapGroupNames(block, row);
+        updatePreview(block);
       });
     }
 
     function parseRowsSpec(value) {
       value = (value || '').trim();
       if (!value) return null;
+      if (/^\d+$/.test(value)) {
+        var count = parseInt(value, 10);
+        if (count < 1) return [];
+        var firstRows = [];
+        for (var i = 0; i < count; i += 1) firstRows.push(i);
+        return firstRows;
+      }
       var rows = [];
       value.replace(/;/g, ',').split(',').forEach(function (part) {
         part = part.trim();
@@ -209,13 +461,40 @@
         var colNum = parseInt(row.querySelector('.column-select').value, 10) || 0;
         var rowsInput = row.querySelector('.rows-input');
         var rows = parseRowsSpec(rowsInput ? rowsInput.value : '');
+        var depends = row.querySelector('.depends-on-select');
+        var dependsOn = depends && depends.value !== '' ? parseInt(depends.value, 10) : null;
         var options = [];
-        row.querySelectorAll('.option-input').forEach(function (input) {
-          var value = input.value.trim();
-          if (value) options.push(value);
-        });
+        var optionMap = {};
+        if (dependsOn !== null && !isNaN(dependsOn)) {
+          row.querySelectorAll('.option-map-group').forEach(function (group) {
+            var parent = (group.querySelector('.map-parent-input').value || '').trim();
+            if (!parent) return;
+            var childOpts = [];
+            group.querySelectorAll('.map-option-input').forEach(function (input) {
+              var value = input.value.trim();
+              if (value) childOpts.push(value);
+            });
+            if (childOpts.length) {
+              optionMap[parent] = childOpts;
+              childOpts.forEach(function (opt) {
+                if (options.indexOf(opt) === -1) options.push(opt);
+              });
+            }
+          });
+        } else {
+          row.querySelectorAll('.independent-options .option-input').forEach(function (input) {
+            var value = input.value.trim();
+            if (value) options.push(value);
+          });
+        }
         if (options.length) {
-          configs.push({ col: colNum, rows: rows, options: options });
+          configs.push({
+            col: colNum,
+            rows: rows,
+            options: options,
+            depends_on_col: dependsOn,
+            option_map: optionMap
+          });
         }
       });
       return configs;
@@ -265,11 +544,20 @@
           var blank = document.createElement('option');
           blank.textContent = '— Select —';
           select.appendChild(blank);
-          match.options.forEach(function (opt) {
-            var option = document.createElement('option');
-            option.textContent = opt;
-            select.appendChild(option);
-          });
+          var label = match.depends_on_col !== null && match.depends_on_col !== undefined
+            ? '(depends on col ' + (match.depends_on_col + 1) + ')'
+            : null;
+          if (label) {
+            var dep = document.createElement('option');
+            dep.textContent = label;
+            select.appendChild(dep);
+          } else {
+            match.options.forEach(function (opt) {
+              var option = document.createElement('option');
+              option.textContent = opt;
+              select.appendChild(option);
+            });
+          }
           td.appendChild(select);
         } else {
           td.innerHTML = '&nbsp;';
@@ -298,7 +586,7 @@
 
     function bindAddOption(block, btn) {
       btn.addEventListener('click', function () {
-        var options = btn.closest('.col-md-4, .col-md-6').querySelector('.dropdown-options');
+        var options = btn.closest('.independent-options').querySelector('.dropdown-options');
         options.insertAdjacentHTML('beforeend', emptyOptionTemplate);
         var newRow = options.lastElementChild;
         bindRemoveOption(block, newRow.querySelector('.remove-option'));
@@ -334,16 +622,47 @@
 
     function bindDropdownRow(block, row) {
       bindToggleDropdown(block, row.querySelector('.toggle-dropdown'));
-      bindAddOption(block, row.querySelector('.add-option'));
-      row.querySelectorAll('.remove-option').forEach(function (btn) { bindRemoveOption(block, btn); });
-      row.querySelector('.column-select').addEventListener('change', function () { updatePreview(block); });
+      var addOption = row.querySelector('.add-option');
+      if (addOption) bindAddOption(block, addOption);
+      row.querySelectorAll('.independent-options .remove-option').forEach(function (btn) {
+        bindRemoveOption(block, btn);
+      });
+      row.querySelector('.column-select').addEventListener('change', function () {
+        refreshDependsOnSelect(block, row);
+        toggleDependencyMode(block, row);
+        updatePreview(block);
+      });
+      var depends = row.querySelector('.depends-on-select');
+      if (depends) {
+        depends.addEventListener('change', function () {
+          toggleDependencyMode(block, row);
+          updatePreview(block);
+        });
+      }
       var rowsInput = row.querySelector('.rows-input');
       if (rowsInput) {
         rowsInput.addEventListener('input', function () { updatePreview(block); });
       }
-      row.querySelectorAll('.option-input').forEach(function (input) {
+      row.querySelectorAll('.independent-options .option-input').forEach(function (input) {
         input.addEventListener('input', function () { updatePreview(block); });
       });
+      row.querySelectorAll('.option-map-group').forEach(function (group) {
+        bindMapGroup(block, row, group);
+      });
+      var addMapGroupBtn = row.querySelector('.add-map-group');
+      if (addMapGroupBtn) {
+        addMapGroupBtn.addEventListener('click', function () {
+          addMapGroup(block, row, '', []);
+          updatePreview(block);
+        });
+      }
+      var syncBtn = row.querySelector('.sync-parent-values');
+      if (syncBtn) {
+        syncBtn.addEventListener('click', function () {
+          syncParentValues(block, row);
+        });
+      }
+      toggleDependencyMode(block, row);
     }
 
     function bindToggleColumn(block, btn) {
@@ -417,12 +736,15 @@
         var activeInput = newRow.querySelector('.dropdown-active-input');
         activeInput.name = prefix + '_col_dd_' + nextIndex + '_active';
         var optionInput = newRow.querySelector('.option-input');
-        optionInput.name = prefix + '_col_dd_' + nextIndex + '_options';
+        if (optionInput) optionInput.name = prefix + '_col_dd_' + nextIndex + '_options';
         var rowsInput = newRow.querySelector('.rows-input');
         if (rowsInput) rowsInput.name = prefix + '_col_dd_' + nextIndex + '_rows';
         var select = buildColumnSelect(block, 0);
         select.name = prefix + '_col_dd_' + nextIndex + '_col';
         newRow.querySelector('.column-select').replaceWith(select);
+        var depends = buildDependsOnSelect(block, '', 0);
+        depends.name = prefix + '_col_dd_' + nextIndex + '_depends_on';
+        newRow.querySelector('.depends-on-select').replaceWith(depends);
         bindDropdownRow(block, newRow);
         block.setAttribute('data-next-dropdown-index', String(nextIndex + 1));
         select.focus();

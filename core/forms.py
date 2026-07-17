@@ -915,15 +915,15 @@ class CVApprovalForm(forms.ModelForm):
 
 
 class FormTableLayoutForm(forms.Form):
-    table_name = forms.CharField(
-        required=False,
-        label='Name of Table',
-        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Name of table'}),
-    )
     table_heading = forms.CharField(
         required=False,
         label='Table Heading',
         widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Table heading'}),
+    )
+    table_name = forms.CharField(
+        required=False,
+        label='Name of Table',
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Name of table'}),
     )
     notes = forms.CharField(
         required=False,

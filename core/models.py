@@ -301,7 +301,10 @@ class FormTableLayout(models.Model):
     cell_dropdowns = models.JSONField(
         default=list,
         blank=True,
-        help_text='Dropdown configs: {col, rows, options, is_active}. Empty rows = all rows.',
+        help_text=(
+            'Dropdown configs: {col, rows, options, is_active, depends_on_col?, option_map?}. '
+            'Empty rows = all rows. When depends_on_col is set, option_map maps parent value → child options.'
+        ),
     )
     created_by = models.ForeignKey(
         CustomUser, on_delete=models.SET_NULL, null=True, blank=True,
@@ -360,13 +363,54 @@ class FormTableLayout(models.Model):
             col = int(entry.get('col', 0))
         except (TypeError, ValueError):
             return None
-        options = [
-            str(option).strip()
-            for option in entry.get('options', [])
-            if str(option).strip()
-        ]
+        col = max(0, col)
+
+        option_map = {}
+        raw_map = entry.get('option_map')
+        if isinstance(raw_map, dict):
+            for parent_key, child_opts in raw_map.items():
+                parent = str(parent_key).strip()
+                if not parent:
+                    continue
+                options_for_parent = [
+                    str(option).strip()
+                    for option in (child_opts or [])
+                    if str(option).strip()
+                ]
+                if options_for_parent:
+                    option_map[parent] = options_for_parent
+
+        depends_on_col = entry.get('depends_on_col', None)
+        if depends_on_col is not None and depends_on_col != '':
+            try:
+                depends_on_col = int(depends_on_col)
+            except (TypeError, ValueError):
+                depends_on_col = None
+            if depends_on_col is not None and (depends_on_col < 0 or depends_on_col == col):
+                depends_on_col = None
+        else:
+            depends_on_col = None
+
+        if depends_on_col is not None and option_map:
+            options = []
+            seen = set()
+            for child_opts in option_map.values():
+                for option in child_opts:
+                    if option not in seen:
+                        seen.add(option)
+                        options.append(option)
+        else:
+            depends_on_col = None
+            option_map = {}
+            options = [
+                str(option).strip()
+                for option in entry.get('options', [])
+                if str(option).strip()
+            ]
+
         if not options:
             return None
+
         rows = []
         raw_rows = entry.get('rows')
         if isinstance(raw_rows, str):
@@ -380,12 +424,17 @@ class FormTableLayout(models.Model):
                 if row_idx >= 0:
                     rows.append(row_idx)
             rows = sorted(set(rows))
-        return {
-            'col': max(0, col),
+
+        result = {
+            'col': col,
             'rows': rows,
             'options': options,
             'is_active': bool(entry.get('is_active', True)),
         }
+        if depends_on_col is not None:
+            result['depends_on_col'] = depends_on_col
+            result['option_map'] = option_map
+        return result
 
     def normalized_column_dropdowns(self):
         dropdowns = []
@@ -405,19 +454,22 @@ class FormTableLayout(models.Model):
 
     def dropdown_for_cell(self, row_idx, col_idx):
         """Return the active dropdown for a cell, or None."""
+        import json
         for dropdown in self.normalized_column_dropdowns():
             if not dropdown['is_active'] or dropdown['col'] != col_idx:
                 continue
             if not dropdown['rows'] or row_idx in dropdown['rows']:
-                return dropdown
+                payload = dict(dropdown)
+                if dropdown.get('depends_on_col') is not None and dropdown.get('option_map'):
+                    payload['option_map_json'] = json.dumps(dropdown['option_map'])
+                return payload
         return None
 
     @staticmethod
     def rows_display(rows):
-        """Format 0-based row indices as 1-based comma-separated text."""
-        if not rows:
-            return ''
-        return ','.join(str(idx + 1) for idx in rows)
+        """Format 0-based row indices for the admin Rows field."""
+        from core.form_table_utils import rows_display as format_rows
+        return format_rows(rows)
 
     def normalized_cell_dropdowns(self):
         return self.normalized_column_dropdowns()

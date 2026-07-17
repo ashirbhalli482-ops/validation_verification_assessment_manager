@@ -20,10 +20,10 @@
       <div class="{% if not forloop.first %}border-top pt-4 mt-4{% endif %}">
         <div class="row mb-3">
           <div class="col-md-3">
-            <strong>Name of Table:</strong> {{ layout.table_name|default:'—' }}
+            <strong>Table Heading:</strong> {{ layout.table_heading|default:'—' }}
           </div>
           <div class="col-md-3">
-            <strong>Table Heading:</strong> {{ layout.table_heading|default:'—' }}
+            <strong>Name of Table:</strong> {{ layout.table_name|default:'—' }}
           </div>
           <div class="col-md-3">
             <strong>Number of Rows:</strong> {{ layout.row_count }}
@@ -43,23 +43,32 @@
             {% for dd in column_dropdowns %}
             <li>
               Column {{ dd.col|add:1 }}
+              {% if dd.depends_on_col != None %}
+              (depends on column {{ dd.depends_on_col|add:1 }})
+              {% endif %}
               {% if dd.rows %}
               (rows {% for r in dd.rows %}{{ r|add:1 }}{% if not forloop.last %}, {% endif %}{% endfor %})
               {% else %}
               (all rows)
               {% endif %}:
+              {% if dd.option_map %}
+                {% for parent, opts in dd.option_map.items %}
+                  <br><span class="ml-3">When “{{ parent }}”: {{ opts|join:", " }}</span>
+                {% endfor %}
+              {% else %}
               {{ dd.options|join:", " }}
+              {% endif %}
               {% if not dd.is_active %}<span class="text-muted">(inactive)</span>{% endif %}
             </li>
             {% endfor %}
           </ul>
         </div>
         {% endif %}
-        {% if layout.table_name %}
-        <h6 class="font-weight-bold mb-2">{{ layout.table_name }}</h6>
-        {% endif %}
         {% if layout.table_heading %}
         <div class="font-weight-bold mb-2">{{ layout.table_heading }}</div>
+        {% endif %}
+        {% if layout.table_name %}
+        <h6 class="font-weight-bold mb-2">{{ layout.table_name }}</h6>
         {% endif %}
         <div class="table-responsive">
           <table class="table table-bordered table-sm mb-0">
@@ -91,7 +100,7 @@
           </table>
         </div>
         {% if layout.table_note %}
-        <p class="small mt-3 mb-0"><strong>Note:</strong> {{ layout.table_note|linebreaksbr }}</p>
+        <p class="small mt-3 mb-0"> {{ layout.table_note|linebreaksbr }}</p>
         {% endif %}
         <p class="text-muted small mt-2 mb-0">
           Last updated: {{ layout.updated_at|date:"M d, Y H:i" }}

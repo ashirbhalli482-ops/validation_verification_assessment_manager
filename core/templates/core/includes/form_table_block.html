@@ -11,12 +11,12 @@
 
     <div class="row">
       <div class="col-md-4 mb-3">
-        <label class="d-block">Name of Table</label>
-        <input type="text" name="tbl_{{ block.key }}_name" class="form-control table-name" placeholder="Name of table" value="{{ block.table_name }}">
-      </div>
-      <div class="col-md-4 mb-3">
         <label class="d-block">Table Heading</label>
         <input type="text" name="tbl_{{ block.key }}_heading" class="form-control table-heading" placeholder="Table heading" value="{{ block.table_heading }}">
+      </div>
+      <div class="col-md-4 mb-3">
+        <label class="d-block">Name of Table</label>
+        <input type="text" name="tbl_{{ block.key }}_name" class="form-control table-name" placeholder="Name of table" value="{{ block.table_name }}">
       </div>
       <div class="col-md-4 mb-3">
         <label class="d-block">Number of Rows</label>
@@ -53,7 +53,7 @@
 
     <div class="mb-3">
       <label class="d-block">Column Dropdowns</label>
-      <p class="text-muted small mb-2">Choose a column and optional rows. Leave Rows blank to apply the dropdown to every row in that column. Example rows: <code>1,2,5</code> or <code>1-3</code>.</p>
+      <p class="text-muted small mb-2">Optional: set <strong>Depends on</strong> so this column’s values change based on another column’s selected value (same row).</p>
       <div class="column-dropdowns">
         {% for dd in block.dropdown_rows %}
         <div class="card mb-2 column-dropdown-row{% if not dd.is_active %} border-secondary{% endif %}" data-index="{{ dd.index }}">
@@ -70,41 +70,107 @@
                 </select>
               </div>
               <div class="col-md-3 mb-2">
+                <label class="small mb-1">Depends on</label>
+                <select name="tbl_{{ block.key }}_col_dd_{{ dd.index }}_depends_on" class="form-control form-control-sm depends-on-select">
+                  <option value="">— None —</option>
+                  {% for column in block.column_rows %}
+                  {% if column.is_active and forloop.counter0 != dd.col %}
+                  <option value="{{ forloop.counter0 }}" {% if dd.depends_on_col == forloop.counter0 %}selected{% endif %}>Column {{ forloop.counter }}: {{ column.label }}</option>
+                  {% endif %}
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="col-md-2 mb-2">
                 <label class="small mb-1">Rows</label>
                 <input type="text"
                        name="tbl_{{ block.key }}_col_dd_{{ dd.index }}_rows"
                        class="form-control form-control-sm rows-input"
                        placeholder="All rows"
                        value="{{ dd.rows_text }}">
-                <small class="text-muted">Blank = all rows</small>
               </div>
-              <div class="col-md-4 mb-2">
-                <label class="small mb-1">Dropdown Values</label>
-                <div class="dropdown-options">
-                  {% for opt in dd.options %}
-                  <div class="input-group input-group-sm mb-1 option-row">
-                    <input type="text" name="tbl_{{ block.key }}_col_dd_{{ dd.index }}_options" class="form-control option-input" placeholder="Value" value="{{ opt }}">
-                    <div class="input-group-append">
-                      <button type="button" class="btn btn-outline-secondary remove-option" title="Remove value">&times;</button>
-                    </div>
-                  </div>
-                  {% empty %}
-                  <div class="input-group input-group-sm mb-1 option-row">
-                    <input type="text" name="tbl_{{ block.key }}_col_dd_{{ dd.index }}_options" class="form-control option-input" placeholder="Value" value="">
-                    <div class="input-group-append">
-                      <button type="button" class="btn btn-outline-secondary remove-option" title="Remove value">&times;</button>
-                    </div>
-                  </div>
-                  {% endfor %}
-                </div>
-                <button type="button" class="btn btn-outline-primary btn-sm add-option mt-1">+ Add Value</button>
-              </div>
-              <div class="col-md-2 mb-2 text-right">
+              <div class="col-md-2 mb-2 text-right ml-auto">
                 <input type="hidden" name="tbl_{{ block.key }}_col_dd_{{ dd.index }}_active" class="dropdown-active-input" value="{% if dd.is_active %}1{% else %}0{% endif %}">
                 <button type="button" class="btn btn-sm {% if dd.is_active %}btn-outline-danger{% else %}btn-outline-success{% endif %} toggle-dropdown">
                   {% if dd.is_active %}Deactivate{% else %}Activate{% endif %}
                 </button>
               </div>
+            </div>
+
+            <div class="independent-options mt-2"{% if dd.depends_on_col != None %} style="display:none"{% endif %}>
+              <label class="small mb-1">Dropdown Values</label>
+              <div class="dropdown-options">
+                {% for opt in dd.options %}
+                <div class="input-group input-group-sm mb-1 option-row">
+                  <input type="text" name="tbl_{{ block.key }}_col_dd_{{ dd.index }}_options" class="form-control option-input" placeholder="Value" value="{{ opt }}">
+                  <div class="input-group-append">
+                    <button type="button" class="btn btn-outline-secondary remove-option" title="Remove value">&times;</button>
+                  </div>
+                </div>
+                {% empty %}
+                <div class="input-group input-group-sm mb-1 option-row">
+                  <input type="text" name="tbl_{{ block.key }}_col_dd_{{ dd.index }}_options" class="form-control option-input" placeholder="Value" value="">
+                  <div class="input-group-append">
+                    <button type="button" class="btn btn-outline-secondary remove-option" title="Remove value">&times;</button>
+                  </div>
+                </div>
+                {% endfor %}
+              </div>
+              <button type="button" class="btn btn-outline-primary btn-sm add-option mt-1">+ Add Value</button>
+            </div>
+
+            <div class="dependent-options mt-2"{% if dd.depends_on_col == None %} style="display:none"{% endif %}>
+              <label class="small mb-1 d-block">Child values by parent selection</label>
+              <p class="text-muted small mb-2">For each parent dropdown value, list the options this column should show.</p>
+              <div class="option-map-groups">
+                {% for item in dd.option_map_items %}
+                <div class="border rounded p-2 mb-2 option-map-group" data-map-index="{{ forloop.counter0 }}">
+                  <div class="form-row align-items-end">
+                    <div class="col-md-4 mb-2">
+                      <label class="small mb-1">When parent value is</label>
+                      <input type="text"
+                             name="tbl_{{ block.key }}_col_dd_{{ dd.index }}_map_parent"
+                             class="form-control form-control-sm map-parent-input"
+                             placeholder="Parent value"
+                             value="{{ item.parent }}">
+                    </div>
+                    <div class="col-md-6 mb-2">
+                      <label class="small mb-1">Show these values</label>
+                      <div class="map-child-options">
+                        {% for opt in item.options %}
+                        <div class="input-group input-group-sm mb-1 option-row">
+                          <input type="text"
+                                 name="tbl_{{ block.key }}_col_dd_{{ dd.index }}_map_opts_{{ forloop.parentloop.counter0 }}"
+                                 class="form-control map-option-input"
+                                 placeholder="Value"
+                                 value="{{ opt }}">
+                          <div class="input-group-append">
+                            <button type="button" class="btn btn-outline-secondary remove-map-option" title="Remove value">&times;</button>
+                          </div>
+                        </div>
+                        {% empty %}
+                        <div class="input-group input-group-sm mb-1 option-row">
+                          <input type="text"
+                                 name="tbl_{{ block.key }}_col_dd_{{ dd.index }}_map_opts_{{ forloop.parentloop.counter0 }}"
+                                 class="form-control map-option-input"
+                                 placeholder="Value"
+                                 value="">
+                          <div class="input-group-append">
+                            <button type="button" class="btn btn-outline-secondary remove-map-option" title="Remove value">&times;</button>
+                          </div>
+                        </div>
+                        {% endfor %}
+                      </div>
+                      <button type="button" class="btn btn-outline-primary btn-sm add-map-option mt-1">+ Add Value</button>
+                    </div>
+                    <div class="col-md-2 mb-2 text-right">
+                      <button type="button" class="btn btn-sm btn-outline-danger remove-map-group">Remove</button>
+                    </div>
+                  </div>
+                </div>
+                {% endfor %}
+              </div>
+              <button type="button" class="btn btn-outline-primary btn-sm add-map-group mt-1">+ Add Parent Value Mapping</button>
+              <button type="button" class="btn btn-outline-secondary btn-sm sync-parent-values mt-1 ml-1">Fill from parent options</button>
             </div>
           </div>
         </div>

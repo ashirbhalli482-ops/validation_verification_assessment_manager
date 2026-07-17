@@ -1,17 +1,17 @@
 {% for section in table_sections %}
 {% with table_layout=section.layout display_table_headers=section.table_headers display_table_rows=section.table_rows %}
 <div class="mb-4">
-  {% if table_layout.table_name %}
-  <h6 class="font-weight-bold mb-1">{{ table_layout.table_name }}</h6>
-  {% endif %}
   {% if table_layout.table_heading %}
   <div class="font-weight-bold mb-1">{{ table_layout.table_heading }}</div>
+  {% endif %}
+  {% if table_layout.table_name %}
+  <h6 class="font-weight-bold mb-1">{{ table_layout.table_name }}</h6>
   {% endif %}
   {% if table_layout.notes %}
   <p class="text-muted small mb-2">{{ table_layout.notes|linebreaksbr }}</p>
   {% endif %}
   <div class="table-responsive">
-    <table class="table table-bordered table-sm mb-0">
+    <table class="table table-bordered table-sm mb-0 form-fill-table form-fill-table-display">
       <thead class="thead-light">
         <tr>
           {% for header in display_table_headers %}
@@ -23,7 +23,7 @@
         {% for row in display_table_rows %}
         <tr>
           {% for cell in row %}
-          <td>{{ cell.value|default:'—' }}</td>
+          <td class="form-fill-display-cell">{{ cell.value|default:'—' }}</td>
           {% endfor %}
         </tr>
         {% endfor %}
@@ -31,7 +31,7 @@
     </table>
   </div>
   {% if table_layout.table_note %}
-  <p class="small mt-2 mb-0"><strong>Note:</strong> {{ table_layout.table_note|linebreaksbr }}</p>
+  <p class="small mt-2 mb-0">{{ table_layout.table_note|linebreaksbr }}</p>
   {% endif %}
 </div>
 {% endwith %}

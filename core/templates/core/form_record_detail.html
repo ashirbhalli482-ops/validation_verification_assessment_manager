@@ -7,12 +7,6 @@
       {% include 'core/includes/form_grey_header.html' with form_def=record.form_definition project=record.project record=record company=company form_owner=form_owner reviews=reviews %}
       <p><strong>Status:</strong> {{ record.get_status_display }}</p>
       {% include 'core/includes/form_table_display.html' %}
-      {% if other_data %}
-      <div class="border p-3 mb-3 bg-light">
-        <strong>Additional data</strong>
-        <pre class="mb-0 mt-2">{{ other_data }}</pre>
-      </div>
-      {% endif %}
       <div class="btn-group">
         {% if can_edit %}
         <a href="{% url 'core:form-record-edit' record.pk %}" class="btn btn-warning">Edit</a>

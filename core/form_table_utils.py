@@ -1,6 +1,40 @@
 """Helpers for admin multi-table layouts and form record table cells."""
 
 
+def allowed_dropdown_values(layout, row_idx, col_idx, row_cells):
+    """Return allowed options for a dropdown cell, or None if the cell is free text."""
+    dropdown = layout.dropdown_for_cell(row_idx, col_idx)
+    if not dropdown:
+        return None
+    if dropdown.get('depends_on_col') is not None:
+        parent_col = dropdown['depends_on_col']
+        parent_val = ''
+        if isinstance(row_cells, (list, tuple)) and 0 <= parent_col < len(row_cells):
+            parent_val = str(row_cells[parent_col] or '').strip()
+        return list(dropdown.get('option_map', {}).get(parent_val, []))
+    return list(dropdown.get('options', []))
+
+
+def validate_table_cells(layout, cells):
+    """Ensure dropdown cells only keep values allowed by admin config (incl. dependencies)."""
+    col_count = len(layout.normalized_columns())
+    validated = []
+    for row_idx, row in enumerate(cells or []):
+        row = list(row) if isinstance(row, (list, tuple)) else []
+        new_row = []
+        for col_idx in range(col_count):
+            val = str(row[col_idx] if col_idx < len(row) else '').strip()
+            temp_row = list(row)
+            for i, v in enumerate(new_row):
+                temp_row[i] = v
+            allowed = allowed_dropdown_values(layout, row_idx, col_idx, temp_row)
+            if allowed is not None and val and val not in allowed:
+                val = ''
+            new_row.append(val)
+        validated.append(new_row)
+    return validated
+
+
 def table_block_keys(post):
     keys = set()
     for key in post:
@@ -32,10 +66,19 @@ def parse_columns(post, prefix):
 
 
 def parse_rows_spec(value, row_count):
-    """Parse 1-based row list text (e.g. '1,2,5' or '1-3') into 0-based indices."""
+    """Parse row text into 0-based indices.
+
+    - Blank → all rows (empty list)
+    - Single number N → first N rows (1..N)
+    - '1,2,5' → specific rows
+    - '1-3' → inclusive range
+    """
     value = (value or '').strip()
     if not value:
         return []
+    if value.isdigit():
+        count = min(int(value), row_count)
+        return list(range(max(0, count)))
     rows = []
     for part in value.replace(';', ',').split(','):
         part = part.strip()
@@ -64,9 +107,14 @@ def parse_rows_spec(value, row_count):
 
 
 def rows_display(rows):
-    """Format 0-based row indices as 1-based comma-separated text."""
+    """Format 0-based row indices for the admin Rows field."""
     if not rows:
         return ''
+    # Contiguous from row 1 → show as single count (first N rows)
+    if rows[0] == 0 and rows == list(range(len(rows))):
+        return str(len(rows))
+    if rows == list(range(rows[0], rows[-1] + 1)):
+        return f'{rows[0] + 1}-{rows[-1] + 1}'
     return ','.join(str(idx + 1) for idx in rows)
 
 
@@ -87,22 +135,80 @@ def parse_column_dropdowns(post, prefix, column_count, row_count=100):
             continue
         is_active = post.get(f'{prefix}_col_dd_{index}_active') == '1'
         rows = parse_rows_spec(post.get(f'{prefix}_col_dd_{index}_rows', ''), row_count)
+
+        depends_raw = (post.get(f'{prefix}_col_dd_{index}_depends_on') or '').strip()
+        depends_on_col = None
+        if depends_raw != '':
+            try:
+                depends_on_col = int(depends_raw)
+            except (TypeError, ValueError):
+                depends_on_col = None
+            if (
+                depends_on_col is None
+                or depends_on_col < 0
+                or depends_on_col >= column_count
+                or depends_on_col == col
+            ):
+                depends_on_col = None
+
+        option_map = {}
+        map_parents = post.getlist(f'{prefix}_col_dd_{index}_map_parent')
+        for map_index, parent_key in enumerate(map_parents):
+            parent = parent_key.strip()
+            if not parent:
+                continue
+            child_opts = [
+                value.strip()
+                for value in post.getlist(f'{prefix}_col_dd_{index}_map_opts_{map_index}')
+                if value.strip()
+            ]
+            if child_opts:
+                option_map[parent] = child_opts
+
         options = [
             value.strip()
             for value in post.getlist(f'{prefix}_col_dd_{index}_options')
             if value.strip()
         ]
-        if not options or col < 0 or col >= column_count:
+
+        if depends_on_col is not None and option_map:
+            options = []
+            seen = set()
+            for child_opts in option_map.values():
+                for option in child_opts:
+                    if option not in seen:
+                        seen.add(option)
+                        options.append(option)
+            entry = {
+                'col': col,
+                'rows': rows,
+                'options': options,
+                'is_active': is_active,
+                'depends_on_col': depends_on_col,
+                'option_map': option_map,
+            }
+        else:
+            if not options or col < 0 or col >= column_count:
+                continue
+            entry = {'col': col, 'rows': rows, 'options': options, 'is_active': is_active}
+
+        if col < 0 or col >= column_count or not entry['options']:
             continue
-        entry = {'col': col, 'rows': rows, 'options': options, 'is_active': is_active}
+
         dropdowns.append(entry)
         parsed_rows.append({
             'index': index,
             'col': col,
             'rows': rows,
             'rows_text': rows_display(rows),
-            'options': options,
+            'options': entry.get('options', options),
             'is_active': is_active,
+            'depends_on_col': entry.get('depends_on_col'),
+            'option_map': entry.get('option_map') or {},
+            'option_map_items': [
+                {'parent': key, 'options': vals}
+                for key, vals in (entry.get('option_map') or {}).items()
+            ],
         })
     return dropdowns, parsed_rows
 
@@ -119,6 +225,12 @@ def build_table_block(layout=None, key=None, parsed=None):
                 'rows_text': rows_display(entry['rows']),
                 'options': entry['options'],
                 'is_active': entry['is_active'],
+                'depends_on_col': entry.get('depends_on_col'),
+                'option_map': entry.get('option_map') or {},
+                'option_map_items': [
+                    {'parent': key, 'options': vals}
+                    for key, vals in (entry.get('option_map') or {}).items()
+                ],
             }
             for index, entry in enumerate(layout.normalized_column_dropdowns())
         ]

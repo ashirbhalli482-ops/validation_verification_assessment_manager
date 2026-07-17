@@ -2336,7 +2336,8 @@ def _parse_table_cells_from_post(post, layout, allow_legacy=False):
             continue
         if 0 <= row_idx < layout.row_count and 0 <= col_idx < len(layout.normalized_columns()):
             cells[row_idx][col_idx] = value
-    return cells
+    from core.form_table_utils import validate_table_cells
+    return validate_table_cells(layout, cells)
 
 
 def _build_record_data(post, project=None, form_def=None, existing_data=None):
