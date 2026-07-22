@@ -24,7 +24,6 @@
             <th>Form</th>
             <th>Name</th>
             <th>Form Type</th>
-            <th>Record</th>
             <th>Action</th>
           </tr>
         </thead>
@@ -34,21 +33,13 @@
             <td>{{ row.form_def.code }}</td>
             <td>{{ row.form_def.name }}</td>
             <td>{{ row.form_def.get_form_type_display }}</td>
-            <td>
-              {% if row.record %}
-              <span class="badge badge-info">{{ row.record.get_status_display }}</span>
-              {% else %}
-              <span class="text-muted">Not started</span>
-              {% endif %}
-            </td>
             <td class="text-nowrap">
               {% if row.record %}
-              <a href="{% url 'core:form-record-detail' row.record.pk %}" class="btn btn-sm btn-info">Open</a>
+              <a href="{% url 'core:form-record-detail' row.record.pk %}" class="btn btn-sm btn-info">View</a>
+              <a href="{% url 'core:form-record-edit' row.record.pk %}" class="btn btn-sm btn-warning">Edit</a>
               {% else %}
-              <a href="{% url 'core:form-record-create' row.project.pk row.form_def.pk %}" class="btn btn-sm btn-primary">Create Record</a>
-              {% endif %}
-              {% if row.form_def.is_public %}
-              <a href="{% url 'core:public-form' 'new' %}?project={{ row.project.pk }}&form={{ row.form_def.pk }}" class="btn btn-sm btn-secondary" target="_blank">Customer Link</a>
+              <a href="{% url 'core:form-record-create' row.project.pk row.form_def.pk %}" class="btn btn-sm btn-info">View</a>
+              <a href="{% url 'core:form-record-create' row.project.pk row.form_def.pk %}" class="btn btn-sm btn-warning">Edit</a>
               {% endif %}
             </td>
           </tr>

@@ -15,9 +15,9 @@
   <div class="form-doc-meta-bar">
     <div class="form-doc-meta-cell form-doc-meta-label-cell">Issue Date:</div>
     <div class="form-doc-meta-cell form-doc-meta-value-cell">{% if company and company.issue_date %}{{ company.issue_date|date:"Y-m-d" }}{% else %}-{% endif %}</div>
-    <div class="form-doc-meta-cell form-doc-meta-label-cell">Document<br>Name:</div>
-    <div class="form-doc-meta-cell form-doc-meta-value-cell">{{ form_def.code }}</div>
-    <div class="form-doc-meta-cell form-doc-meta-value-cell">({{ form_def.name }})</div>
+    <div class="form-doc-meta-cell form-doc-meta-label-cell form-doc-meta-doc-label">Document Name:</div>
+    <div class="form-doc-meta-cell form-doc-meta-value-cell form-doc-meta-doc-code">{{ form_def.code }}</div>
+    <div class="form-doc-meta-cell form-doc-meta-value-cell form-doc-meta-doc-name">({{ form_def.name }})</div>
     <div class="form-doc-meta-cell form-doc-meta-label-cell">Owner:</div>
     <div class="form-doc-meta-cell form-doc-meta-value-cell">{{ form_owner|default:"VVB" }}</div>
     <div class="form-doc-meta-cell form-doc-meta-label-cell">Version:</div>
@@ -35,13 +35,8 @@
       <div class="form-doc-project-cell form-doc-project-value">{{ project.get_phase_display|default:"-" }}</div>
     </div>
     <div class="form-doc-project-row">
-      <div class="form-doc-project-cell form-doc-project-label">Report Type:</div>
-      <div class="form-doc-project-cell form-doc-project-value">
-        {% if project.report_type and project.year %}{{ project.report_type }}-{{ project.year }}
-        {% elif project.report_type %}{{ project.report_type }}
-        {% elif project.year %}{{ project.year }}
-        {% else %}-{% endif %}
-      </div>
+      <div class="form-doc-project-cell form-doc-project-label form-doc-project-report-label">Report Type &amp; Year:</div>
+      <div class="form-doc-project-cell form-doc-project-value form-doc-project-report-value">{% if project.report_type and project.year %}{{ project.report_type }}-{{ project.year }}{% elif project.report_type %}{{ project.report_type }}{% elif project.year %}{{ project.year }}{% else %}-{% endif %}</div>
       <div class="form-doc-project-cell form-doc-project-label">Facility:</div>
       <div class="form-doc-project-cell form-doc-project-value">{{ project.location|default:"-" }}</div>
       <div class="form-doc-project-cell form-doc-project-label">Document Type:</div>

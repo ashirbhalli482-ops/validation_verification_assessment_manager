@@ -34,7 +34,8 @@
 }
 .form-doc-meta-bar {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto auto minmax(0, 1.4fr) auto minmax(0, 1.2fr) auto minmax(0, 1fr);
+  grid-template-columns: max-content minmax(6rem, 0.7fr) max-content max-content minmax(10rem, 1.6fr) max-content minmax(5rem, 1fr) max-content minmax(5rem, 0.8fr);
+  width: 100%;
   align-items: stretch;
   background: #8bc34a;
   color: #fff;
@@ -42,28 +43,39 @@
   margin-bottom: 0;
   border: 1px solid #6fa032;
   border-radius: 2px;
-  overflow: hidden;
+  overflow-x: auto;
 }
 .form-doc-meta-cell {
   display: flex;
   align-items: center;
-  padding: 0.45rem 0.65rem;
+  justify-content: flex-start;
+  text-align: left;
+  padding: 0.45rem 0.75rem;
   border-right: 1px solid rgba(255, 255, 255, 0.55);
   font-style: italic;
   font-size: 0.9rem;
   line-height: 1.2;
-  min-width: 0;
-  word-break: break-word;
+  white-space: nowrap;
+  word-break: normal;
+  overflow-wrap: normal;
 }
 .form-doc-meta-cell:last-child {
   border-right: none;
 }
 .form-doc-meta-label-cell {
   font-weight: 600;
-  white-space: nowrap;
 }
 .form-doc-meta-value-cell {
   font-weight: 500;
+}
+.form-doc-meta-doc-label,
+.form-doc-meta-doc-code,
+.form-doc-meta-doc-name {
+  white-space: nowrap;
+}
+.form-doc-meta-doc-name {
+  padding-left: 0.85rem;
+  padding-right: 0.85rem;
 }
 /* Keep older class names harmless if referenced elsewhere */
 .form-doc-meta-item {
@@ -88,40 +100,49 @@
   margin-top: 0;
   border: 1px solid #fff;
   border-radius: 2px;
-  overflow: hidden;
+  display: grid;
+  grid-template-columns: max-content minmax(8rem, 1.1fr) max-content minmax(7rem, 2fr) max-content max-content;
+  width: 100%;
+  overflow-x: auto;
 }
 .form-doc-project-row {
-  display: grid;
-  grid-template-columns: auto minmax(3.5rem, 0.55fr) auto minmax(0, 2.2fr) auto minmax(0, 0.9fr);
-  align-items: stretch;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.85);
-}
-.form-doc-project-row:last-child {
-  border-bottom: none;
+  display: contents;
 }
 .form-doc-project-cell {
   display: flex;
   align-items: center;
-  justify-content: center;
-  text-align: center;
-  padding: 0.45rem 0.55rem;
+  justify-content: flex-start;
+  text-align: left;
+  padding: 0.45rem 0.75rem;
   border-right: 1px solid rgba(255, 255, 255, 0.85);
   font-style: italic;
   font-weight: 700;
   font-size: 0.9rem;
   line-height: 1.2;
   color: #fff;
-  min-width: 0;
-  word-break: break-word;
+  white-space: nowrap;
+  word-break: normal;
+  overflow-wrap: normal;
 }
-.form-doc-project-cell:last-child {
+.form-doc-project-row:first-child .form-doc-project-cell {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.85);
+}
+.form-doc-project-cell:nth-child(6n) {
   border-right: none;
 }
 .form-doc-project-label {
   white-space: nowrap;
+  justify-content: flex-start;
+  text-align: left;
 }
 .form-doc-project-value {
   font-weight: 700;
+  justify-content: flex-start;
+  text-align: left;
+}
+.form-doc-project-report-label,
+.form-doc-project-report-value {
+  white-space: nowrap;
 }
 .form-doc-record-meta,
 .form-doc-reviews,
@@ -129,17 +150,9 @@
   color: #5c6670;
 }
 @media (max-width: 992px) {
-  .form-doc-meta-bar {
-    grid-template-columns: auto minmax(0, 1fr);
-  }
-  .form-doc-meta-cell {
-    border-bottom: 1px solid rgba(255, 255, 255, 0.35);
-  }
-  .form-doc-project-row {
-    grid-template-columns: auto minmax(0, 1fr);
-  }
-  .form-doc-project-cell {
-    border-bottom: 1px solid rgba(255, 255, 255, 0.45);
+  .form-doc-meta-bar,
+  .form-doc-project-bar {
+    width: 100%;
   }
 }
 </style>

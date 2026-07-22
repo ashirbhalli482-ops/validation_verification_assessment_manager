@@ -37,32 +37,22 @@
     <div class="card-header"><strong>{{ group.sub_package.code }} — {{ group.sub_package.name }}</strong></div>
     <div class="card-body table-responsive">
       <table class="table table-sm table-bordered">
-        <thead><tr><th>Form</th><th>Name</th><th>Form Type</th><th>Record</th><th>Action</th></tr></thead>
+        <thead><tr><th>Form</th><th>Name</th><th>Form Type</th><th>Action</th></tr></thead>
         <tbody>
           {% for row in group.form_rows %}
           <tr>
             <td>{{ row.form_def.code }}</td>
             <td>{{ row.form_def.name }}</td>
             <td>{{ row.form_def.get_form_type_display }}</td>
-            <td>
+            <td class="text-nowrap">
               {% if row.record %}
-                <span class="badge badge-info">{{ row.record.get_status_display }}</span>
+                <a href="{% url 'core:form-record-detail' row.record.pk %}" class="btn btn-sm btn-info">View</a>
+                <a href="{% url 'core:form-record-edit' row.record.pk %}" class="btn btn-sm btn-warning">Edit</a>
+              {% elif user.user_type == 'manager' or user.user_type == 'admin' or team_member and team_member.role == 'team_member' %}
+                <a href="{% url 'core:form-record-create' project.pk row.form_def.pk %}" class="btn btn-sm btn-info">View</a>
+                <a href="{% url 'core:form-record-create' project.pk row.form_def.pk %}" class="btn btn-sm btn-warning">Edit</a>
               {% else %}
-                <span class="text-muted">Not started</span>
-              {% endif %}
-            </td>
-            <td>
-              {% if row.record %}
-                <a href="{% url 'core:form-record-detail' row.record.pk %}" class="btn btn-sm btn-info">Open</a>
-              {% elif user.user_type == 'manager' or user.user_type == 'admin' %}
-                <a href="{% url 'core:form-record-create' project.pk row.form_def.pk %}" class="btn btn-sm btn-primary">Create Record</a>
-              {% elif team_member and team_member.role == 'team_member' %}
-                <a href="{% url 'core:form-record-create' project.pk row.form_def.pk %}" class="btn btn-sm btn-primary">Create Record</a>
-              {% else %}
-                <span class="text-muted small">Not started</span>
-              {% endif %}
-              {% if row.form_def.is_public and user.user_type == 'manager' %}
-                <a href="{% url 'core:public-form' 'new' %}?project={{ project.pk }}&form={{ row.form_def.pk }}" class="btn btn-sm btn-secondary" target="_blank">Customer Link</a>
+                <span class="text-muted small">—</span>
               {% endif %}
             </td>
           </tr>
