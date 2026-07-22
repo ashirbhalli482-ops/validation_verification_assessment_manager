@@ -10,6 +10,9 @@
   {% if table_layout.notes %}
   <p class="text-muted small mb-2">{{ table_layout.notes|linebreaksbr }}</p>
   {% endif %}
+  {% if section.option_maps %}
+  {{ section.option_maps|json_script:section.option_maps_script_id }}
+  {% endif %}
   <div class="table-responsive">
     <table class="table table-bordered table-sm mb-0 form-fill-table" data-layout-id="{{ table_layout.pk }}">
       <thead class="thead-light">
@@ -21,7 +24,7 @@
       </thead>
       <tbody>
         {% for row in table_rows %}
-        <tr data-table-row="{{ forloop.counter0 }}">
+        <tr data-table-row="{{ forloop.counter0 }}" style="content-visibility:auto;contain-intrinsic-size:auto 40px;">
           {% for cell in row %}
           <td>
             {% if cell.dropdown %}
@@ -32,7 +35,6 @@
                     data-table-row="{{ cell.row }}"
                     {% if cell.dropdown.depends_on_col != None %}
                     data-depends-on-col="{{ cell.dropdown.depends_on_col }}"
-                    data-option-map="{{ cell.dropdown.option_map_json|escape }}"
                     data-selected-value="{{ cell.value|escape }}"
                     {% endif %}>
               <option value="">— Select —</option>
@@ -64,6 +66,24 @@
 
 <script>
 (function () {
+  var optionMapCache = {};
+
+  function getOptionMaps(table) {
+    var layoutId = table.getAttribute('data-layout-id');
+    if (optionMapCache[layoutId]) return optionMapCache[layoutId];
+    var el = document.getElementById('table-option-maps-' + layoutId);
+    if (!el) {
+      optionMapCache[layoutId] = {};
+      return optionMapCache[layoutId];
+    }
+    try {
+      optionMapCache[layoutId] = JSON.parse(el.textContent || '{}');
+    } catch (e) {
+      optionMapCache[layoutId] = {};
+    }
+    return optionMapCache[layoutId];
+  }
+
   function measureTextWidth(text, styleSource) {
     var probe = document.createElement('span');
     probe.style.cssText = 'position:absolute;visibility:hidden;white-space:pre;';
@@ -82,6 +102,12 @@
   function fitTextarea(el) {
     if (!el) return;
     var value = el.value || '';
+    if (!value) {
+      el.style.width = '';
+      el.style.minWidth = '';
+      el.style.height = '';
+      return;
+    }
     var lines = value.split('\n');
     var maxLineWidth = 0;
     for (var i = 0; i < lines.length; i++) {
@@ -93,7 +119,6 @@
     var width = Math.max(minWidth, Math.min(maxLineWidth + padding, maxWidth));
     el.style.width = width + 'px';
     el.style.minWidth = width + 'px';
-
     el.style.height = 'auto';
     el.style.height = Math.max(el.scrollHeight, 31) + 'px';
   }
@@ -113,13 +138,12 @@
     el.style.minWidth = width + 'px';
   }
 
-  function parseOptionMap(el) {
-    var raw = el.getAttribute('data-option-map') || '{}';
-    try {
-      return JSON.parse(raw);
-    } catch (e) {
-      return {};
-    }
+  function parseOptionMap(childSelect) {
+    var table = childSelect.closest('.form-fill-table');
+    if (!table) return {};
+    var maps = getOptionMaps(table);
+    var col = childSelect.getAttribute('data-table-col');
+    return maps[col] || {};
   }
 
   function findParentSelect(childSelect) {
@@ -157,7 +181,6 @@
     } else {
       childSelect.removeAttribute('title');
     }
-    fitSelect(childSelect);
   }
 
   function refreshDependents(parentSelect) {
@@ -170,46 +193,57 @@
     });
   }
 
-  function initDependentDropdowns() {
-    document.querySelectorAll('select[data-depends-on-col]').forEach(function (child) {
+  function initDependentDropdowns(root) {
+    (root || document).querySelectorAll('select[data-depends-on-col]').forEach(function (child) {
       var parent = findParentSelect(child);
       var initial = child.getAttribute('data-selected-value') || child.value;
       setDependentOptions(child, parent ? parent.value : '', initial);
     });
+  }
 
-    document.querySelectorAll('.form-fill-table select[data-table-col]').forEach(function (select) {
-      select.addEventListener('change', function () {
-        refreshDependents(select);
-        fitSelect(select);
+  function fitFilledFields(root) {
+    (root || document).querySelectorAll('[data-fit-textarea]').forEach(function (el) {
+      if (el.value) fitTextarea(el);
+    });
+    (root || document).querySelectorAll('[data-fit-select]').forEach(function (el) {
+      if (el.value) fitSelect(el);
+    });
+  }
+
+  function bind(root) {
+    var scope = root || document;
+    scope.querySelectorAll('[data-fit-textarea]').forEach(function (el) {
+      if (el.dataset.fitBound) return;
+      el.dataset.fitBound = '1';
+      el.addEventListener('focus', function () { fitTextarea(el); });
+      el.addEventListener('input', function () { fitTextarea(el); });
+    });
+    scope.querySelectorAll('[data-fit-select]').forEach(function (el) {
+      if (el.dataset.fitBound) return;
+      el.dataset.fitBound = '1';
+      el.addEventListener('focus', function () { fitSelect(el); });
+      el.addEventListener('change', function () {
+        refreshDependents(el);
+        fitSelect(el);
       });
     });
   }
 
-  function fitAll(root) {
-    (root || document).querySelectorAll('[data-fit-textarea]').forEach(fitTextarea);
-    (root || document).querySelectorAll('[data-fit-select]').forEach(fitSelect);
-  }
-
-  function bind(root) {
-    (root || document).querySelectorAll('[data-fit-textarea]').forEach(function (el) {
-      el.addEventListener('input', function () { fitTextarea(el); });
-    });
-    (root || document).querySelectorAll('[data-fit-select]').forEach(function (el) {
-      el.addEventListener('change', function () { fitSelect(el); });
-    });
-  }
-
-  function init() {
-    initDependentDropdowns();
-    fitAll(document);
-    bind(document);
+  function init(root) {
+    optionMapCache = {};
+    initDependentDropdowns(root);
+    bind(root);
+    if (window.requestIdleCallback) {
+      window.requestIdleCallback(function () { fitFilledFields(root); }, { timeout: 500 });
+    } else {
+      setTimeout(function () { fitFilledFields(root); }, 0);
+    }
   }
 
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
+    document.addEventListener('DOMContentLoaded', function () { init(document); });
   } else {
-    init();
+    init(document);
   }
-  window.addEventListener('resize', function () { fitAll(document); });
 })();
 </script>

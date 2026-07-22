@@ -452,17 +452,25 @@ class FormTableLayout(models.Model):
             if dropdown['is_active'] and not dropdown['rows']
         }
 
-    def dropdown_for_cell(self, row_idx, col_idx):
-        """Return the active dropdown for a cell, or None."""
+    def dropdown_lookup(self):
+        """Precompute active dropdown configs once per layout for fast cell lookup."""
         import json
+        by_col = {}
         for dropdown in self.normalized_column_dropdowns():
-            if not dropdown['is_active'] or dropdown['col'] != col_idx:
+            if not dropdown['is_active']:
                 continue
+            payload = dict(dropdown)
+            if dropdown.get('depends_on_col') is not None and dropdown.get('option_map'):
+                payload['option_map_json'] = json.dumps(dropdown['option_map'])
+            by_col.setdefault(dropdown['col'], []).append(payload)
+        return by_col
+
+    def dropdown_for_cell(self, row_idx, col_idx, lookup=None):
+        """Return the active dropdown for a cell, or None."""
+        configs = (lookup or self.dropdown_lookup()).get(col_idx, [])
+        for dropdown in configs:
             if not dropdown['rows'] or row_idx in dropdown['rows']:
-                payload = dict(dropdown)
-                if dropdown.get('depends_on_col') is not None and dropdown.get('option_map'):
-                    payload['option_map_json'] = json.dumps(dropdown['option_map'])
-                return payload
+                return dropdown
         return None
 
     @staticmethod

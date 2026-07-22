@@ -1895,23 +1895,55 @@ class TeamMemberDeleteView(ManagerRequiredMixin, View):
         return redirect('core:project-detail', pk=project_id)
 
 
+_FORM_RECORD_SELECT = (
+    'project',
+    'project__manager',
+    'project__manager__managed_company',
+    'project__manager__company',
+    'form_definition',
+    'project__package_instance',
+    'project__package_instance__authorization',
+)
+
+
+def _get_form_record(pk):
+    return get_object_or_404(
+        FormRecord.objects.select_related(*_FORM_RECORD_SELECT),
+        pk=pk,
+    )
+
+
 # --- Form Records & Workflow ---
 class FormRecordCreateView(LoginRequiredMixin, View):
     def get(self, request, project_id, form_id):
-        project = get_object_or_404(Project, pk=project_id)
+        project = get_object_or_404(
+            Project.objects.select_related(
+                'manager', 'manager__managed_company', 'manager__company',
+                'package_instance', 'package_instance__authorization',
+            ),
+            pk=project_id,
+        )
         form_def = get_object_or_404(FormDefinition, pk=form_id)
         if not can_create_form_record(request.user, project, form_def):
             messages.error(request, 'You are not authorized to create this form record.')
             return redirect('core:project-detail', pk=project_id)
-        if FormRecord.objects.filter(project=project, form_definition=form_def).exists():
+        existing = FormRecord.objects.filter(
+            project=project, form_definition=form_def,
+        ).only('pk').first()
+        if existing:
             messages.info(request, 'A record already exists for this form. Opening existing record.')
-            record = FormRecord.objects.get(project=project, form_definition=form_def)
-            return redirect('core:form-record-detail', pk=record.pk)
+            return redirect('core:form-record-detail', pk=existing.pk)
         ctx = _form_record_context(request, project, form_def, None)
         return render(request, _form_template_name(form_def), ctx)
 
     def post(self, request, project_id, form_id):
-        project = get_object_or_404(Project, pk=project_id)
+        project = get_object_or_404(
+            Project.objects.select_related(
+                'manager', 'manager__managed_company', 'manager__company',
+                'package_instance', 'package_instance__authorization',
+            ),
+            pk=project_id,
+        )
         form_def = get_object_or_404(FormDefinition, pk=form_id)
         if not can_create_form_record(request.user, project, form_def):
             return redirect('core:project-detail', pk=project_id)
@@ -1932,17 +1964,20 @@ class FormRecordCreateView(LoginRequiredMixin, View):
 
 class FormRecordDetailView(LoginRequiredMixin, View):
     def get(self, request, pk):
-        record = get_object_or_404(FormRecord, pk=pk)
+        record = _get_form_record(pk)
         if not can_access_form(request.user, record.project, record.form_definition):
             return redirect('core:dashboard')
         other_data = dict(record.data or {})
         other_data.pop('table_cells', None)
-        display_sections = _table_sections_for_record(record.form_definition, record)
+        display_sections = _table_sections_for_record(
+            record.form_definition, record, sparse=True,
+        )
+        company = company_for_project(record.project)
         return render(request, 'core/form_record_detail.html', {
             'record': record,
-            'company': company_for_project(record.project),
-            'form_owner': _form_owner_label(company_for_project(record.project), record.project),
-            'reviews': record.reviews.filter(approved=True),
+            'company': company,
+            'form_owner': _form_owner_label(company, record.project),
+            'reviews': list(record.reviews.filter(approved=True)),
             'can_edit': record.can_edit(request.user),
             'can_submit': record.can_submit(request.user),
             'can_review': record.can_review(request.user),
@@ -1954,7 +1989,7 @@ class FormRecordDetailView(LoginRequiredMixin, View):
 
 class FormRecordEditView(LoginRequiredMixin, View):
     def get(self, request, pk):
-        record = get_object_or_404(FormRecord, pk=pk)
+        record = _get_form_record(pk)
         if not record.can_edit(request.user):
             messages.error(request, 'Cannot edit this form.')
             return redirect('core:form-record-detail', pk=pk)
@@ -1962,7 +1997,7 @@ class FormRecordEditView(LoginRequiredMixin, View):
         return render(request, _form_template_name(record.form_definition), ctx)
 
     def post(self, request, pk):
-        record = get_object_or_404(FormRecord, pk=pk)
+        record = _get_form_record(pk)
         if not record.can_edit(request.user):
             return redirect('core:form-record-detail', pk=pk)
         form = FormRecordForm(request.POST, instance=record)
@@ -2214,18 +2249,27 @@ def _form_owner_label(company, project):
     return 'VVB'
 
 
-def _table_sections_for_record(form_def, record=None):
+def _table_sections_for_record(form_def, record=None, sparse=False):
     layouts = list(FormTableLayout.objects.filter(form_definition=form_def).order_by('table_number', 'pk'))
     data = (record.data or {}) if record else {}
     sections = []
     for layout in layouts:
         stored = stored_cells_for_layout(data, layout, layouts)
         cells = _default_table_cells(layout, stored)
-        headers, rows = _active_table_render(layout, cells)
+        lookup = layout.dropdown_lookup()
+        headers, rows = _active_table_render(layout, cells, sparse=sparse, lookup=lookup)
+        option_maps = {
+            str(col_idx): cfg['option_map']
+            for col_idx, configs in lookup.items()
+            for cfg in configs
+            if cfg.get('option_map')
+        }
         sections.append({
             'layout': layout,
             'table_headers': headers,
             'table_rows': rows,
+            'option_maps': option_maps,
+            'option_maps_script_id': f'table-option-maps-{layout.pk}',
         })
     return sections
 
@@ -2240,12 +2284,17 @@ def _form_record_context(request, project, form_def, record, form=None):
         'record': record,
         'company': company,
         'form_owner': _form_owner_label(company, project),
-        'dropdown_lists': DropdownList.objects.prefetch_related('options'),
-        'reviews': record.reviews.filter(approved=True) if record else [],
+        'reviews': list(record.reviews.filter(approved=True)) if record else [],
         'table_sections': table_sections,
     }
-    if form_def.code == 'F-01C-MRC':
-        ctx['employees'] = EmployeeRecord.objects.filter(manager=project.manager)
+    # Only load global dropdown lists for templates that render them.
+    code = form_def.code
+    if code in ('F-01C-MRC', 'F-02-IRR') or 'CALC' in code:
+        ctx['dropdown_lists'] = []
+    else:
+        ctx['dropdown_lists'] = list(DropdownList.objects.prefetch_related('options'))
+    if code == 'F-01C-MRC':
+        ctx['employees'] = list(EmployeeRecord.objects.filter(manager_id=project.manager_id))
     return ctx
 
 
@@ -2275,21 +2324,39 @@ def _project_header_data(project):
     }
 
 
-def _active_table_render(layout, cells):
+def _row_has_content(row):
+    return any(str(cell or '').strip() for cell in (row or []))
+
+
+def _active_table_render(layout, cells, sparse=False, lookup=None):
     """Prepare active-only headers and rows (with original column indices) for templates."""
     active = layout.active_columns()
     headers = [column['label'] for _, column in active]
+    lookup = lookup if lookup is not None else layout.dropdown_lookup()
     rows = []
     for row_idx, row in enumerate(cells or []):
+        if sparse and not _row_has_content(row):
+            continue
         row_cells = []
         for col_idx, _ in active:
             row_cells.append({
                 'row': row_idx,
                 'col': col_idx,
                 'value': row[col_idx] if col_idx < len(row) else '',
-                'dropdown': layout.dropdown_for_cell(row_idx, col_idx),
+                'dropdown': layout.dropdown_for_cell(row_idx, col_idx, lookup=lookup),
             })
         rows.append(row_cells)
+    if sparse and not rows and cells:
+        # Keep one blank row so empty tables still show structure.
+        rows.append([
+            {
+                'row': 0,
+                'col': col_idx,
+                'value': '',
+                'dropdown': layout.dropdown_for_cell(0, col_idx, lookup=lookup),
+            }
+            for col_idx, _ in active
+        ])
     return headers, rows
 
 
