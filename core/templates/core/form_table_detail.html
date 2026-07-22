@@ -67,6 +67,9 @@
         {% if layout.table_heading %}
         <div class="font-weight-bold mb-2">{{ layout.table_heading }}</div>
         {% endif %}
+        {% if layout.notes %}
+        <p class="text-muted small mb-2">{{ layout.notes|linebreaksbr }}</p>
+        {% endif %}
         {% if layout.table_name %}
         <h6 class="font-weight-bold mb-2">{{ layout.table_name }}</h6>
         {% endif %}

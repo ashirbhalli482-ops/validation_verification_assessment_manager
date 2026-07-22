@@ -4,11 +4,11 @@
   {% if table_layout.table_heading %}
   <div class="font-weight-bold mb-1">{{ table_layout.table_heading }}</div>
   {% endif %}
-  {% if table_layout.table_name %}
-  <h6 class="font-weight-bold mb-1">{{ table_layout.table_name }}</h6>
-  {% endif %}
   {% if table_layout.notes %}
   <p class="text-muted small mb-2">{{ table_layout.notes|linebreaksbr }}</p>
+  {% endif %}
+  {% if table_layout.table_name %}
+  <h6 class="font-weight-bold mb-1">{{ table_layout.table_name }}</h6>
   {% endif %}
   <div class="table-responsive">
     <table class="table table-bordered table-sm mb-0 form-fill-table form-fill-table-display">

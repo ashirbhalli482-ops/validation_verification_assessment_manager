@@ -184,8 +184,8 @@ class DashboardView(LoginRequiredMixin, View):
             ctx.update(user_stats)
             ctx.update({
                 'company_count': Company.objects.count(),
-                'authorization_count': PackageAuthorization.objects.count(),
                 'form_details_count': _admin_form_definitions().count(),
+                'form_table_count': FormTableLayout.objects.count(),
                 'library_count': LibraryDocument.objects.count(),
             })
             cache.set(cache_key, {k: v for k, v in ctx.items() if k != 'user'}, self._CACHE_TTL)

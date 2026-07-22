@@ -93,6 +93,9 @@
     var main = document.getElementById('app-main');
     if (main) runInlineScripts(main);
     updateActiveNav();
+    if (typeof window.updateHeaderPageTitle === 'function') {
+      window.updateHeaderPageTitle();
+    }
     if (window.jQuery) {
       window.jQuery(function ($) {
         $('[id$="SuccessModal"]').modal('show');

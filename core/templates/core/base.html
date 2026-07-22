@@ -44,11 +44,13 @@
 
     <ul class="nav navbar-nav d-md-down-none">
       <li class="nav-item px-3">
-        <a class="nav-link" href="{% url 'core:dashboard' %}">
+        <a class="nav-link" href="{% url 'core:dashboard' %}" id="header-page-title-link">
           <i class="fa fa-tachometer-alt"></i>
-          {% if user.user_type == 'admin' %}Admin Dashboard
-          {% elif user.user_type == 'manager' %}Manager Dashboard
-          {% else %}Employee Dashboard{% endif %}
+          <span id="header-page-title">
+            {% if user.user_type == 'admin' %}Admin Dashboard
+            {% elif user.user_type == 'manager' %}Manager Dashboard
+            {% else %}Employee Dashboard{% endif %}
+          </span>
         </a>
       </li>
     </ul>
@@ -158,9 +160,6 @@
               <li class="nav-item">
                 <a class="nav-link" href="{% url 'core:library-list' %}"><i class="fa fa-book"></i> View Informations</a>
               </li>
-              <li class="nav-item">
-                <a class="nav-link" href="{% url 'core:dropdown-list' %}"><i class="fa fa-list"></i> View Drop-Down List</a>
-              </li>
               {% elif user.user_type == 'manager' %}
               <li class="nav-item">
                 <a class="nav-link" href="{% url 'core:project-list'%}"><i class="fa fa-folder"></i> View Projects</a>
@@ -206,12 +205,6 @@
               </li>
               <li class="nav-item">
                 <a class="nav-link" href="{% url 'core:form-table-list' %}"><i class="fa fa-table"></i> Create Tables In Form</a>
-              </li>
-              <li class="nav-item">
-                <a class="nav-link" href="{% url 'core:package-authorization-create' %}"><i class="fa fa-key"></i> Authorize Packages</a>
-              </li>
-              <li class="nav-item">
-                <a class="nav-link" href="{% url 'core:dropdown-create' %}"><i class="fa fa-list"></i> Create Drop-Down List</a>
               </li>
               <li class="nav-item">
                 <a class="nav-link" href="{% url 'core:library-upload' %}"><i class="fa fa-upload"></i> Upload Documents</a>
@@ -274,7 +267,7 @@
 
         <li class="breadcrumb-menu d-md-down-none">
           <div class="btn-group" role="group" aria-label="Button group">
-            <a class="btn" href="./"><i class="fa fa-tachometer-alt"></i> &nbsp;Dashboard</a>
+            <a class="btn" href="{% url 'core:dashboard' %}"><i class="fa fa-tachometer-alt"></i> &nbsp;Dashboard</a>
           </div>
         </li>
       </ol>
@@ -295,6 +288,32 @@
     {% endif %}
     <script src="{% static 'core/js/app.js' %}?v={{ STATIC_VERSION }}" defer></script>
     {% block chart_scripts %}{% endblock %}
+    <script>
+      window.updateHeaderPageTitle = function () {
+        var titleEl = document.getElementById('header-page-title');
+        if (!titleEl) return;
+        var items = document.querySelectorAll('#app-main > .breadcrumb > .breadcrumb-item');
+        var label = '';
+        if (items.length) {
+          label = (items[items.length - 1].textContent || '').replace(/\s+/g, ' ').trim();
+        }
+        if (!label || /^home$/i.test(label) || /^dashboard$/i.test(label)) {
+          {% if user.user_type == 'admin' %}
+          label = 'Admin Dashboard';
+          {% elif user.user_type == 'manager' %}
+          label = 'Manager Dashboard';
+          {% else %}
+          label = 'Employee Dashboard';
+          {% endif %}
+        }
+        titleEl.textContent = label;
+      };
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', window.updateHeaderPageTitle);
+      } else {
+        window.updateHeaderPageTitle();
+      }
+    </script>
     <script src="{% static 'core/js/partial-nav.js' %}?v={{ STATIC_VERSION }}" defer></script>
     {% block extra_scripts %}{% endblock %}
 

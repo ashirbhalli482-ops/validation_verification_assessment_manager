@@ -4,11 +4,11 @@
   {% if table_layout.table_heading %}
   <div class="font-weight-bold mb-1">{{ table_layout.table_heading }}</div>
   {% endif %}
-  {% if table_layout.table_name %}
-  <label class="d-block font-weight-bold">{{ table_layout.table_name }}</label>
-  {% endif %}
   {% if table_layout.notes %}
   <p class="text-muted small mb-2">{{ table_layout.notes|linebreaksbr }}</p>
+  {% endif %}
+  {% if table_layout.table_name %}
+  <label class="d-block font-weight-bold">{{ table_layout.table_name }}</label>
   {% endif %}
   {% if section.option_maps %}
   {{ section.option_maps|json_script:section.option_maps_script_id }}
