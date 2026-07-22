@@ -53,7 +53,11 @@
 
     <div class="mb-3">
       <label class="d-block">Column Dropdowns</label>
-      <p class="text-muted small mb-2">Optional: set <strong>Depends on</strong> so this column’s values change based on another column’s selected value (same row).</p>
+      <p class="text-muted small mb-2">
+        Set <strong>Depends on</strong> so a column’s options change from another column’s selected value (same row).
+        Use <strong>Fill from parent options</strong>, then enter the child values for each parent value.
+        Chains are supported (e.g. Col 3 depends on Col 2, Col 2 depends on Col 1).
+      </p>
       <div class="column-dropdowns">
         {% for dd in block.dropdown_rows %}
         <div class="card mb-2 column-dropdown-row{% if not dd.is_active %} border-secondary{% endif %}" data-index="{{ dd.index }}">

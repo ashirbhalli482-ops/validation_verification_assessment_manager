@@ -68,6 +68,18 @@
 
   function runInlineScripts(container) {
     container.querySelectorAll('script:not([src])').forEach(function (oldScript) {
+      var type = (oldScript.getAttribute('type') || 'text/javascript').toLowerCase().trim();
+      // Keep JSON / template data blobs (e.g. Django json_script for dependent dropdowns).
+      if (
+        type &&
+        type !== 'text/javascript' &&
+        type !== 'application/javascript' &&
+        type !== 'module' &&
+        type !== 'text/ecmascript' &&
+        type !== 'application/ecmascript'
+      ) {
+        return;
+      }
       var code = oldScript.textContent.trim();
       if (!code) {
         oldScript.remove();

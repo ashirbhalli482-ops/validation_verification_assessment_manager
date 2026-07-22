@@ -14,7 +14,9 @@
   {{ section.option_maps|json_script:section.option_maps_script_id }}
   {% endif %}
   <div class="table-responsive">
-    <table class="table table-bordered table-sm mb-0 form-fill-table" data-layout-id="{{ table_layout.pk }}">
+    <table class="table table-bordered table-sm mb-0 form-fill-table"
+           data-layout-id="{{ table_layout.pk }}"
+           {% if section.option_maps_json %}data-option-maps="{{ section.option_maps_json|escape }}"{% endif %}>
       <thead class="thead-light">
         <tr>
           {% for header in table_headers %}
@@ -48,7 +50,9 @@
             <textarea name="table_cell_{{ table_layout.pk }}_{{ cell.row }}_{{ cell.col }}"
                       class="form-control form-control-sm form-table-cell-input"
                       rows="1"
-                      data-fit-textarea>{{ cell.value }}</textarea>
+                      data-fit-textarea
+                      data-table-col="{{ cell.col }}"
+                      data-table-row="{{ cell.row }}">{{ cell.value }}</textarea>
             {% endif %}
           </td>
           {% endfor %}
@@ -64,6 +68,15 @@
 {% endwith %}
 {% endfor %}
 
+<style>
+.form-table-select-locked {
+  background-color: #e9ecef !important;
+  color: #6c757d;
+  pointer-events: none;
+  cursor: not-allowed;
+}
+</style>
+
 <script>
 (function () {
   var optionMapCache = {};
@@ -71,16 +84,24 @@
   function getOptionMaps(table) {
     var layoutId = table.getAttribute('data-layout-id');
     if (optionMapCache[layoutId]) return optionMapCache[layoutId];
+
+    var maps = {};
     var el = document.getElementById('table-option-maps-' + layoutId);
-    if (!el) {
-      optionMapCache[layoutId] = {};
-      return optionMapCache[layoutId];
+    if (el) {
+      try {
+        maps = JSON.parse(el.textContent || '{}');
+      } catch (e) {
+        maps = {};
+      }
     }
-    try {
-      optionMapCache[layoutId] = JSON.parse(el.textContent || '{}');
-    } catch (e) {
-      optionMapCache[layoutId] = {};
+    if ((!maps || !Object.keys(maps).length) && table.getAttribute('data-option-maps')) {
+      try {
+        maps = JSON.parse(table.getAttribute('data-option-maps') || '{}');
+      } catch (e2) {
+        maps = {};
+      }
     }
+    optionMapCache[layoutId] = maps || {};
     return optionMapCache[layoutId];
   }
 
@@ -143,22 +164,61 @@
     if (!table) return {};
     var maps = getOptionMaps(table);
     var col = childSelect.getAttribute('data-table-col');
-    return maps[col] || {};
+    return maps[String(col)] || maps[col] || {};
   }
 
-  function findParentSelect(childSelect) {
+  function mappedOptions(map, parentValue) {
+    var key = (parentValue || '').trim();
+    if (!key) return [];
+    if (Object.prototype.hasOwnProperty.call(map, key)) {
+      return (map[key] || []).slice();
+    }
+    var found = [];
+    Object.keys(map || {}).forEach(function (k) {
+      if ((k || '').trim() === key) {
+        found = (map[k] || []).slice();
+      }
+    });
+    return found;
+  }
+
+  function findParentField(childSelect) {
     var parentCol = childSelect.getAttribute('data-depends-on-col');
     if (parentCol === null || parentCol === '') return null;
     var row = childSelect.closest('tr');
     if (!row) return null;
-    return row.querySelector('select[data-table-col="' + parentCol + '"]');
+    return (
+      row.querySelector('select[data-table-col="' + parentCol + '"]') ||
+      row.querySelector('textarea[data-table-col="' + parentCol + '"]') ||
+      row.querySelector('input[data-table-col="' + parentCol + '"]')
+    );
+  }
+
+  function parentFieldValue(parent) {
+    if (!parent) return '';
+    return (parent.value || '').trim();
+  }
+
+  function setLocked(childSelect, locked, blankLabel) {
+    childSelect.classList.toggle('form-table-select-locked', locked);
+    childSelect.setAttribute('aria-disabled', locked ? 'true' : 'false');
+    if (locked) {
+      childSelect.tabIndex = -1;
+      childSelect.title = 'Select the parent column value first';
+    } else {
+      childSelect.removeAttribute('tabIndex');
+      childSelect.removeAttribute('title');
+    }
+    if (childSelect.options[0]) {
+      childSelect.options[0].textContent = blankLabel;
+    }
   }
 
   function setDependentOptions(childSelect, parentValue, keepValue) {
     var map = parseOptionMap(childSelect);
-    var allowed = (parentValue && map[parentValue]) ? map[parentValue].slice() : [];
+    var allowed = mappedOptions(map, parentValue);
     var current = keepValue !== undefined ? keepValue : childSelect.value;
-    var hasParent = Boolean(parentValue);
+    var hasParent = Boolean((parentValue || '').trim());
 
     while (childSelect.options.length > 1) {
       childSelect.remove(1);
@@ -175,29 +235,54 @@
     if (allowed.indexOf(current) === -1) {
       childSelect.value = '';
     }
-    childSelect.disabled = !hasParent;
+
     if (!hasParent) {
-      childSelect.title = 'Select the parent column value first';
+      setLocked(childSelect, true, '— Select parent first —');
+    } else if (!allowed.length) {
+      setLocked(childSelect, true, '— No options for this value —');
     } else {
-      childSelect.removeAttribute('title');
+      setLocked(childSelect, false, '— Select —');
     }
   }
 
-  function refreshDependents(parentSelect) {
-    var row = parentSelect.closest('tr');
+  function refreshDependents(parentField) {
+    var row = parentField.closest('tr');
     if (!row) return;
-    var parentCol = parentSelect.getAttribute('data-table-col');
+    var parentCol = parentField.getAttribute('data-table-col');
     row.querySelectorAll('select[data-depends-on-col="' + parentCol + '"]').forEach(function (child) {
-      setDependentOptions(child, parentSelect.value);
+      setDependentOptions(child, parentFieldValue(parentField));
       refreshDependents(child);
     });
   }
 
+  function dependencyDepth(select, seen) {
+    seen = seen || {};
+    var col = select.getAttribute('data-table-col');
+    if (seen[col]) return 0;
+    seen[col] = true;
+    var parent = findParentField(select);
+    if (!parent || !parent.hasAttribute('data-depends-on-col')) {
+      return parent && parent.tagName === 'SELECT' && parent.hasAttribute('data-depends-on-col')
+        ? 1 + dependencyDepth(parent, seen)
+        : (parent ? 1 : 0);
+    }
+    if (parent.tagName === 'SELECT' && parent.hasAttribute('data-depends-on-col')) {
+      return 1 + dependencyDepth(parent, seen);
+    }
+    return 1;
+  }
+
   function initDependentDropdowns(root) {
-    (root || document).querySelectorAll('select[data-depends-on-col]').forEach(function (child) {
-      var parent = findParentSelect(child);
+    var children = Array.prototype.slice.call(
+      (root || document).querySelectorAll('select[data-depends-on-col]')
+    );
+    children.sort(function (a, b) {
+      return dependencyDepth(a) - dependencyDepth(b);
+    });
+    children.forEach(function (child) {
+      var parent = findParentField(child);
       var initial = child.getAttribute('data-selected-value') || child.value;
-      setDependentOptions(child, parent ? parent.value : '', initial);
+      setDependentOptions(child, parentFieldValue(parent), initial);
     });
   }
 
@@ -216,7 +301,10 @@
       if (el.dataset.fitBound) return;
       el.dataset.fitBound = '1';
       el.addEventListener('focus', function () { fitTextarea(el); });
-      el.addEventListener('input', function () { fitTextarea(el); });
+      el.addEventListener('input', function () {
+        fitTextarea(el);
+        refreshDependents(el);
+      });
     });
     scope.querySelectorAll('[data-fit-select]').forEach(function (el) {
       if (el.dataset.fitBound) return;

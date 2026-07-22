@@ -2269,6 +2269,7 @@ def _table_sections_for_record(form_def, record=None, sparse=False):
             'table_headers': headers,
             'table_rows': rows,
             'option_maps': option_maps,
+            'option_maps_json': json.dumps(option_maps) if option_maps else '',
             'option_maps_script_id': f'table-option-maps-{layout.pk}',
         })
     return sections
