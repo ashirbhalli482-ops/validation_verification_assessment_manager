@@ -306,6 +306,20 @@ class FormTableLayout(models.Model):
             'Empty rows = all rows. When depends_on_col is set, option_map maps parent value → child options.'
         ),
     )
+    table_summary = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text=(
+            'Optional table summary: {enabled, title, columns:[{label, subheader}], '
+            'rows:[{label, cells:[{value, formula}]}], '
+            'dropdowns:[{col, rows, options, is_active, depends_on_table_col?, '
+            'depends_on_col?, option_map?}]}. '
+            'depends_on_table_col links to the main table column; option_map maps parent value → child options. '
+            'Admin formulas e.g. =COUNTIF("Bases Risk Rating","High"), '
+            '=COUNTIFS(B:B,"Inherent Risk",F:F,"High"), or '
+            '=((B2*3)+(C2*2)+(D2*1))/(B2+C2+D2).'
+        ),
+    )
     created_by = models.ForeignKey(
         CustomUser, on_delete=models.SET_NULL, null=True, blank=True,
         related_name='created_form_table_layouts',
@@ -484,6 +498,204 @@ class FormTableLayout(models.Model):
 
     def active_cell_dropdown_map(self):
         return self.active_column_dropdown_map()
+
+    @staticmethod
+    def normalize_summary_dropdown(entry):
+        """Normalize a summary dropdown; may depend on a main-table column."""
+        if not isinstance(entry, dict):
+            return None
+        try:
+            col = int(entry.get('col'))
+        except (TypeError, ValueError):
+            return None
+        if col < 0:
+            return None
+
+        option_map = {}
+        raw_map = entry.get('option_map')
+        if isinstance(raw_map, dict):
+            for parent_key, child_opts in raw_map.items():
+                parent = str(parent_key).strip()
+                if not parent:
+                    continue
+                options_for_parent = [
+                    str(option).strip()
+                    for option in (child_opts or [])
+                    if str(option).strip()
+                ]
+                if options_for_parent:
+                    option_map[parent] = options_for_parent
+
+        depends_on_table_col = entry.get('depends_on_table_col', None)
+        if depends_on_table_col is not None and depends_on_table_col != '':
+            try:
+                depends_on_table_col = int(depends_on_table_col)
+            except (TypeError, ValueError):
+                depends_on_table_col = None
+            if depends_on_table_col is not None and depends_on_table_col < 0:
+                depends_on_table_col = None
+        else:
+            depends_on_table_col = None
+
+        # Legacy: summary-to-summary depends_on_col still supported.
+        depends_on_col = entry.get('depends_on_col', None)
+        if depends_on_table_col is not None:
+            depends_on_col = None
+        elif depends_on_col is not None and depends_on_col != '':
+            try:
+                depends_on_col = int(depends_on_col)
+            except (TypeError, ValueError):
+                depends_on_col = None
+            if depends_on_col is not None and (depends_on_col < 0 or depends_on_col == col):
+                depends_on_col = None
+        else:
+            depends_on_col = None
+
+        if depends_on_table_col is not None and option_map:
+            options = []
+            seen = set()
+            for child_opts in option_map.values():
+                for option in child_opts:
+                    if option not in seen:
+                        seen.add(option)
+                        options.append(option)
+        elif depends_on_col is not None and option_map:
+            options = []
+            seen = set()
+            for child_opts in option_map.values():
+                for option in child_opts:
+                    if option not in seen:
+                        seen.add(option)
+                        options.append(option)
+        else:
+            depends_on_table_col = None
+            depends_on_col = None
+            option_map = {}
+            options = [
+                str(option).strip()
+                for option in entry.get('options', [])
+                if str(option).strip()
+            ]
+
+        if not options:
+            return None
+
+        rows = []
+        raw_rows = entry.get('rows')
+        if isinstance(raw_rows, str):
+            raw_rows = [part.strip() for part in raw_rows.replace(';', ',').split(',') if part.strip()]
+        if isinstance(raw_rows, (list, tuple)):
+            for item in raw_rows:
+                try:
+                    row_idx = int(item)
+                except (TypeError, ValueError):
+                    continue
+                if row_idx >= 0:
+                    rows.append(row_idx)
+            rows = sorted(set(rows))
+
+        result = {
+            'col': col,
+            'rows': rows,
+            'options': options,
+            'is_active': bool(entry.get('is_active', True)),
+        }
+        if depends_on_table_col is not None:
+            result['depends_on_table_col'] = depends_on_table_col
+            result['option_map'] = option_map
+        elif depends_on_col is not None:
+            result['depends_on_col'] = depends_on_col
+            result['option_map'] = option_map
+        return result
+
+    @staticmethod
+    def normalize_table_summary(entry):
+        """Normalize optional summary config; empty/disabled → {}."""
+        if not isinstance(entry, dict):
+            return {}
+        enabled = bool(entry.get('enabled'))
+        if not enabled:
+            return {}
+        title = str(entry.get('title') or '').strip()
+        columns = []
+        for col in entry.get('columns') or []:
+            if isinstance(col, dict):
+                label = str(col.get('label') or '').strip()
+                subheader = str(col.get('subheader') or '').strip()
+            else:
+                label = str(col or '').strip()
+                subheader = ''
+            if label:
+                columns.append({'label': label, 'subheader': subheader})
+        rows = []
+        for row in entry.get('rows') or []:
+            if not isinstance(row, dict):
+                continue
+            label = str(row.get('label') or '').strip()
+            cells = []
+            for cell in row.get('cells') or []:
+                if isinstance(cell, dict):
+                    cells.append({
+                        'value': str(cell.get('value') or '').strip(),
+                        'formula': str(cell.get('formula') or '').strip(),
+                    })
+                else:
+                    cells.append({'value': str(cell or '').strip(), 'formula': ''})
+            if not columns and not cells and not label:
+                continue
+            if columns:
+                while len(cells) < len(columns):
+                    cells.append({'value': '', 'formula': ''})
+                cells = cells[:len(columns)]
+            rows.append({'label': label, 'cells': cells})
+        if not columns:
+            columns = [{'label': 'Column 1', 'subheader': ''}]
+        if not rows:
+            rows = [{'label': '', 'cells': [{'value': '', 'formula': ''} for _ in columns]}]
+        dropdowns = []
+        for dd_entry in entry.get('dropdowns') or []:
+            normalized = FormTableLayout.normalize_summary_dropdown(dd_entry)
+            if not normalized:
+                continue
+            if normalized['col'] >= len(columns):
+                continue
+            dropdowns.append(normalized)
+        return {
+            'enabled': True,
+            'title': title,
+            'columns': columns,
+            'rows': rows,
+            'dropdowns': dropdowns,
+        }
+
+    def normalized_table_summary(self):
+        return self.normalize_table_summary(self.table_summary or {})
+
+    def has_table_summary(self):
+        summary = self.normalized_table_summary()
+        return bool(summary.get('enabled'))
+
+    def summary_dropdown_lookup(self):
+        """Map summary column index → active dropdown config."""
+        summary = self.normalized_table_summary()
+        lookup = {}
+        for dropdown in summary.get('dropdowns') or []:
+            if not dropdown.get('is_active', True):
+                continue
+            col = dropdown['col']
+            rows = dropdown.get('rows') or []
+            lookup.setdefault(col, []).append(dropdown)
+            # Prefer all-rows config when multiple; keep list for row scoping
+            _ = rows
+        return lookup
+
+    def summary_dropdown_for_cell(self, row_idx, col_idx, lookup=None):
+        configs = (lookup or self.summary_dropdown_lookup()).get(col_idx, [])
+        for dropdown in configs:
+            rows = dropdown.get('rows') or []
+            if not rows or row_idx in rows:
+                return dropdown
+        return None
 
 
 class PackageAuthorization(models.Model):
@@ -773,9 +985,21 @@ class EmployeeRecord(models.Model):
 
 
 class FormRecord(models.Model):
-    """Individual form record with workflow and JSON data storage."""
+    """Individual form record with workflow and JSON data storage.
+
+    Project forms: ``project`` set, ``owner_manager`` null.
+    Manager standalone forms (View All Forms / Master Record / Proposal):
+    ``project`` null, ``owner_manager`` set — data is independent of project forms.
+    """
     project = models.ForeignKey(
-        Project, on_delete=models.CASCADE, related_name='form_records'
+        Project, on_delete=models.CASCADE, related_name='form_records',
+        null=True, blank=True,
+    )
+    owner_manager = models.ForeignKey(
+        CustomUser, on_delete=models.CASCADE, null=True, blank=True,
+        related_name='owned_standalone_form_records',
+        limit_choices_to={'user_type': 'manager'},
+        help_text='Set for manager standalone forms not linked to a project.',
     )
     form_definition = models.ForeignKey(
         FormDefinition, on_delete=models.CASCADE, related_name='records'
@@ -799,11 +1023,29 @@ class FormRecord(models.Model):
 
     class Meta:
         ordering = ['-updated_at']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['owner_manager', 'form_definition'],
+                condition=models.Q(project__isnull=True, owner_manager__isnull=False),
+                name='uniq_standalone_manager_form',
+            ),
+        ]
 
     def __str__(self):
-        return f'{self.form_definition.code} - {self.project.project_number}'
+        code = self.form_definition.code
+        if self.project_id:
+            return f'{code} - {self.project.project_number}'
+        if self.owner_manager_id:
+            return f'{code} - {self.owner_manager}'
+        return code
+
+    @property
+    def is_standalone(self):
+        return self.project_id is None
 
     def _team_member(self, user):
+        if not self.project_id:
+            return None
         from .access import get_team_member
         return get_team_member(user, self.project)
 
@@ -812,6 +1054,11 @@ class FormRecord(models.Model):
             return True
         if self.status in ('approved', 'finalized', 'submitted'):
             return False
+        if self.is_standalone:
+            return (
+                user.user_type == 'manager'
+                and self.owner_manager_id == user.id
+            )
         if user.user_type == 'manager' and self.project.manager == user:
             return True
         tm = self._team_member(user)
@@ -820,18 +1067,24 @@ class FormRecord(models.Model):
         return False
 
     def can_submit(self, user):
+        """Submit for Senior Review — manager's users only, not the project manager."""
+        if self.is_standalone:
+            return False
         if self.status not in ('draft', 'returned'):
             return False
-        if user.user_type == 'manager' and self.project.manager == user:
-            return True
+        # Project manager reviews/finalizes; they do not submit for senior review.
+        if user.user_type == 'manager' and self.project.manager_id == user.id:
+            return False
         tm = self._team_member(user)
         return (
             tm is not None
             and tm.role == 'team_member'
-            and self.created_by_user == user
+            and self.created_by_user_id == user.id
         )
 
     def can_review(self, user):
+        if self.is_standalone:
+            return False
         if self.status not in ('submitted', 'approved'):
             return False
         if self.status == 'finalized':
@@ -847,6 +1100,8 @@ class FormRecord(models.Model):
         ).exists()
 
     def can_finalize(self, user):
+        if self.is_standalone:
+            return False
         return (
             user.user_type == 'manager'
             and self.project.manager == user

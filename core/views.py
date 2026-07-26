@@ -35,14 +35,16 @@ from .forms import (
 )
 from .access import (
     can_access_project, can_access_form, can_create_form_record,
+    can_create_standalone_form_record, can_access_form_record,
     can_access_library_document, get_authorized_library_documents,
     get_employee_projects, get_team_member, can_view_report, get_manager_manageable_users,
-    company_for_project,
+    company_for_project, manager_company_for_user,
 )
 from .permissions import AdminRequiredMixin, ManagerRequiredMixin, EmployeeBlockedMixin, ManagerOrAdminMixin
 from .context_processors import invalidate_notification_cache
 from .form_table_utils import (
     build_table_block, block_from_post, table_block_keys, stored_cells_for_layout,
+    build_summary_display, default_table_summary_seed_json,
 )
 from .package_seed import get_active_package_template
 
@@ -1068,6 +1070,7 @@ class FormTableLayoutEditView(AdminRequiredMixin, View):
             'table_blocks': table_blocks,
             'empty_block': build_table_block(key='new0'),
             'has_tables': has_tables,
+            'default_summary_seed_json': default_table_summary_seed_json(),
         })
 
     def post(self, request, pk):
@@ -1090,6 +1093,7 @@ class FormTableLayoutEditView(AdminRequiredMixin, View):
                 'empty_block': build_table_block(key='new0'),
                 'has_tables': any(block.get('layout_id') for block in valid_blocks),
                 'form_error': 'Fix the highlighted table blocks before saving.',
+                'default_summary_seed_json': default_table_summary_seed_json(),
             })
 
         removed_ids = {
@@ -1118,6 +1122,9 @@ class FormTableLayoutEditView(AdminRequiredMixin, View):
                     'row_count': block['row_count'],
                     'column_headers': block['columns'],
                     'cell_dropdowns': block['cell_dropdowns'],
+                    'table_summary': FormTableLayout.normalize_table_summary(
+                        block.get('table_summary') or {}
+                    ),
                     'created_by': request.user,
                 }
                 if block['layout_id']:
@@ -1642,32 +1649,49 @@ def _build_project_form_groups(project, user=None, form_types=None):
     return sub_packages
 
 
-def _build_manager_forms_by_type(projects, form_types=None):
-    """Unique allocated forms across all projects, grouped by form type only."""
-    allowed_types = set(form_types) if form_types else None
-    by_type = {key: {} for key, _ in FORM_TYPE_CHOICES}
-    for project in projects.order_by('project_number'):
-        for group in _build_project_form_groups(project):
-            for row in group['form_rows']:
-                form_def = row['form_def']
-                if allowed_types is not None and form_def.form_type not in allowed_types:
-                    continue
-                bucket = by_type.setdefault(form_def.form_type, {})
-                existing = bucket.get(form_def.id)
-                if existing is None:
-                    bucket[form_def.id] = {
-                        'form_def': form_def,
-                        'project': project,
-                        'record': row['record'],
-                    }
-                elif row['record'] and not existing['record']:
-                    existing['record'] = row['record']
-                    existing['project'] = project
-    type_order = (
-        [(key, label) for key, label in FORM_TYPE_CHOICES if key in allowed_types]
-        if allowed_types is not None
-        else list(FORM_TYPE_CHOICES)
+# All form types may appear under manager View All Forms as standalone copies.
+# Master Record / Proposal views pass a narrower form_types filter.
+MANAGER_VIEW_ALL_FORM_TYPES = tuple(key for key, _ in FORM_TYPE_CHOICES)
+
+
+def _build_manager_standalone_forms_by_type(manager, form_types=None):
+    """Authorized forms with manager-owned standalone records only.
+
+    Never uses project FormRecords — edits here stay independent of project forms.
+    """
+    allowed_types = set(form_types) if form_types else set(MANAGER_VIEW_ALL_FORM_TYPES)
+    if not allowed_types:
+        return []
+
+    form_ids = set(
+        AuthorizedForm.objects.filter(
+            authorization__manager=manager,
+            is_active=True,
+        ).values_list('form_definition_id', flat=True)
     )
+    forms = FormDefinition.objects.filter(
+        id__in=form_ids,
+        form_type__in=allowed_types,
+        created_by__isnull=False,
+    )
+    record_by_form = {
+        r.form_definition_id: r
+        for r in FormRecord.objects.filter(
+            owner_manager=manager,
+            project__isnull=True,
+            form_definition_id__in=form_ids,
+        ).select_related('form_definition')
+    }
+    by_type = {key: {} for key, _ in FORM_TYPE_CHOICES}
+    for form_def in forms:
+        by_type[form_def.form_type][form_def.id] = {
+            'form_def': form_def,
+            'project': None,
+            'record': record_by_form.get(form_def.id),
+        }
+    type_order = [
+        (key, label) for key, label in FORM_TYPE_CHOICES if key in allowed_types
+    ]
     return [
         {
             'key': key,
@@ -1683,30 +1707,30 @@ def _build_manager_forms_by_type(projects, form_types=None):
 
 
 def _manager_view_forms_response(request, form_types=None, page_title='View All Forms', page_description=''):
-    projects = Project.objects.filter(
-        manager=request.user,
-    ).select_related(
-        'package_instance',
-        'package_instance__authorization',
-        'package_instance__authorization__package_template',
-    ).order_by('project_number')
+    has_authorization = PackageAuthorization.objects.filter(manager=request.user).exists()
     if not page_description:
         page_description = (
-            'All forms allocated by the administrator, grouped by form type. '
-            'Team users only see and can work with Project type forms on project pages.'
+            'All forms allocated by the administrator. '
+            'These copies are not linked to any project — edits here do not change forms inside a project. '
+            'Project pages keep their own separate project form records.'
         )
     return render(request, 'core/manager_view_forms.html', {
-        'form_type_groups': _build_manager_forms_by_type(projects, form_types=form_types),
-        'has_projects': projects.exists(),
+        'form_type_groups': _build_manager_standalone_forms_by_type(
+            request.user, form_types=form_types,
+        ),
+        'has_authorization': has_authorization,
         'page_title': page_title,
         'page_description': page_description,
     })
 
 
 class ManagerViewFormsView(ManagerRequiredMixin, View):
-    """Manager: view all allocated forms grouped by form type."""
+    """Manager: all allocated forms as standalone copies (not project-linked)."""
     def get(self, request):
-        return _manager_view_forms_response(request)
+        return _manager_view_forms_response(
+            request,
+            form_types=list(MANAGER_VIEW_ALL_FORM_TYPES),
+        )
 
 
 class ManagerViewMasterRecordView(ManagerRequiredMixin, View):
@@ -1716,7 +1740,10 @@ class ManagerViewMasterRecordView(ManagerRequiredMixin, View):
             request,
             form_types=['master_record'],
             page_title='View Master Record',
-            page_description='Master Record forms allocated by the administrator.',
+            page_description=(
+                'Master Record forms allocated by the administrator. '
+                'These are not linked to projects — edits here do not change project forms.'
+            ),
         )
 
 
@@ -1727,7 +1754,10 @@ class ManagerViewProposalFormsView(ManagerRequiredMixin, View):
             request,
             form_types=['proposal'],
             page_title='View Proposal Forms',
-            page_description='Proposal forms allocated by the administrator.',
+            page_description=(
+                'Proposal forms allocated by the administrator. '
+                'These are not linked to projects — edits here do not change project forms.'
+            ),
         )
 
 
@@ -1900,6 +1930,9 @@ _FORM_RECORD_SELECT = (
     'project__manager',
     'project__manager__managed_company',
     'project__manager__company',
+    'owner_manager',
+    'owner_manager__managed_company',
+    'owner_manager__company',
     'form_definition',
     'project__package_instance',
     'project__package_instance__authorization',
@@ -1911,6 +1944,19 @@ def _get_form_record(pk):
         FormRecord.objects.select_related(*_FORM_RECORD_SELECT),
         pk=pk,
     )
+
+
+def _company_for_form_record(record=None, project=None, user=None):
+    if project:
+        return company_for_project(project)
+    if record and record.project_id:
+        return company_for_project(record.project)
+    owner = None
+    if record and record.owner_manager_id:
+        owner = record.owner_manager
+    elif user and getattr(user, 'user_type', None) == 'manager':
+        owner = user
+    return manager_company_for_user(owner) if owner else None
 
 
 # --- Form Records & Workflow ---
@@ -1951,6 +1997,7 @@ class FormRecordCreateView(LoginRequiredMixin, View):
         if form.is_valid():
             record = form.save(commit=False)
             record.project = project
+            record.owner_manager = None
             record.form_definition = form_def
             record.created_by_user = request.user
             record.created_by_name = request.user.get_full_name() or request.user.username
@@ -1962,17 +2009,62 @@ class FormRecordCreateView(LoginRequiredMixin, View):
         return render(request, _form_template_name(form_def), ctx)
 
 
+class ManagerStandaloneFormCreateView(ManagerRequiredMixin, View):
+    """Create/open a manager-owned form record not linked to any project."""
+
+    def get(self, request, form_id):
+        form_def = get_object_or_404(FormDefinition, pk=form_id)
+        if not can_create_standalone_form_record(request.user, form_def):
+            messages.error(request, 'You are not authorized to open this form.')
+            return redirect('core:manager-view-forms')
+        existing = FormRecord.objects.filter(
+            owner_manager=request.user,
+            project__isnull=True,
+            form_definition=form_def,
+        ).only('pk').first()
+        if existing:
+            return redirect('core:form-record-detail', pk=existing.pk)
+        ctx = _form_record_context(request, None, form_def, None)
+        return render(request, _form_template_name(form_def), ctx)
+
+    def post(self, request, form_id):
+        form_def = get_object_or_404(FormDefinition, pk=form_id)
+        if not can_create_standalone_form_record(request.user, form_def):
+            return redirect('core:manager-view-forms')
+        existing = FormRecord.objects.filter(
+            owner_manager=request.user,
+            project__isnull=True,
+            form_definition=form_def,
+        ).only('pk').first()
+        if existing:
+            return redirect('core:form-record-edit', pk=existing.pk)
+        form = FormRecordForm(request.POST)
+        if form.is_valid():
+            record = form.save(commit=False)
+            record.project = None
+            record.owner_manager = request.user
+            record.form_definition = form_def
+            record.created_by_user = request.user
+            record.created_by_name = request.user.get_full_name() or request.user.username
+            record.data = _build_record_data(request.POST, project=None, form_def=form_def)
+            record.save()
+            messages.success(request, 'Form record created.')
+            return redirect('core:form-record-detail', pk=record.pk)
+        ctx = _form_record_context(request, None, form_def, None, form=form)
+        return render(request, _form_template_name(form_def), ctx)
+
+
 class FormRecordDetailView(LoginRequiredMixin, View):
     def get(self, request, pk):
         record = _get_form_record(pk)
-        if not can_access_form(request.user, record.project, record.form_definition):
+        if not can_access_form_record(request.user, record):
             return redirect('core:dashboard')
         other_data = dict(record.data or {})
         other_data.pop('table_cells', None)
         display_sections = _table_sections_for_record(
             record.form_definition, record, sparse=True,
         )
-        company = company_for_project(record.project)
+        company = _company_for_form_record(record=record)
         return render(request, 'core/form_record_detail.html', {
             'record': record,
             'company': company,
@@ -2016,7 +2108,7 @@ class FormRecordEditView(LoginRequiredMixin, View):
 class FormSubmitView(LoginRequiredMixin, View):
     def post(self, request, pk):
         record = get_object_or_404(FormRecord, pk=pk)
-        if not record.can_submit(request.user):
+        if record.is_standalone or not record.can_submit(request.user):
             messages.error(request, 'You cannot submit this form.')
             return redirect('core:form-record-detail', pk=pk)
         record.status = 'submitted'
@@ -2046,6 +2138,8 @@ class FormSubmitView(LoginRequiredMixin, View):
 class FormReviewView(LoginRequiredMixin, View):
     def post(self, request, pk):
         record = get_object_or_404(FormRecord, pk=pk)
+        if record.is_standalone:
+            return redirect('core:form-record-detail', pk=pk)
         action = request.POST.get('action')
         if action == 'approve' and record.can_review(request.user):
             order = record.reviews.filter(approved=True).count() + 1
@@ -2082,7 +2176,7 @@ class FormReviewView(LoginRequiredMixin, View):
 class FormFinalizeView(ManagerRequiredMixin, View):
     def post(self, request, pk):
         record = get_object_or_404(FormRecord, pk=pk)
-        if not record.can_finalize(request.user):
+        if record.is_standalone or not record.can_finalize(request.user):
             return redirect('core:form-record-detail', pk=pk)
         record.status = 'finalized'
         record.finalized_by = request.user
@@ -2249,9 +2343,10 @@ def _form_owner_label(company, project):
     return 'VVB'
 
 
-def _table_sections_for_record(form_def, record=None, sparse=False):
+def _table_sections_for_record(form_def, record=None, sparse=False, summary_editable=False):
     layouts = list(FormTableLayout.objects.filter(form_definition=form_def).order_by('table_number', 'pk'))
     data = (record.data or {}) if record else {}
+    stored_summaries = data.get('table_summary_cells') if isinstance(data.get('table_summary_cells'), dict) else {}
     sections = []
     for layout in layouts:
         stored = stored_cells_for_layout(data, layout, layouts)
@@ -2264,6 +2359,7 @@ def _table_sections_for_record(form_def, record=None, sparse=False):
             for cfg in configs
             if cfg.get('option_map')
         }
+        summary_stored = stored_summaries.get(str(layout.pk))
         sections.append({
             'layout': layout,
             'table_headers': headers,
@@ -2271,13 +2367,19 @@ def _table_sections_for_record(form_def, record=None, sparse=False):
             'option_maps': option_maps,
             'option_maps_json': json.dumps(option_maps) if option_maps else '',
             'option_maps_script_id': f'table-option-maps-{layout.pk}',
+            'table_summary': build_summary_display(
+                layout,
+                cells,
+                stored_summary_cells=summary_stored,
+                editable=summary_editable,
+            ),
         })
     return sections
 
 
 def _form_record_context(request, project, form_def, record, form=None):
-    company = company_for_project(project)
-    table_sections = _table_sections_for_record(form_def, record)
+    company = _company_for_form_record(record=record, project=project, user=request.user)
+    table_sections = _table_sections_for_record(form_def, record, summary_editable=True)
     ctx = {
         'form': form or FormRecordForm(instance=record),
         'project': project,
@@ -2295,7 +2397,8 @@ def _form_record_context(request, project, form_def, record, form=None):
     else:
         ctx['dropdown_lists'] = list(DropdownList.objects.prefetch_related('options'))
     if code == 'F-01C-MRC':
-        ctx['employees'] = list(EmployeeRecord.objects.filter(manager_id=project.manager_id))
+        manager_id = project.manager_id if project else request.user.id
+        ctx['employees'] = list(EmployeeRecord.objects.filter(manager_id=manager_id))
     return ctx
 
 
@@ -2408,6 +2511,29 @@ def _parse_table_cells_from_post(post, layout, allow_legacy=False):
     return validate_table_cells(layout, cells)
 
 
+def _parse_summary_cells_from_post(post, layout):
+    """Parse fill-time summary dropdown values; keep admin defaults for missing cells."""
+    summary = layout.normalized_table_summary()
+    if not summary.get('enabled'):
+        return None
+    rows = summary.get('rows') or []
+    col_count = len(summary.get('columns') or [])
+    result = []
+    for row_idx, row in enumerate(rows):
+        row_vals = []
+        for col_idx in range(col_count):
+            admin_value = ''
+            if col_idx < len(row.get('cells') or []):
+                admin_value = str(row['cells'][col_idx].get('value') or '').strip()
+            key = f'summary_cell_{layout.pk}_{row_idx}_{col_idx}'
+            if key in post:
+                row_vals.append((post.get(key) or '').strip())
+            else:
+                row_vals.append(admin_value)
+        result.append(row_vals)
+    return result
+
+
 def _build_record_data(post, project=None, form_def=None, existing_data=None):
     """Merge project snapshot, notes, dropdowns, and optional admin table cells."""
     data = dict(existing_data or {})
@@ -2423,6 +2549,13 @@ def _build_record_data(post, project=None, form_def=None, existing_data=None):
                 for layout in layouts
             }
             data['table_cells'] = table_cells
+            summary_cells = {}
+            for layout in layouts:
+                parsed = _parse_summary_cells_from_post(post, layout)
+                if parsed is not None:
+                    summary_cells[str(layout.pk)] = parsed
+            if summary_cells:
+                data['table_summary_cells'] = summary_cells
     return data
 
 
@@ -2430,7 +2563,7 @@ def _parse_form_data(post):
     data = {}
     skip = {'csrfmiddlewaretoken', 'created_by_name', 'notes', 'return'}
     for key, value in post.items():
-        if key in skip or key.startswith('table_cell_'):
+        if key in skip or key.startswith('table_cell_') or key.startswith('summary_cell_'):
             continue
         if key.startswith('field_'):
             data[key[6:]] = value

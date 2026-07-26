@@ -38,8 +38,8 @@
               <a href="{% url 'core:form-record-detail' row.record.pk %}" class="btn btn-sm btn-info">View</a>
               <a href="{% url 'core:form-record-edit' row.record.pk %}" class="btn btn-sm btn-warning">Edit</a>
               {% else %}
-              <a href="{% url 'core:form-record-create' row.project.pk row.form_def.pk %}" class="btn btn-sm btn-info">View</a>
-              <a href="{% url 'core:form-record-create' row.project.pk row.form_def.pk %}" class="btn btn-sm btn-warning">Edit</a>
+              <a href="{% url 'core:manager-form-record-create' row.form_def.pk %}" class="btn btn-sm btn-info">View</a>
+              <a href="{% url 'core:manager-form-record-create' row.form_def.pk %}" class="btn btn-sm btn-warning">Edit</a>
               {% endif %}
             </td>
           </tr>
@@ -52,10 +52,10 @@
   <div class="card">
     <div class="card-body text-center text-muted">
       No allocated forms found.
-      {% if has_projects %}
-      Contact your administrator to authorize forms, or open a project to get started.
+      {% if has_authorization %}
+      Contact your administrator to authorize forms for your package.
       {% else %}
-      <a href="{% url 'core:project-create' %}">Create a project</a> to get started.
+      Contact your administrator to authorize a package for your account.
       {% endif %}
     </div>
   </div>

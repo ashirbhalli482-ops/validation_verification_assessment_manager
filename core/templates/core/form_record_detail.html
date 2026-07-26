@@ -27,7 +27,11 @@
           <button class="btn btn-dark">Finalize (Project Manager)</button>
         </form>
         {% endif %}
+        {% if record.project_id %}
         <a href="{% url 'core:project-detail' record.project.pk %}" class="btn btn-secondary">Back to Package</a>
+        {% else %}
+        <a href="{% url 'core:manager-view-forms' %}" class="btn btn-secondary">Back to Forms</a>
+        {% endif %}
       </div>
     </div>
   </div>

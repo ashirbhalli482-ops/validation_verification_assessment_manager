@@ -33,6 +33,7 @@
   {% if table_layout.table_note %}
   <p class="small mt-2 mb-0">{{ table_layout.table_note|linebreaksbr }}</p>
   {% endif %}
+  {% include 'core/includes/form_table_summary.html' with table_summary=section.table_summary %}
 </div>
 {% endwith %}
 {% endfor %}

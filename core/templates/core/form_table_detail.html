@@ -105,6 +105,52 @@
         {% if layout.table_note %}
         <p class="small mt-3 mb-0"> {{ layout.table_note|linebreaksbr }}</p>
         {% endif %}
+        {% if layout.has_table_summary %}
+        {% with summary=layout.normalized_table_summary %}
+        <div class="mt-3 form-table-summary form-table-summary-excel">
+          <div class="table-responsive">
+            <table class="table table-bordered table-sm mb-0 form-table-summary-table">
+              <thead>
+                <tr class="summary-title-row">
+                  <th colspan="{{ summary.columns|length }}">{{ summary.title|default:layout.table_name|default:"Summary" }}</th>
+                </tr>
+                <tr class="summary-header-row">
+                  {% for col in summary.columns %}
+                  <th>{{ col.label }}{% if col.subheader %}<div class="small">{{ col.subheader }}</div>{% endif %}</th>
+                  {% endfor %}
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in summary.rows %}
+                <tr>
+                  {% for cell in row.cells %}
+                  <td class="summary-data-cell">
+                    {% if cell.formula %}<code class="small">{{ cell.formula }}</code>{% elif cell.value %}{{ cell.value }}{% else %}—{% endif %}
+                  </td>
+                  {% endfor %}
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        {% if summary.dropdowns %}
+        <div class="mt-2">
+          <strong class="small">Summary dropdowns:</strong>
+          <ul class="small mb-0 pl-3">
+            {% for dd in summary.dropdowns %}
+            <li>
+              Col {{ dd.col|add:1 }}
+              {% if dd.depends_on_table_col != None %}depends on table column {{ dd.depends_on_table_col|add:1 }}{% elif dd.depends_on_col != None %}depends on summary col {{ dd.depends_on_col|add:1 }}{% endif %}
+              — {{ dd.options|join:", " }}
+              {% if not dd.is_active %}<span class="text-muted">(inactive)</span>{% endif %}
+            </li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% endif %}
+        {% endwith %}
+        {% endif %}
         <p class="text-muted small mt-2 mb-0">
           Last updated: {{ layout.updated_at|date:"M d, Y H:i" }}
         </p>

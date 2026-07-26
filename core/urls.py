@@ -73,6 +73,7 @@ urlpatterns = [
     path('forms/view/', views.ManagerViewFormsView.as_view(), name='manager-view-forms'),
     path('forms/view/master-record/', views.ManagerViewMasterRecordView.as_view(), name='manager-view-master-record'),
     path('forms/view/proposal/', views.ManagerViewProposalFormsView.as_view(), name='manager-view-proposal-forms'),
+    path('forms/manager/<int:form_id>/create/', views.ManagerStandaloneFormCreateView.as_view(), name='manager-form-record-create'),
     path('projects/create/', views.ProjectCreateView.as_view(), name='project-create'),
     path('projects/<int:pk>/', views.ProjectDetailView.as_view(), name='project-detail'),
     path('projects/<int:pk>/edit/', views.ProjectUpdateView.as_view(), name='project-edit'),

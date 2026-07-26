@@ -941,3 +941,36 @@
 	word-break: break-word;
 	max-width: 28rem;
 }
+
+/* Excel-like table summary */
+.form-table-summary-excel .form-table-summary-table {
+	border-collapse: collapse;
+	width: 100%;
+	background: #fff;
+}
+
+.form-table-summary-excel .form-table-summary-table th,
+.form-table-summary-excel .form-table-summary-table td {
+	border: 1px solid #222 !important;
+	vertical-align: middle;
+	padding: 0.45rem 0.6rem;
+}
+
+.form-table-summary-excel .summary-title-row th {
+	background: #d9d9d9;
+	text-align: center;
+	font-weight: 700;
+	font-size: 0.95rem;
+}
+
+.form-table-summary-excel .summary-header-row th,
+.form-table-summary-excel .summary-subheader-row th {
+	background: #efefef;
+	text-align: center;
+	font-weight: 600;
+}
+
+.form-table-summary-excel .summary-data-cell {
+	text-align: center;
+	white-space: nowrap;
+}

@@ -168,7 +168,7 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 STATICFILES_DIRS = [
     os.path.join(BASE_DIR, 'core/static'),
 ]
-STATIC_VERSION = os.environ.get('STATIC_VERSION', '16')
+STATIC_VERSION = os.environ.get('STATIC_VERSION', '18')
 
 STORAGES = {
     'default': {

@@ -80,12 +80,23 @@ def is_form_authorized_for_project(form_definition, project):
     ).exists()
 
 
+def is_form_authorized_for_manager(form_definition, manager):
+    """Form is active on any package authorization for this manager."""
+    return AuthorizedForm.objects.filter(
+        authorization__manager=manager,
+        form_definition=form_definition,
+        is_active=True,
+    ).exists()
+
+
 def is_form_allocatable_to_team_users(form_definition):
     """Team members (users) may only work with project-type forms."""
     return form_definition.form_type == 'project'
 
 
 def can_access_form(user, project, form_definition):
+    if not project:
+        return False
     if not can_access_project(user, project):
         return False
     if not is_form_authorized_for_project(form_definition, project):
@@ -99,7 +110,32 @@ def can_access_form(user, project, form_definition):
     return get_team_member(user, project) is not None
 
 
+def can_access_standalone_form(user, form_definition, record=None):
+    """Manager-owned forms not linked to a project (View All Forms, etc.).
+
+    Any authorized form type may have a standalone copy. That copy never
+    shares data with project-bound FormRecords.
+    """
+    if not user.is_authenticated:
+        return False
+    if user.user_type == 'admin':
+        return True
+    if user.user_type != 'manager':
+        return False
+    if not is_form_authorized_for_manager(form_definition, user):
+        return False
+    if record is not None:
+        if record.project_id is not None:
+            return False
+        if record.owner_manager_id and record.owner_manager_id != user.id:
+            return False
+    return True
+
+
 def can_create_form_record(user, project, form_definition):
+    # Project pages only create project-type form records bound to that project.
+    if form_definition.form_type != 'project':
+        return False
     if not can_access_form(user, project, form_definition):
         return False
     if user.user_type in ('admin', 'manager'):
@@ -108,6 +144,17 @@ def can_create_form_record(user, project, form_definition):
     if tm is None or tm.role != 'team_member':
         return False
     return is_form_allocatable_to_team_users(form_definition)
+
+
+def can_create_standalone_form_record(user, form_definition):
+    return can_access_standalone_form(user, form_definition)
+
+
+def can_access_form_record(user, record):
+    """Access check for any FormRecord (project-bound or standalone)."""
+    if record.project_id:
+        return can_access_form(user, record.project, record.form_definition)
+    return can_access_standalone_form(user, record.form_definition, record=record)
 
 
 def can_access_library_document(user, document):
@@ -235,7 +282,7 @@ def can_view_report(user, record):
         return False
     if record.status not in ('approved', 'finalized'):
         return False
-    return can_access_form(user, record.project, record.form_definition)
+    return can_access_form_record(user, record)
 
 
 def get_manager_manageable_users(manager):

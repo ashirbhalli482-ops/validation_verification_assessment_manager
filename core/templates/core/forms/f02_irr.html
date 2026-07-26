@@ -15,7 +15,11 @@
         {% if record and form_def.is_public %}
         <a href="{% url 'core:public-form' record.pk %}" class="btn btn-info" target="_blank">Customer Public Link</a>
         {% endif %}
+        {% if project %}
         <a href="{% url 'core:project-detail' project.pk %}" class="btn btn-secondary">Back</a>
+        {% else %}
+        <a href="{% url 'core:manager-view-forms' %}" class="btn btn-secondary">Back</a>
+        {% endif %}
       </form>
     </div>
   </div>

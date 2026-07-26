@@ -1,0 +1,490 @@
+{% if table_summary %}
+<div class="mt-3 form-table-summary form-table-summary-excel"
+     data-summary-layout-id="{{ table_summary.layout_id }}"
+     {% if table_summary.option_maps_json %}data-summary-option-maps="{{ table_summary.option_maps_json|escape }}"{% endif %}
+     {% if table_summary.formula_grid_json %}data-summary-formulas="{{ table_summary.formula_grid_json|escape }}"{% endif %}
+     {% if table_summary.static_grid_json %}data-summary-statics="{{ table_summary.static_grid_json|escape }}"{% endif %}
+     {% if table_summary.column_headers_json %}data-summary-headers="{{ table_summary.column_headers_json|escape }}"{% endif %}>
+  {% if table_summary.option_maps %}
+  <script type="application/json" id="summary-option-maps-{{ table_summary.layout_id }}">{{ table_summary.option_maps_json|safe }}</script>
+  {% endif %}
+  {% if table_summary.formula_grid_json %}
+  <script type="application/json" id="summary-formulas-{{ table_summary.layout_id }}">{{ table_summary.formula_grid_json|safe }}</script>
+  {% endif %}
+  {% if table_summary.static_grid_json %}
+  <script type="application/json" id="summary-statics-{{ table_summary.layout_id }}">{{ table_summary.static_grid_json|safe }}</script>
+  {% endif %}
+  {% if table_summary.column_headers_json %}
+  <script type="application/json" id="summary-headers-{{ table_summary.layout_id }}">{{ table_summary.column_headers_json|safe }}</script>
+  {% endif %}
+  <div class="table-responsive">
+    <table class="table table-bordered table-sm mb-0 form-table-summary-table">
+      <thead>
+        <tr class="summary-title-row">
+          <th colspan="{{ table_summary.columns|length }}">{{ table_summary.title }}</th>
+        </tr>
+        <tr class="summary-header-row">
+          {% for col in table_summary.columns %}
+          <th{% if table_summary.has_subheaders and not col.subheader %} rowspan="2"{% endif %}>{{ col.label }}</th>
+          {% endfor %}
+        </tr>
+        {% if table_summary.has_subheaders %}
+        <tr class="summary-subheader-row">
+          {% for col in table_summary.columns %}
+            {% if col.subheader %}
+            <th>{{ col.subheader }}</th>
+            {% endif %}
+          {% endfor %}
+        </tr>
+        {% endif %}
+      </thead>
+      <tbody>
+        {% for row in table_summary.rows %}
+        <tr data-summary-row="{{ row.row_index }}">
+          {% for cell in row.cells %}
+          <td class="summary-data-cell">
+            {% if cell.editable and cell.dropdown %}
+            <select name="summary_cell_{{ table_summary.layout_id }}_{{ cell.row }}_{{ cell.col }}"
+                    class="form-control form-control-sm form-summary-cell-select"
+                    data-summary-col="{{ cell.col }}"
+                    data-summary-row="{{ cell.row }}"
+                    {% if cell.dropdown.depends_on_table_col != None %}
+                    data-depends-on-table-col="{{ cell.dropdown.depends_on_table_col }}"
+                    data-selected-value="{{ cell.value|escape }}"
+                    {% elif cell.dropdown.depends_on_col != None %}
+                    data-depends-on-col="{{ cell.dropdown.depends_on_col }}"
+                    data-selected-value="{{ cell.value|escape }}"
+                    {% endif %}>
+              <option value="">— Select —</option>
+              {% if cell.dropdown.depends_on_col == None %}
+                {% for opt in cell.dropdown.options %}
+                <option value="{{ opt }}" {% if cell.value == opt %}selected{% endif %}>{{ opt }}</option>
+                {% endfor %}
+              {% endif %}
+            </select>
+            {% elif cell.editable %}
+            <textarea name="summary_cell_{{ table_summary.layout_id }}_{{ cell.row }}_{{ cell.col }}"
+                      class="form-control form-control-sm form-summary-cell-input"
+                      rows="1"
+                      data-summary-col="{{ cell.col }}"
+                      data-summary-row="{{ cell.row }}"
+                      placeholder="Enter value">{{ cell.value }}</textarea>
+            {% else %}
+            <span class="summary-calc-value"
+                  data-summary-col="{{ cell.col }}"
+                  data-summary-row="{{ cell.row }}"
+                  {% if cell.formula %}data-formula="{{ cell.formula|escape }}"{% endif %}>{{ cell.display|default:'—' }}</span>
+            {% endif %}
+          </td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% if table_summary.editable %}
+<script>
+(function () {
+  function parseJsonEl(id, attrFallback, wrap) {
+    var el = document.getElementById(id);
+    var data = null;
+    if (el) {
+      try { data = JSON.parse(el.textContent || 'null'); } catch (e) { data = null; }
+    }
+    if (data == null && wrap && attrFallback && wrap.getAttribute(attrFallback)) {
+      try { data = JSON.parse(wrap.getAttribute(attrFallback) || 'null'); } catch (e2) { data = null; }
+    }
+    return data;
+  }
+
+  function excelColToIndex(letters) {
+    letters = (letters || '').toUpperCase();
+    if (!/^[A-Z]+$/.test(letters)) return null;
+    var value = 0;
+    for (var i = 0; i < letters.length; i++) {
+      value = value * 26 + (letters.charCodeAt(i) - 64);
+    }
+    return value - 1;
+  }
+
+  function resolveMainCol(rangeExpr, headers) {
+    var expr = (rangeExpr || '').trim();
+    var cn = /^C(\d+)$/i.exec(expr);
+    if (cn) return parseInt(cn[1], 10);
+    if (/^\d+$/.test(expr)) return parseInt(expr, 10);
+    var m = /^\$?([A-Za-z]+)(?:\$?\d+)?(?::\$?[A-Za-z]+(?:\$?\d+)?)?$/.exec(expr);
+    if (m) return excelColToIndex(m[1]);
+    var name = stripLiteral(expr).trim().toLowerCase();
+    if (name && headers && headers.length) {
+      for (var i = 0; i < headers.length; i++) {
+        if (String(headers[i] || '').trim().toLowerCase() === name) return i;
+      }
+    }
+    return null;
+  }
+
+  function splitArgs(inner) {
+    var args = [];
+    var cur = '';
+    var quote = null;
+    for (var i = 0; i < (inner || '').length; i++) {
+      var ch = inner.charAt(i);
+      if (quote) {
+        cur += ch;
+        if (ch === quote) quote = null;
+        continue;
+      }
+      if (ch === '"' || ch === "'") {
+        quote = ch;
+        cur += ch;
+        continue;
+      }
+      if (ch === ',') {
+        args.push(cur.trim());
+        cur = '';
+        continue;
+      }
+      cur += ch;
+    }
+    if (cur || args.length) args.push(cur.trim());
+    return args;
+  }
+
+  function stripLiteral(value) {
+    var text = String(value || '').trim();
+    if (text.length >= 2 && text.charAt(0) === text.charAt(text.length - 1) && (text.charAt(0) === '"' || text.charAt(0) === "'")) {
+      return text.slice(1, -1).trim();
+    }
+    return text;
+  }
+
+  function countIf(grid, colIndex, criteria) {
+    if (colIndex == null || colIndex < 0) return 0;
+    var needle = String(criteria || '').trim().toLowerCase();
+    var total = 0;
+    (grid || []).forEach(function (row) {
+      if (!row || colIndex >= row.length) return;
+      var value = String(row[colIndex] || '').trim();
+      if (value && value.toLowerCase() === needle) total += 1;
+    });
+    return total;
+  }
+
+  function countIfs(grid, pairs) {
+    if (!pairs || !pairs.length) return 0;
+    var total = 0;
+    (grid || []).forEach(function (row) {
+      if (!row) return;
+      var ok = true;
+      for (var i = 0; i < pairs.length; i++) {
+        var colIndex = pairs[i][0];
+        var criteria = pairs[i][1];
+        if (colIndex == null || colIndex < 0 || colIndex >= row.length) { ok = false; break; }
+        var value = String(row[colIndex] || '').trim();
+        if (!value || value.toLowerCase() !== String(criteria).trim().toLowerCase()) { ok = false; break; }
+      }
+      if (ok) total += 1;
+    });
+    return total;
+  }
+
+  function formatNumber(value) {
+    if (typeof value !== 'number' || !isFinite(value)) return '0';
+    if (Math.abs(value - Math.round(value)) < 1e-9) return String(Math.round(value));
+    return String(Math.round(value * 1e10) / 1e10).replace(/\.?0+$/, '');
+  }
+
+  function toNumber(value) {
+    var n = parseFloat(String(value == null ? '' : value).replace(/,/g, '').trim());
+    return isNaN(n) ? 0 : n;
+  }
+
+  function evalArithmetic(expr) {
+    if (!/^[\d\.\+\-\*\/\(\)\s]+$/.test(expr)) return null;
+    try {
+      // eslint-disable-next-line no-new-func
+      var result = Function('"use strict"; return (' + expr + ');')();
+      if (typeof result !== 'number' || !isFinite(result)) return 0;
+      return result;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function evaluateFormula(formula, grid, rowValues, headers) {
+    formula = String(formula || '').trim();
+    if (!formula || formula.charAt(0) !== '=') return null;
+
+    var countifs = /^=\s*COUNTIFS\(\s*(.+)\s*\)$/i.exec(formula);
+    if (countifs) {
+      var args = splitArgs(countifs[1]);
+      if (args.length < 2 || args.length % 2 !== 0) return '0';
+      var pairs = [];
+      for (var i = 0; i < args.length; i += 2) {
+        pairs.push([resolveMainCol(args[i], headers), stripLiteral(args[i + 1])]);
+      }
+      return String(countIfs(grid, pairs));
+    }
+
+    var countif = /^=\s*COUNTIF\(\s*([^,]+)\s*,\s*['"]?([^'"]+)['"]?\s*\)$/i.exec(formula);
+    if (countif) {
+      return String(countIf(grid, resolveMainCol(countif[1], headers), countif[2]));
+    }
+
+    var sumCol = /^=SUM\(C(\d+)\)\s*$/i.exec(formula);
+    if (sumCol) {
+      var col = parseInt(sumCol[1], 10);
+      var total = 0;
+      (grid || []).forEach(function (row) {
+        if (!row || col >= row.length) return;
+        var raw = String(row[col] || '').trim().replace(/,/g, '');
+        if (!raw) return;
+        var n = parseFloat(raw);
+        if (!isNaN(n)) total += n;
+      });
+      return formatNumber(total);
+    }
+
+    if (rowValues == null) return null;
+    var expr = formula.slice(1).trim();
+    expr = expr.replace(/SC(\d+)/gi, function (_, idx) {
+      return String(toNumber(rowValues[parseInt(idx, 10)]));
+    });
+    expr = expr.replace(/\$?([A-Za-z]+)\$?\d+/g, function (_, letters) {
+      var idx = excelColToIndex(letters);
+      return String(toNumber(idx == null ? 0 : rowValues[idx]));
+    });
+    var result = evalArithmetic(expr);
+    if (result == null) return '0';
+    return formatNumber(result);
+  }
+
+  function readTableGrid(table) {
+    var grid = [];
+    if (!table) return grid;
+    table.querySelectorAll('tbody tr[data-table-row]').forEach(function (tr) {
+      var rowIdx = parseInt(tr.getAttribute('data-table-row'), 10);
+      if (isNaN(rowIdx)) return;
+      while (grid.length <= rowIdx) grid.push([]);
+      tr.querySelectorAll('[data-table-col]').forEach(function (field) {
+        var col = parseInt(field.getAttribute('data-table-col'), 10);
+        if (isNaN(col)) return;
+        grid[rowIdx][col] = (field.value || '').trim();
+      });
+    });
+    return grid;
+  }
+
+  function getSummaryMaps(wrap) {
+    return parseJsonEl('summary-option-maps-' + wrap.getAttribute('data-summary-layout-id'), 'data-summary-option-maps', wrap) || {};
+  }
+
+  function mappedOptions(map, parentValue) {
+    var key = (parentValue || '').trim();
+    if (!key) return [];
+    if (Object.prototype.hasOwnProperty.call(map, key)) return (map[key] || []).slice();
+    var found = [];
+    Object.keys(map || {}).forEach(function (k) {
+      if ((k || '').trim() === key) found = (map[k] || []).slice();
+    });
+    return found;
+  }
+
+  function unionMappedOptions(map, parentValues) {
+    var options = [];
+    var seen = {};
+    (parentValues || []).forEach(function (parentValue) {
+      mappedOptions(map, parentValue).forEach(function (opt) {
+        if (!seen[opt]) {
+          seen[opt] = true;
+          options.push(opt);
+        }
+      });
+    });
+    return options;
+  }
+
+  function setSelectOptions(child, allowed, keepValue) {
+    var current = keepValue !== undefined ? keepValue : child.value;
+    while (child.options.length > 1) child.remove(1);
+    allowed.forEach(function (opt) {
+      var option = document.createElement('option');
+      option.value = opt;
+      option.textContent = opt;
+      if (opt === current) option.selected = true;
+      child.appendChild(option);
+    });
+    if (allowed.indexOf(current) === -1) child.value = '';
+  }
+
+  function setDependent(child, parentValue, keepValue) {
+    var wrap = child.closest('.form-table-summary');
+    var maps = getSummaryMaps(wrap);
+    var col = child.getAttribute('data-summary-col');
+    var map = maps[String(col)] || maps[col] || {};
+    setSelectOptions(child, mappedOptions(map, parentValue), keepValue);
+  }
+
+  function tableFieldValue(field) {
+    if (!field) return '';
+    return (field.value || '').trim();
+  }
+
+  function collectTableColumnValues(table, colIndex) {
+    var values = [];
+    var seen = {};
+    table.querySelectorAll('[data-table-col="' + colIndex + '"]').forEach(function (field) {
+      var value = tableFieldValue(field);
+      if (value && !seen[value]) {
+        seen[value] = true;
+        values.push(value);
+      }
+    });
+    return values;
+  }
+
+  function refreshTableDependent(child, keepValue) {
+    var wrap = child.closest('.form-table-summary');
+    var section = child.closest('.form-fill-table-wrap');
+    var tableCol = child.getAttribute('data-depends-on-table-col');
+    if (!wrap || !section || tableCol === null || tableCol === '') return;
+    var layoutId = wrap.getAttribute('data-summary-layout-id');
+    var table = section.querySelector('.form-fill-table[data-layout-id="' + layoutId + '"]') ||
+                section.querySelector('.form-fill-table');
+    if (!table) return;
+    var maps = getSummaryMaps(wrap);
+    var col = child.getAttribute('data-summary-col');
+    var map = maps[String(col)] || maps[col] || {};
+    var parents = collectTableColumnValues(table, tableCol);
+    var initial = keepValue !== undefined ? keepValue : (child.getAttribute('data-selected-value') || child.value);
+    setSelectOptions(child, unionMappedOptions(map, parents), initial);
+  }
+
+  function refreshChildren(parent) {
+    var row = parent.closest('tr');
+    if (!row) return;
+    var parentCol = parent.getAttribute('data-summary-col');
+    row.querySelectorAll('select[data-depends-on-col="' + parentCol + '"]').forEach(function (child) {
+      setDependent(child, parent.value || '');
+      refreshChildren(child);
+    });
+  }
+
+  function refreshAllTableDependents(section) {
+    if (!section) return;
+    section.querySelectorAll('.form-table-summary select[data-depends-on-table-col]').forEach(function (child) {
+      refreshTableDependent(child);
+    });
+  }
+
+  function recalculateSummary(wrap) {
+    var layoutId = wrap.getAttribute('data-summary-layout-id');
+    var section = wrap.closest('.form-fill-table-wrap');
+    var table = section
+      ? (section.querySelector('.form-fill-table[data-layout-id="' + layoutId + '"]') || section.querySelector('.form-fill-table'))
+      : null;
+    var grid = readTableGrid(table);
+    var formulas = parseJsonEl('summary-formulas-' + layoutId, 'data-summary-formulas', wrap) || [];
+    var statics = parseJsonEl('summary-statics-' + layoutId, 'data-summary-statics', wrap) || [];
+    var headers = parseJsonEl('summary-headers-' + layoutId, 'data-summary-headers', wrap) || [];
+
+    wrap.querySelectorAll('tr[data-summary-row]').forEach(function (tr) {
+      var rowIdx = parseInt(tr.getAttribute('data-summary-row'), 10);
+      var rowFormulas = formulas[rowIdx] || [];
+      var rowStatics = statics[rowIdx] || [];
+      var displays = [];
+      var pending = [];
+
+      for (var col = 0; col < Math.max(rowFormulas.length, rowStatics.length, 1); col++) {
+        var formula = rowFormulas[col] || '';
+        var staticVal = rowStatics[col] || '';
+        if (formula) {
+          var pass1 = evaluateFormula(formula, grid, null, headers);
+          if (pass1 != null) {
+            displays[col] = pass1;
+            pending[col] = false;
+          } else {
+            displays[col] = '';
+            pending[col] = formula.charAt(0) === '=';
+          }
+        } else {
+          displays[col] = staticVal;
+          pending[col] = false;
+        }
+      }
+
+      var rowValues = displays.map(toNumber);
+      for (var c = 0; c < pending.length; c++) {
+        if (!pending[c]) continue;
+        var computed = evaluateFormula(rowFormulas[c], grid, rowValues, headers);
+        displays[c] = computed == null ? '0' : computed;
+        rowValues[c] = toNumber(displays[c]);
+      }
+
+      tr.querySelectorAll('.summary-calc-value').forEach(function (span) {
+        var colIdx = parseInt(span.getAttribute('data-summary-col'), 10);
+        if (isNaN(colIdx)) return;
+        var text = displays[colIdx];
+        span.textContent = (text === '' || text == null) ? '—' : text;
+      });
+    });
+  }
+
+  function scheduleSummaryRecalc(wrap) {
+    recalculateSummary(wrap);
+    setTimeout(function () { recalculateSummary(wrap); }, 0);
+    setTimeout(function () { recalculateSummary(wrap); }, 50);
+    setTimeout(function () { recalculateSummary(wrap); }, 250);
+  }
+
+  document.querySelectorAll('.form-table-summary').forEach(function (wrap) {
+    wrap.querySelectorAll('select[data-depends-on-col]').forEach(function (child) {
+      var row = child.closest('tr');
+      var parentCol = child.getAttribute('data-depends-on-col');
+      var parent = row.querySelector('select[data-summary-col="' + parentCol + '"]');
+      var initial = child.getAttribute('data-selected-value') || child.value;
+      setDependent(child, parent ? parent.value : '', initial);
+    });
+    wrap.querySelectorAll('select[data-depends-on-table-col]').forEach(function (child) {
+      var initial = child.getAttribute('data-selected-value') || child.value;
+      refreshTableDependent(child, initial);
+    });
+    wrap.querySelectorAll('select[data-summary-col]').forEach(function (el) {
+      el.addEventListener('change', function () { refreshChildren(el); });
+    });
+
+    // Defer until linked table dropdowns restore selected values.
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', function () { scheduleSummaryRecalc(wrap); });
+    } else {
+      scheduleSummaryRecalc(wrap);
+    }
+
+    var section = wrap.closest('.form-fill-table-wrap');
+    if (section && !section.dataset.summaryLiveCalcBound) {
+      section.dataset.summaryLiveCalcBound = '1';
+      var rerun = function () {
+        refreshAllTableDependents(section);
+        section.querySelectorAll('.form-table-summary').forEach(recalculateSummary);
+      };
+      section.addEventListener('change', function (evt) {
+        var target = evt.target;
+        if (!target || !target.getAttribute || target.getAttribute('data-table-col') === null) return;
+        rerun();
+      });
+      section.addEventListener('input', function (evt) {
+        var target = evt.target;
+        if (!target || !target.getAttribute || target.getAttribute('data-table-col') === null) return;
+        rerun();
+      });
+    }
+  });
+
+  document.addEventListener('form-fill-table-ready', function () {
+    document.querySelectorAll('.form-table-summary').forEach(recalculateSummary);
+  });
+})();
+</script>
+{% endif %}
+{% endif %}

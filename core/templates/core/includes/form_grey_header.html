@@ -3,7 +3,7 @@
 <div class="form-document-header mb-4">
   <div class="row align-items-start form-document-header-top">
     <div class="col-md-7">
-      <h4 class="form-doc-company-name mb-1">{% if company %}{{ company.name }}{% else %}{{ project.company_name }}{% endif %}</h4>
+      <h4 class="form-doc-company-name mb-1">{% if company %}{{ company.name }}{% elif project %}{{ project.company_name }}{% else %}—{% endif %}</h4>
       <div class="form-doc-subtitle">Document Control</div>
     </div>
     <div class="col-md-5 text-md-right form-doc-branding">
@@ -47,7 +47,11 @@
   {% if record %}
   <div class="form-doc-record-meta">
     <small>
+      {% if project %}
       <strong>Project:</strong> {{ project.project_number }} |
+      {% else %}
+      <strong>Scope:</strong> Manager form (not linked to a project) |
+      {% endif %}
       <strong>Created by:</strong> {{ record.created_by_name }} |
       {{ record.created_date }}
     </small>
