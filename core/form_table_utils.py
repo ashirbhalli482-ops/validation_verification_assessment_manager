@@ -564,8 +564,11 @@ def parse_summary_dropdowns(post, prefix, summary_col_count, table_col_count, ro
                 for value in post.getlist(f'{prefix}_{mid}_{index}_map_opts_{map_index}')
                 if value.strip()
             ]
-            if child_opts:
-                option_map[parent] = child_opts
+            # Summary admin UI only collects parent values when Depends on is set;
+            # if child options were omitted, use the parent value as the shown option.
+            if not child_opts:
+                child_opts = [parent]
+            option_map[parent] = child_opts
 
         options = [
             value.strip()

@@ -9,6 +9,17 @@
 <li class="breadcrumb-item active">{{ form_def.code }}</li>
 {% endblock %}
 {% block content %}
+<style>
+  /* Summary "Depends on (table column)": parent values only — do not show child option UI.
+     Main-table column dropdowns (.column-dropdown-row) are unchanged. */
+  .summary-dropdown-row .map-child-values {
+    display: none !important;
+  }
+  .summary-dropdown-row .map-parent-values {
+    flex: 0 0 83.333333%;
+    max-width: 83.333333%;
+  }
+</style>
 <div class="container-fluid">
   <div class="card">
     <div class="card-header d-flex justify-content-between align-items-center">
@@ -90,11 +101,40 @@
 <div id="empty-map-group" style="display:none;">
   <div class="border rounded p-2 mb-2 option-map-group" data-map-index="__MAP__">
     <div class="form-row align-items-end">
-      <div class="col-md-4 mb-2">
+      <div class="col-md-4 mb-2 map-parent-values">
         <label class="small mb-1">When parent value is</label>
         <input type="text" class="form-control form-control-sm map-parent-input" placeholder="Parent value" value="">
       </div>
-      <div class="col-md-6 mb-2">
+      <div class="col-md-6 mb-2 map-child-values">
+        <label class="small mb-1">Show these values</label>
+        <div class="map-child-options">
+          <div class="input-group input-group-sm mb-1 option-row">
+            <input type="text" class="form-control map-option-input" placeholder="Value" value="">
+            <div class="input-group-append">
+              <button type="button" class="btn btn-outline-secondary remove-map-option" title="Remove value">&times;</button>
+            </div>
+          </div>
+        </div>
+        <button type="button" class="btn btn-outline-primary btn-sm add-map-option mt-1">+ Add Value</button>
+      </div>
+      <div class="col-md-2 mb-2 text-right">
+        <button type="button" class="btn btn-sm btn-outline-danger remove-map-group">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# Summary-only: parent value is chosen from Depends-on column dropdown options. #}
+<div id="empty-summary-map-group" style="display:none;">
+  <div class="border rounded p-2 mb-2 option-map-group" data-map-index="__MAP__">
+    <div class="form-row align-items-end">
+      <div class="col-md-10 mb-2 map-parent-values">
+        <label class="small mb-1">When parent value is</label>
+        <select class="form-control form-control-sm map-parent-input">
+          <option value="">— Select parent value —</option>
+        </select>
+      </div>
+      <div class="col-md-6 mb-2 map-child-values">
         <label class="small mb-1">Show these values</label>
         <div class="map-child-options">
           <div class="input-group input-group-sm mb-1 option-row">
@@ -195,8 +235,8 @@
         <button type="button" class="btn btn-outline-primary btn-sm add-option mt-1">+ Add Value</button>
       </div>
       <div class="dependent-options mt-2" style="display:none">
-        <label class="small mb-1 d-block">Child values by parent selection</label>
-        <p class="text-muted small mb-2">For each main-table parent value, list the options this summary column should show.</p>
+        <label class="small mb-1 d-block">Parent values from main table</label>
+        <p class="text-muted small mb-2">Select specific values from the Depends on table column. Use Fill to add all parent options.</p>
         <div class="option-map-groups"></div>
         <button type="button" class="btn btn-outline-primary btn-sm add-map-group mt-1">+ Add Parent Value Mapping</button>
         <button type="button" class="btn btn-outline-secondary btn-sm sync-parent-values mt-1 ml-1">Fill from parent options</button>
@@ -242,6 +282,10 @@
     var emptyOptionTemplate = document.getElementById('empty-option-row').innerHTML;
     var emptyMapOptionTemplate = document.getElementById('empty-map-option-row').innerHTML;
     var emptyMapGroupTemplate = document.getElementById('empty-map-group').innerHTML;
+    var emptySummaryMapGroupEl = document.getElementById('empty-summary-map-group');
+    var emptySummaryMapGroupTemplate = emptySummaryMapGroupEl
+      ? emptySummaryMapGroupEl.innerHTML
+      : emptyMapGroupTemplate;
     var emptyDropdownTemplate = document.getElementById('empty-column-dropdown').innerHTML;
     var emptySummaryDropdownTemplate = document.getElementById('empty-summary-dropdown').innerHTML;
     var emptyBlockTemplate = document.getElementById('empty-table-block').innerHTML;
@@ -1287,7 +1331,106 @@
       var dependent = row.querySelector('.dependent-options');
       if (independent) independent.style.display = hasDepends ? 'none' : '';
       if (dependent) dependent.style.display = hasDepends ? '' : 'none';
-      if (hasDepends) syncSummaryParentValues(block, row);
+      if (hasDepends) {
+        var groups = row.querySelector('.option-map-groups');
+        if (groups && !groups.querySelector('.option-map-group')) {
+          addSummaryMapGroup(block, row, '', ['']);
+        } else {
+          refreshSummaryParentSelects(block, row);
+        }
+        updateSummaryFillButton(block, row);
+      }
+    }
+
+    function getSummaryDependsCol(row) {
+      var depends = row.querySelector('.summary-depends-on-select');
+      if (!depends || depends.value === '') return null;
+      var colIndex = parseInt(depends.value, 10);
+      return isNaN(colIndex) ? null : colIndex;
+    }
+
+    function getUsedSummaryParentValues(row, exceptGroup) {
+      var used = {};
+      row.querySelectorAll('.option-map-group').forEach(function (group) {
+        if (exceptGroup && group === exceptGroup) return;
+        var field = group.querySelector('.map-parent-input');
+        var val = field ? String(field.value || '').trim() : '';
+        if (val) used[val] = true;
+      });
+      return used;
+    }
+
+    function updateSummaryFillButton(block, row) {
+      var syncBtn = row.querySelector('.sync-parent-values');
+      if (!syncBtn) return;
+      var colIndex = getSummaryDependsCol(row);
+      var options = colIndex === null ? [] : getOptionsForColumn(block, colIndex);
+      syncBtn.disabled = !options.length;
+      syncBtn.title = options.length
+        ? 'Add a mapping row for every dropdown value on the Depends on column'
+        : 'Add dropdown values on the Depends on table column first';
+    }
+
+    function populateSummaryParentSelect(block, row, select, selectedValue) {
+      var colIndex = getSummaryDependsCol(row);
+      var options = colIndex === null ? [] : getOptionsForColumn(block, colIndex);
+      var used = getUsedSummaryParentValues(row, select.closest('.option-map-group'));
+      var selected = selectedValue != null ? String(selectedValue) : String(select.value || '');
+      if (!selected && select.getAttribute('data-selected-parent')) {
+        selected = String(select.getAttribute('data-selected-parent') || '');
+      }
+      select.innerHTML = '';
+      var placeholder = document.createElement('option');
+      placeholder.value = '';
+      placeholder.textContent = options.length
+        ? '— Select parent value —'
+        : '— No parent options (configure dropdown on that column) —';
+      select.appendChild(placeholder);
+      options.forEach(function (opt) {
+        if (used[opt] && opt !== selected) return;
+        var option = document.createElement('option');
+        option.value = opt;
+        option.textContent = opt;
+        if (opt === selected) option.selected = true;
+        select.appendChild(option);
+      });
+      if (selected && options.indexOf(selected) === -1) {
+        var legacy = document.createElement('option');
+        legacy.value = selected;
+        legacy.textContent = selected + ' (saved)';
+        legacy.selected = true;
+        select.appendChild(legacy);
+      } else if (selected) {
+        select.value = selected;
+      }
+      select.setAttribute('data-selected-parent', select.value || '');
+    }
+
+    function ensureSummaryParentSelect(block, row, group) {
+      var field = group.querySelector('.map-parent-input');
+      if (!field) return null;
+      var selected = field.value || field.getAttribute('data-selected-parent') || '';
+      var select = field;
+      if (field.tagName !== 'SELECT') {
+        select = document.createElement('select');
+        select.className = 'form-control form-control-sm map-parent-input';
+        select.name = field.name || '';
+        field.replaceWith(select);
+      }
+      populateSummaryParentSelect(block, row, select, selected);
+      return select;
+    }
+
+    function refreshSummaryParentSelects(block, row) {
+      row.querySelectorAll('.option-map-group').forEach(function (group) {
+        ensureSummaryParentSelect(block, row, group);
+        syncSummaryMapParentToChild(group);
+      });
+      row.querySelectorAll('.option-map-group').forEach(function (group) {
+        var select = group.querySelector('select.map-parent-input');
+        if (select) populateSummaryParentSelect(block, row, select, select.value);
+      });
+      updateSummaryFillButton(block, row);
     }
 
     function getSummaryOptionsForColumn(node, colIndex) {
@@ -1329,61 +1472,114 @@
           var val = input.value.trim();
           if (val) childOpts.push(val);
         });
-        if (parent) existing[parent] = childOpts;
+        if (parent) existing[parent] = childOpts.length ? childOpts : [parent];
       });
       groups.innerHTML = '';
       parentOptions.forEach(function (parentValue) {
-        addSummaryMapGroup(block, row, parentValue, existing[parentValue] || ['']);
+        addSummaryMapGroup(block, row, parentValue, existing[parentValue] || [parentValue]);
       });
       if (!parentOptions.length) {
         addSummaryMapGroup(block, row, '', ['']);
       }
+      refreshSummaryParentSelects(block, row);
       syncSummaryDropdownFieldNames(row.closest('.table-summary-editor') || block);
+    }
+
+    function syncSummaryMapParentToChild(group) {
+      var parent = group.querySelector('.map-parent-input');
+      if (!parent) return;
+      var parentVal = (parent.value || '').trim();
+      if (parent.setAttribute) parent.setAttribute('data-selected-parent', parentVal);
+      var optsWrap = group.querySelector('.map-child-options');
+      if (!optsWrap) return;
+      var inputs = optsWrap.querySelectorAll('.map-option-input');
+      if (!inputs.length) {
+        optsWrap.insertAdjacentHTML('beforeend', emptyMapOptionTemplate);
+        inputs = optsWrap.querySelectorAll('.map-option-input');
+      }
+      inputs[0].value = parentVal;
+      Array.prototype.forEach.call(inputs, function (input, i) {
+        if (i > 0) {
+          var rowEl = input.closest('.option-row');
+          if (rowEl) rowEl.remove();
+        }
+      });
     }
 
     function addSummaryMapGroup(block, row, parentValue, childOptions) {
       var groups = row.querySelector('.option-map-groups');
-      groups.insertAdjacentHTML('beforeend', emptyMapGroupTemplate.replace(/__MAP__/g, '0'));
+      groups.insertAdjacentHTML('beforeend', emptySummaryMapGroupTemplate.replace(/__MAP__/g, '0'));
       var group = groups.lastElementChild;
-      group.querySelector('.map-parent-input').value = parentValue || '';
       var optsWrap = group.querySelector('.map-child-options');
       optsWrap.innerHTML = '';
-      var opts = (childOptions && childOptions.length) ? childOptions : [''];
+      var parentVal = (parentValue || '').trim();
+      var opts = (childOptions && childOptions.length) ? childOptions : (parentVal ? [parentVal] : ['']);
       opts.forEach(function (opt) {
         optsWrap.insertAdjacentHTML('beforeend', emptyMapOptionTemplate);
         optsWrap.lastElementChild.querySelector('.map-option-input').value = opt;
       });
+      ensureSummaryParentSelect(block, row, group);
+      var parentSelect = group.querySelector('.map-parent-input');
+      if (parentSelect && parentVal) {
+        populateSummaryParentSelect(block, row, parentSelect, parentVal);
+      }
+      syncSummaryMapParentToChild(group);
       bindSummaryMapGroup(block, row, group);
+      refreshSummaryParentSelects(block, row);
     }
 
     function bindSummaryMapGroup(block, row, group) {
-      group.querySelector('.remove-map-group').addEventListener('click', function () {
-        var groups = row.querySelectorAll('.option-map-group');
-        if (groups.length <= 1) {
-          group.querySelector('.map-parent-input').value = '';
-          group.querySelectorAll('.map-option-input').forEach(function (input, i) {
-            if (i === 0) input.value = '';
-            else input.closest('.option-row').remove();
+      ensureSummaryParentSelect(block, row, group);
+      var parentInput = group.querySelector('.map-parent-input');
+      if (parentInput && !parentInput.dataset.summaryParentBound) {
+        parentInput.dataset.summaryParentBound = '1';
+        parentInput.addEventListener('change', function () {
+          syncSummaryMapParentToChild(group);
+          refreshSummaryParentSelects(block, row);
+          syncSummaryDropdownFieldNames(block);
+        });
+      }
+      var removeBtn = group.querySelector('.remove-map-group');
+      if (removeBtn && !removeBtn.dataset.bound) {
+        removeBtn.dataset.bound = '1';
+        removeBtn.addEventListener('click', function () {
+          var groupsList = row.querySelectorAll('.option-map-group');
+          if (groupsList.length <= 1) {
+            var parentField = group.querySelector('.map-parent-input');
+            if (parentField) parentField.value = '';
+            group.querySelectorAll('.map-option-input').forEach(function (input, i) {
+              if (i === 0) input.value = '';
+              else input.closest('.option-row').remove();
+            });
+            refreshSummaryParentSelects(block, row);
+            syncSummaryDropdownFieldNames(block);
+            return;
+          }
+          group.remove();
+          refreshSummaryParentSelects(block, row);
+          syncSummaryDropdownFieldNames(block);
+        });
+      }
+      var addMapOpt = group.querySelector('.add-map-option');
+      if (addMapOpt && !addMapOpt.dataset.bound) {
+        addMapOpt.dataset.bound = '1';
+        addMapOpt.addEventListener('click', function () {
+          var wrap = group.querySelector('.map-child-options');
+          wrap.insertAdjacentHTML('beforeend', emptyMapOptionTemplate);
+          var newRow = wrap.lastElementChild;
+          newRow.querySelector('.remove-map-option').addEventListener('click', function () {
+            bindSummaryRemoveMapOption(block, row, newRow.querySelector('.remove-map-option'));
           });
           syncSummaryDropdownFieldNames(block);
-          return;
-        }
-        group.remove();
-        syncSummaryDropdownFieldNames(block);
-      });
-      group.querySelector('.add-map-option').addEventListener('click', function () {
-        var wrap = group.querySelector('.map-child-options');
-        wrap.insertAdjacentHTML('beforeend', emptyMapOptionTemplate);
-        var newRow = wrap.lastElementChild;
-        newRow.querySelector('.remove-map-option').addEventListener('click', function () {
-          bindSummaryRemoveMapOption(block, row, newRow.querySelector('.remove-map-option'));
+          newRow.querySelector('.map-option-input').focus();
         });
-        syncSummaryDropdownFieldNames(block);
-        newRow.querySelector('.map-option-input').focus();
-      });
+      }
       group.querySelectorAll('.remove-map-option').forEach(function (btn) {
+        if (btn.dataset.bound) return;
+        btn.dataset.bound = '1';
         bindSummaryRemoveMapOption(block, row, btn);
       });
+      syncSummaryMapParentToChild(group);
     }
 
     function bindSummaryRemoveMapOption(block, row, btn) {

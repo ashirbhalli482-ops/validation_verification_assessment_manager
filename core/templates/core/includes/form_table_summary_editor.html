@@ -120,20 +120,25 @@
           </div>
 
           <div class="dependent-options mt-2"{% if dd.depends_on_table_col == None and dd.depends_on_col == None %} style="display:none"{% endif %}>
-            <label class="small mb-1 d-block">Child values by parent selection</label>
+            <label class="small mb-1 d-block">Parent values from main table</label>
+            <p class="text-muted small mb-2">Select specific values from the Depends on table column. Use Fill to add all parent options.</p>
             <div class="option-map-groups">
               {% for item in dd.option_map_items %}
               <div class="border rounded p-2 mb-2 option-map-group" data-map-index="{{ forloop.counter0 }}">
                 <div class="form-row align-items-end">
-                  <div class="col-md-4 mb-2">
+                  <div class="col-md-10 mb-2 map-parent-values">
                     <label class="small mb-1">When parent value is</label>
-                    <input type="text"
-                           name="tbl_{{ block.key }}_sum_{{ summary.index }}_dd_{{ dd.index }}_map_parent"
-                           class="form-control form-control-sm map-parent-input"
-                           placeholder="Parent value"
-                           value="{{ item.parent }}">
+                    <select name="tbl_{{ block.key }}_sum_{{ summary.index }}_dd_{{ dd.index }}_map_parent"
+                            class="form-control form-control-sm map-parent-input"
+                            data-selected-parent="{{ item.parent|escape }}">
+                      <option value="">— Select parent value —</option>
+                      {% if item.parent %}
+                      <option value="{{ item.parent }}" selected>{{ item.parent }}</option>
+                      {% endif %}
+                    </select>
                   </div>
-                  <div class="col-md-6 mb-2">
+                  {# Hidden for summary Depends-on UI; kept in DOM so save/runtime option_map stays valid. #}
+                  <div class="col-md-6 mb-2 map-child-values">
                     <label class="small mb-1">Show these values</label>
                     <div class="map-child-options">
                       {% for opt in item.options %}
@@ -153,7 +158,7 @@
                                name="tbl_{{ block.key }}_sum_{{ summary.index }}_dd_{{ dd.index }}_map_opts_{{ forloop.parentloop.counter0 }}"
                                class="form-control map-option-input"
                                placeholder="Value"
-                               value="">
+                               value="{{ item.parent }}">
                         <div class="input-group-append">
                           <button type="button" class="btn btn-outline-secondary remove-map-option" title="Remove value">&times;</button>
                         </div>
