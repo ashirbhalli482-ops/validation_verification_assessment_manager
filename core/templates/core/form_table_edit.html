@@ -53,6 +53,10 @@
   {% include 'core/includes/form_table_block.html' with block=empty_block form_def=form_def %}
 </div>
 
+<div id="empty-summary-editor" style="display:none;">
+  {% include 'core/includes/form_table_summary_editor.html' with block=empty_block summary=empty_summary %}
+</div>
+
 <script type="application/json" id="default-table-summary-seed">{{ default_summary_seed_json|default:"{}"|safe }}</script>
 
 <div id="empty-column-header" style="display:none;">
@@ -628,8 +632,6 @@
       var title = block.querySelector('.table-block-title');
       var tableName = tableNameInput ? tableNameInput.value.trim() : '';
       title.textContent = tableName || 'New Table';
-      var summaryTitle = block.querySelector('.summary-title-input');
-      if (summaryTitle) summaryTitle.value = tableName;
     }
 
     function updatePreviewTitle(block) {
@@ -822,11 +824,11 @@
       });
     }
 
-    function updateSummaryHeaders(block) {
-      var headerRow = block.querySelector('.summary-header-row');
+    function updateSummaryHeaders(editor) {
+      var headerRow = editor.querySelector('.summary-header-row');
       if (!headerRow) return;
       var labels = [];
-      block.querySelectorAll('.summary-column-row').forEach(function (row) {
+      editor.querySelectorAll('.summary-column-row').forEach(function (row) {
         var labelInput = row.querySelector('.summary-column-input');
         var subInput = row.querySelector('.summary-column-sub-input');
         var label = labelInput ? (labelInput.value.trim() || 'Column') : 'Column';
@@ -845,51 +847,79 @@
       headerRow.innerHTML = html;
     }
 
-    function syncSummaryFieldNames(block) {
-      var prefix = prefixFor(block);
-      var enabled = block.querySelector('.summary-enabled-input');
-      var title = block.querySelector('.summary-title-input');
-      if (enabled) enabled.name = prefix + '_summary_enabled';
-      if (title) {
-        title.name = prefix + '_summary_title';
-        var tableName = block.querySelector('.table-name');
-        if (tableName) title.value = tableName.value.trim();
+    function syncSummaryFieldNames(editor) {
+      var block = editor.closest('.table-block');
+      if (!block) return;
+      var idx = editor.getAttribute('data-summary-index') || '0';
+      var prefix = prefixFor(block) + '_sum_' + idx;
+      var present = editor.querySelector('.summary-present-input');
+      var title = editor.querySelector('.summary-title-input');
+      if (present) {
+        present.name = prefix + '_present';
+        present.value = '1';
       }
-      block.querySelectorAll('.summary-column-row').forEach(function (row) {
+      if (title) title.name = prefix + '_title';
+      editor.querySelectorAll('.summary-column-row').forEach(function (row) {
         var labelInput = row.querySelector('.summary-column-input');
         var subInput = row.querySelector('.summary-column-sub-input');
-        if (labelInput) labelInput.name = prefix + '_summary_columns';
-        if (subInput) subInput.name = prefix + '_summary_column_subs';
+        if (labelInput) labelInput.name = prefix + '_columns';
+        if (subInput) subInput.name = prefix + '_column_subs';
       });
-      block.querySelectorAll('.summary-row').forEach(function (row, rowIdx) {
+      editor.querySelectorAll('.summary-row').forEach(function (row, rowIdx) {
         row.querySelectorAll('.summary-cell').forEach(function (cell, colIdx) {
           var valueInput = cell.querySelector('.summary-cell-value');
           var formulaInput = cell.querySelector('.summary-cell-formula');
-          if (valueInput) valueInput.name = prefix + '_summary_cell_' + rowIdx + '_' + colIdx + '_value';
-          if (formulaInput) formulaInput.name = prefix + '_summary_cell_' + rowIdx + '_' + colIdx + '_formula';
+          if (valueInput) valueInput.name = prefix + '_cell_' + rowIdx + '_' + colIdx + '_value';
+          if (formulaInput) formulaInput.name = prefix + '_cell_' + rowIdx + '_' + colIdx + '_formula';
         });
       });
+      editor.querySelectorAll('.summary-dropdown-row').forEach(function (row) {
+        var ddIdx = row.getAttribute('data-index');
+        var ddPrefix = prefix + '_dd_' + ddIdx;
+        var colSel = row.querySelector('.summary-column-select');
+        var depSel = row.querySelector('.summary-depends-on-select');
+        var rowsInput = row.querySelector('.summary-rows-input');
+        var activeInput = row.querySelector('.summary-dropdown-active-input');
+        if (colSel) colSel.name = ddPrefix + '_col';
+        if (depSel) depSel.name = ddPrefix + '_depends_on';
+        if (rowsInput) rowsInput.name = ddPrefix + '_rows';
+        if (activeInput) activeInput.name = ddPrefix + '_active';
+        row.querySelectorAll('.independent-options .option-input').forEach(function (input) {
+          input.name = ddPrefix + '_options';
+        });
+        row.querySelectorAll('.map-parent-input').forEach(function (input) {
+          input.name = ddPrefix + '_map_parent';
+        });
+        row.querySelectorAll('.option-map-group').forEach(function (group) {
+          var mapIndex = group.getAttribute('data-map-index');
+          group.querySelectorAll('.map-option-input').forEach(function (input) {
+            input.name = ddPrefix + '_map_opts_' + mapIndex;
+          });
+        });
+      });
+      var heading = editor.querySelector('strong');
+      if (heading) heading.textContent = 'Table Summary ' + (parseInt(idx, 10) + 1);
     }
 
-    function ensureSummaryCellCount(block) {
-      var colCount = block.querySelectorAll('.summary-column-row').length;
+    function ensureSummaryCellCount(editor) {
+      var colCount = editor.querySelectorAll('.summary-column-row').length;
       if (colCount < 1) {
-        var colsWrap = block.querySelector('.summary-columns');
+        var colsWrap = editor.querySelector('.summary-columns');
         if (colsWrap) {
           var defaultCol = createSummaryColumnRow();
           defaultCol.querySelector('.summary-column-input').value = 'Column 1';
           colsWrap.appendChild(defaultCol);
-          bindSummaryColumn(block, defaultCol);
+          bindSummaryColumn(editor, defaultCol);
           colCount = 1;
         }
       }
-      var tbody = block.querySelector('.summary-rows');
+      var tbody = editor.querySelector('.summary-rows');
       if (tbody && !tbody.querySelector('.summary-row')) {
         var defaultRow = createSummaryRow();
         tbody.appendChild(defaultRow);
-        bindSummaryRow(block, defaultRow);
+        bindSummaryRow(editor, defaultRow);
       }
-      block.querySelectorAll('.summary-row').forEach(function (row) {
+      editor.querySelectorAll('.summary-row').forEach(function (row) {
         var cells = row.querySelectorAll('.summary-cell');
         while (cells.length < colCount) {
           var removeBtn = row.querySelector('.remove-summary-row');
@@ -907,48 +937,49 @@
           cells = row.querySelectorAll('.summary-cell');
         }
       });
-      updateSummaryHeaders(block);
-      syncSummaryFieldNames(block);
+      updateSummaryHeaders(editor);
+      syncSummaryFieldNames(editor);
     }
 
-    function bindSummaryRow(block, row) {
+    function bindSummaryRow(editor, row) {
       var removeBtn = row.querySelector('.remove-summary-row');
       if (!removeBtn || removeBtn.dataset.bound) return;
       removeBtn.dataset.bound = '1';
       removeBtn.addEventListener('click', function () {
-        var rows = block.querySelectorAll('.summary-row');
+        var rows = editor.querySelectorAll('.summary-row');
         if (rows.length <= 1) {
           alert('At least one summary row is required.');
           return;
         }
         row.remove();
-        syncSummaryFieldNames(block);
+        syncSummaryFieldNames(editor);
       });
     }
 
-    function bindSummaryColumn(block, row) {
+    function bindSummaryColumn(editor, row) {
       var removeBtn = row.querySelector('.remove-summary-column');
       var input = row.querySelector('.summary-column-input');
       var subInput = row.querySelector('.summary-column-sub-input');
       if (input && !input.dataset.bound) {
         input.dataset.bound = '1';
-        input.addEventListener('input', function () { updateSummaryHeaders(block); });
+        input.addEventListener('input', function () { updateSummaryHeaders(editor); });
       }
       if (subInput && !subInput.dataset.bound) {
         subInput.dataset.bound = '1';
-        subInput.addEventListener('input', function () { updateSummaryHeaders(block); });
+        subInput.addEventListener('input', function () { updateSummaryHeaders(editor); });
       }
-      if (!removeBtn || removeBtn.dataset.bound) return;
-      removeBtn.dataset.bound = '1';
-      removeBtn.addEventListener('click', function () {
-        var cols = block.querySelectorAll('.summary-column-row');
-        if (cols.length <= 1) {
-          alert('At least one summary column is required.');
-          return;
-        }
-        row.remove();
-        ensureSummaryCellCount(block);
-      });
+      if (removeBtn && !removeBtn.dataset.bound) {
+        removeBtn.dataset.bound = '1';
+        removeBtn.addEventListener('click', function () {
+          var cols = editor.querySelectorAll('.summary-column-row');
+          if (cols.length <= 1) {
+            alert('At least one summary column is required.');
+            return;
+          }
+          row.remove();
+          ensureSummaryCellCount(editor);
+        });
+      }
     }
 
     function excelLetters(index) {
@@ -996,16 +1027,18 @@
       try { return JSON.parse(el.textContent || 'null'); } catch (e) { return null; }
     }
 
-    function applyDefaultSummaryLayout(block) {
+    function applyDefaultSummaryLayout(editor) {
       // Seed from server default (empty_table_summary); admin can edit every field after.
       var seed = getDefaultSummarySeed();
       if (!seed) return;
-      var colsWrap = block.querySelector('.summary-columns');
-      var tbody = block.querySelector('.summary-rows');
+      var colsWrap = editor.querySelector('.summary-columns');
+      var tbody = editor.querySelector('.summary-rows');
       if (!colsWrap || !tbody) return;
 
       var columns = seed.columns || [];
       var rows = seed.rows || [];
+      var titleInput = editor.querySelector('.summary-title-input');
+      if (titleInput && seed.title) titleInput.value = seed.title;
 
       colsWrap.innerHTML = '';
       columns.forEach(function (col) {
@@ -1013,7 +1046,7 @@
         row.querySelector('.summary-column-input').value = col.label || '';
         row.querySelector('.summary-column-sub-input').value = col.subheader || '';
         colsWrap.appendChild(row);
-        bindSummaryColumn(block, row);
+        bindSummaryColumn(editor, row);
       });
 
       tbody.innerHTML = '';
@@ -1036,41 +1069,118 @@
           if (formulaInput) formulaInput.value = src.formula || '';
         });
         tbody.appendChild(row);
-        bindSummaryRow(block, row);
+        bindSummaryRow(editor, row);
       });
 
-      var ddWrap = block.querySelector('.summary-column-dropdowns');
-      if (ddWrap) ddWrap.innerHTML = '';
-      block.setAttribute('data-next-summary-dropdown-index', '0');
-      updateSummaryHeaders(block);
-      syncSummaryFieldNames(block);
-      initSummaryDropdowns(block);
+      var ddWrap = editor.querySelector('.summary-column-dropdowns');
+      if (ddWrap) {
+        ddWrap.innerHTML = '';
+        ddWrap.setAttribute('data-next-summary-dropdown-index', '0');
+      }
+      updateSummaryHeaders(editor);
+      syncSummaryFieldNames(editor);
+      initSummaryDropdowns(editor);
     }
 
-    function setSummaryEnabled(block, enabled) {
-      var input = block.querySelector('.summary-enabled-input');
-      var editor = block.querySelector('.table-summary-editor');
-      var addBtn = block.querySelector('.add-summary-btn');
-      if (input) input.value = enabled ? '1' : '0';
-      if (editor) editor.style.display = enabled ? '' : 'none';
-      if (addBtn) addBtn.style.display = enabled ? 'none' : '';
-      if (enabled) {
-        updateBlockTitle(block);
-        ensureSummaryCellCount(block);
-      } else {
-        syncSummaryFieldNames(block);
+    function nextSummaryIndex(block) {
+      var section = block.querySelector('.table-summary-section');
+      var next = section ? parseInt(section.getAttribute('data-next-summary-index') || '0', 10) : 0;
+      if (isNaN(next)) next = 0;
+      var used = {};
+      block.querySelectorAll('.table-summary-editor').forEach(function (ed) {
+        used[ed.getAttribute('data-summary-index')] = true;
+      });
+      while (used[String(next)]) next += 1;
+      if (section) section.setAttribute('data-next-summary-index', String(next + 1));
+      return next;
+    }
+
+    function initSummaryEditor(block, editor) {
+      if (!editor || editor.dataset.summaryBound === '1') return;
+      editor.dataset.summaryBound = '1';
+
+      editor.querySelectorAll('.summary-column-row').forEach(function (row) {
+        bindSummaryColumn(editor, row);
+      });
+      editor.querySelectorAll('.summary-row').forEach(function (row) {
+        bindSummaryRow(editor, row);
+      });
+
+      var removeSummaryBtn = editor.querySelector('.remove-summary-btn');
+      if (removeSummaryBtn && !removeSummaryBtn.dataset.bound) {
+        removeSummaryBtn.dataset.bound = '1';
+        removeSummaryBtn.addEventListener('click', function (evt) {
+          evt.preventDefault();
+          if (!confirm('Remove this summary?')) return;
+          editor.remove();
+          block.querySelectorAll('.table-summary-editor').forEach(function (ed) {
+            syncSummaryFieldNames(ed);
+          });
+        });
       }
+
+      var addColBtn = editor.querySelector('.add-summary-column');
+      if (addColBtn && !addColBtn.dataset.bound) {
+        addColBtn.dataset.bound = '1';
+        addColBtn.addEventListener('click', function (evt) {
+          evt.preventDefault();
+          var colsWrap = editor.querySelector('.summary-columns');
+          var newRow = createSummaryColumnRow();
+          colsWrap.appendChild(newRow);
+          bindSummaryColumn(editor, newRow);
+          ensureSummaryCellCount(editor);
+          newRow.querySelector('.summary-column-input').focus();
+        });
+      }
+
+      var addRowBtn = editor.querySelector('.add-summary-row');
+      if (addRowBtn && !addRowBtn.dataset.bound) {
+        addRowBtn.dataset.bound = '1';
+        addRowBtn.addEventListener('click', function (evt) {
+          evt.preventDefault();
+          var tbody = editor.querySelector('.summary-rows');
+          var newRow = createSummaryRow();
+          tbody.appendChild(newRow);
+          bindSummaryRow(editor, newRow);
+          ensureSummaryCellCount(editor);
+          var firstValue = newRow.querySelector('.summary-cell-value');
+          if (firstValue) firstValue.focus();
+        });
+      }
+
+      initSummaryDropdowns(editor);
+      syncSummaryFieldNames(editor);
+      updateSummaryHeaders(editor);
+    }
+
+    function addSummaryEditor(block) {
+      var list = block.querySelector('.table-summaries-list');
+      var templateRoot = document.getElementById('empty-summary-editor');
+      if (!list || !templateRoot) return null;
+      var source = templateRoot.querySelector('.table-summary-editor');
+      if (!source) return null;
+      var editor = source.cloneNode(true);
+      var idx = nextSummaryIndex(block);
+      editor.setAttribute('data-summary-index', String(idx));
+      editor.dataset.summaryBound = '';
+      list.appendChild(editor);
+      applyDefaultSummaryLayout(editor);
+      var tableName = block.querySelector('.table-name');
+      var titleInput = editor.querySelector('.summary-title-input');
+      if (titleInput && tableName && !titleInput.value.trim()) {
+        titleInput.value = tableName.value.trim();
+      }
+      initSummaryEditor(block, editor);
+      syncSummaryFieldNames(editor);
+      return editor;
     }
 
     function initSummarySection(block) {
       var section = block.querySelector('.table-summary-section');
       if (!section) return;
 
-      block.querySelectorAll('.summary-column-row').forEach(function (row) {
-        bindSummaryColumn(block, row);
-      });
-      block.querySelectorAll('.summary-row').forEach(function (row) {
-        bindSummaryRow(block, row);
+      block.querySelectorAll('.table-summary-editor').forEach(function (editor) {
+        initSummaryEditor(block, editor);
       });
 
       var addSummaryBtn = block.querySelector('.add-summary-btn');
@@ -1078,58 +1188,14 @@
         addSummaryBtn.dataset.bound = '1';
         addSummaryBtn.addEventListener('click', function (evt) {
           evt.preventDefault();
-          applyDefaultSummaryLayout(block);
-          setSummaryEnabled(block, true);
+          addSummaryEditor(block);
         });
       }
-
-      var removeSummaryBtn = block.querySelector('.remove-summary-btn');
-      if (removeSummaryBtn && !removeSummaryBtn.dataset.bound) {
-        removeSummaryBtn.dataset.bound = '1';
-        removeSummaryBtn.addEventListener('click', function (evt) {
-          evt.preventDefault();
-          if (!confirm('Remove the summary for this table?')) return;
-          setSummaryEnabled(block, false);
-        });
-      }
-
-      var addColBtn = block.querySelector('.add-summary-column');
-      if (addColBtn && !addColBtn.dataset.bound) {
-        addColBtn.dataset.bound = '1';
-        addColBtn.addEventListener('click', function (evt) {
-          evt.preventDefault();
-          var colsWrap = block.querySelector('.summary-columns');
-          var newRow = createSummaryColumnRow();
-          colsWrap.appendChild(newRow);
-          bindSummaryColumn(block, newRow);
-          ensureSummaryCellCount(block);
-          newRow.querySelector('.summary-column-input').focus();
-        });
-      }
-
-      var addRowBtn = block.querySelector('.add-summary-row');
-      if (addRowBtn && !addRowBtn.dataset.bound) {
-        addRowBtn.dataset.bound = '1';
-        addRowBtn.addEventListener('click', function (evt) {
-          evt.preventDefault();
-          var tbody = block.querySelector('.summary-rows');
-          var newRow = createSummaryRow();
-          tbody.appendChild(newRow);
-          bindSummaryRow(block, newRow);
-          ensureSummaryCellCount(block);
-          var firstValue = newRow.querySelector('.summary-cell-value');
-          if (firstValue) firstValue.focus();
-        });
-      }
-
-      initSummaryDropdowns(block);
-      syncSummaryFieldNames(block);
-      updateSummaryHeaders(block);
     }
 
-    function getSummaryColumns(block) {
+    function getSummaryColumns(editor) {
       var columns = [];
-      block.querySelectorAll('.summary-column-row').forEach(function (row, index) {
+      editor.querySelectorAll('.summary-column-row').forEach(function (row, index) {
         var input = row.querySelector('.summary-column-input');
         var label = input ? (input.value.trim() || ('Column ' + (index + 1))) : ('Column ' + (index + 1));
         columns.push({ index: index, label: label });
@@ -1137,10 +1203,10 @@
       return columns;
     }
 
-    function buildSummaryColumnSelect(block, selectedCol) {
+    function buildSummaryColumnSelect(editor, selectedCol) {
       var select = document.createElement('select');
       select.className = 'form-control form-control-sm summary-column-select';
-      getSummaryColumns(block).forEach(function (col) {
+      getSummaryColumns(editor).forEach(function (col) {
         var option = document.createElement('option');
         option.value = String(col.index);
         option.textContent = col.label;
@@ -1182,33 +1248,39 @@
       return select;
     }
 
-    function syncSummaryDropdownFieldNames(block) {
-      var prefix = prefixFor(block);
-      block.querySelectorAll('.summary-dropdown-row').forEach(function (row) {
+    function syncSummaryDropdownFieldNames(node) {
+      var editor = (node && node.classList && node.classList.contains('table-summary-editor'))
+        ? node
+        : ((node && node.closest && node.closest('.table-summary-editor')) || node);
+      var block = (editor && editor.closest && editor.closest('.table-block')) || editor || node;
+      var idx = (editor && editor.getAttribute) ? (editor.getAttribute('data-summary-index') || '0') : '0';
+      var prefix = prefixFor(block) + '_sum_' + idx;
+      (editor || node).querySelectorAll('.summary-dropdown-row').forEach(function (row) {
         var index = row.getAttribute('data-index');
         var colSelect = row.querySelector('.summary-column-select');
         var depends = row.querySelector('.summary-depends-on-select');
         var rowsInput = row.querySelector('.summary-rows-input');
         var active = row.querySelector('.summary-dropdown-active-input');
-        if (colSelect) colSelect.name = prefix + '_summary_dd_' + index + '_col';
-        if (depends) depends.name = prefix + '_summary_dd_' + index + '_depends_on';
-        if (rowsInput) rowsInput.name = prefix + '_summary_dd_' + index + '_rows';
-        if (active) active.name = prefix + '_summary_dd_' + index + '_active';
+        if (colSelect) colSelect.name = prefix + '_dd_' + index + '_col';
+        if (depends) depends.name = prefix + '_dd_' + index + '_depends_on';
+        if (rowsInput) rowsInput.name = prefix + '_dd_' + index + '_rows';
+        if (active) active.name = prefix + '_dd_' + index + '_active';
         row.querySelectorAll('.independent-options .option-input').forEach(function (input) {
-          input.name = prefix + '_summary_dd_' + index + '_options';
+          input.name = prefix + '_dd_' + index + '_options';
         });
         row.querySelectorAll('.option-map-group').forEach(function (group, mapIndex) {
           group.setAttribute('data-map-index', String(mapIndex));
           var parent = group.querySelector('.map-parent-input');
-          if (parent) parent.name = prefix + '_summary_dd_' + index + '_map_parent';
+          if (parent) parent.name = prefix + '_dd_' + index + '_map_parent';
           group.querySelectorAll('.map-option-input').forEach(function (input) {
-            input.name = prefix + '_summary_dd_' + index + '_map_opts_' + mapIndex;
+            input.name = prefix + '_dd_' + index + '_map_opts_' + mapIndex;
           });
         });
       });
     }
 
-    function toggleSummaryDependencyMode(block, row) {
+    function toggleSummaryDependencyMode(node, row) {
+      var block = (node && node.closest && node.closest('.table-block')) || node;
       var depends = row.querySelector('.summary-depends-on-select');
       var hasDepends = depends && depends.value !== '';
       var independent = row.querySelector('.independent-options');
@@ -1218,9 +1290,12 @@
       if (hasDepends) syncSummaryParentValues(block, row);
     }
 
-    function getSummaryOptionsForColumn(block, colIndex) {
+    function getSummaryOptionsForColumn(node, colIndex) {
+      var editor = (node && node.classList && node.classList.contains('table-summary-editor'))
+        ? node
+        : ((node && node.closest && node.closest('.table-summary-editor')) || node);
       var options = [];
-      block.querySelectorAll('.summary-dropdown-row').forEach(function (row) {
+      editor.querySelectorAll('.summary-dropdown-row').forEach(function (row) {
         var select = row.querySelector('.summary-column-select');
         if (!select || String(select.value) !== String(colIndex)) return;
         var depends = row.querySelector('.summary-depends-on-select');
@@ -1239,7 +1314,8 @@
       return options;
     }
 
-    function syncSummaryParentValues(block, row) {
+    function syncSummaryParentValues(node, row) {
+      var block = (node && node.closest && node.closest('.table-block')) || node;
       var depends = row.querySelector('.summary-depends-on-select');
       if (!depends || !depends.value) return;
       var parentOptions = getOptionsForColumn(block, parseInt(depends.value, 10));
@@ -1262,7 +1338,7 @@
       if (!parentOptions.length) {
         addSummaryMapGroup(block, row, '', ['']);
       }
-      syncSummaryDropdownFieldNames(block);
+      syncSummaryDropdownFieldNames(row.closest('.table-summary-editor') || block);
     }
 
     function addSummaryMapGroup(block, row, parentValue, childOptions) {
@@ -1424,58 +1500,70 @@
       syncSummaryDropdownFieldNames(block);
     }
 
-    function refreshSummaryDropdownSelects(block) {
-      block.querySelectorAll('.summary-dropdown-row').forEach(function (row) {
-        var colSelect = row.querySelector('.summary-column-select');
-        var selected = colSelect ? Number(colSelect.value || 0) : 0;
-        var newSelect = buildSummaryColumnSelect(block, selected);
-        newSelect.name = colSelect ? colSelect.name : '';
-        if (colSelect) colSelect.replaceWith(newSelect);
-        newSelect.dataset.bound = '';
-        var depends = row.querySelector('.summary-depends-on-select');
-        var depVal = depends ? depends.value : '';
-        var newDepends = buildSummaryDependsOnSelect(block, depVal);
-        newDepends.name = depends ? depends.name : '';
-        if (depends) depends.replaceWith(newDepends);
-        bindSummaryDropdownRow(block, row);
+    function refreshSummaryDropdownSelects(editorOrBlock) {
+      var editors = [];
+      if (editorOrBlock.classList && editorOrBlock.classList.contains('table-summary-editor')) {
+        editors = [editorOrBlock];
+      } else {
+        editors = Array.prototype.slice.call(editorOrBlock.querySelectorAll('.table-summary-editor'));
+      }
+      editors.forEach(function (editor) {
+        var block = editor.closest('.table-block') || editorOrBlock;
+        editor.querySelectorAll('.summary-dropdown-row').forEach(function (row) {
+          var colSelect = row.querySelector('.summary-column-select');
+          var selected = colSelect ? Number(colSelect.value || 0) : 0;
+          var newSelect = buildSummaryColumnSelect(editor, selected);
+          newSelect.name = colSelect ? colSelect.name : '';
+          if (colSelect) colSelect.replaceWith(newSelect);
+          newSelect.dataset.bound = '';
+          var depends = row.querySelector('.summary-depends-on-select');
+          var depVal = depends ? depends.value : '';
+          var newDepends = buildSummaryDependsOnSelect(block, depVal);
+          newDepends.name = depends ? depends.name : '';
+          if (depends) depends.replaceWith(newDepends);
+          bindSummaryDropdownRow(editor, row);
+        });
+        syncSummaryDropdownFieldNames(editor);
       });
     }
 
-    function initSummaryDropdowns(block) {
-      block.querySelectorAll('.summary-dropdown-row').forEach(function (row) {
-        bindSummaryDropdownRow(block, row);
+    function initSummaryDropdowns(editor) {
+      var block = editor.closest('.table-block') || editor;
+      editor.querySelectorAll('.summary-dropdown-row').forEach(function (row) {
+        bindSummaryDropdownRow(editor, row);
       });
-      refreshSummaryDropdownSelects(block);
-      var addBtn = block.querySelector('.add-summary-dropdown');
+      refreshSummaryDropdownSelects(editor);
+      var addBtn = editor.querySelector('.add-summary-dropdown');
       if (addBtn && !addBtn.dataset.bound) {
         addBtn.dataset.bound = '1';
         addBtn.addEventListener('click', function (evt) {
           evt.preventDefault();
-          var nextIndex = parseInt(block.getAttribute('data-next-summary-dropdown-index') || '0', 10);
-          var wrap = block.querySelector('.summary-column-dropdowns');
+          var ddWrap = editor.querySelector('.summary-column-dropdowns');
+          var nextIndex = parseInt((ddWrap && ddWrap.getAttribute('data-next-summary-dropdown-index')) || '0', 10);
+          if (isNaN(nextIndex)) nextIndex = 0;
+          var wrap = ddWrap;
           var temp = document.createElement('div');
           temp.innerHTML = emptySummaryDropdownTemplate.replace(/__INDEX__/g, String(nextIndex));
           var newRow = temp.firstElementChild;
           wrap.appendChild(newRow);
           newRow.setAttribute('data-index', String(nextIndex));
-          var builtCol = buildSummaryColumnSelect(block, 0);
+          var builtCol = buildSummaryColumnSelect(editor, 0);
           var oldCol = newRow.querySelector('.summary-column-select');
           if (oldCol) oldCol.replaceWith(builtCol);
           var builtDep = buildSummaryDependsOnSelect(block, '');
           var oldDep = newRow.querySelector('.summary-depends-on-select');
           if (oldDep) oldDep.replaceWith(builtDep);
-          bindSummaryDropdownRow(block, newRow);
-          block.setAttribute('data-next-summary-dropdown-index', String(nextIndex + 1));
-          syncSummaryDropdownFieldNames(block);
+          bindSummaryDropdownRow(editor, newRow);
+          if (ddWrap) ddWrap.setAttribute('data-next-summary-dropdown-index', String(nextIndex + 1));
+          syncSummaryDropdownFieldNames(editor);
           builtDep.focus();
         });
       }
-      // Keep summary dropdown column lists in sync when summary columns change.
-      block.querySelectorAll('.summary-column-input').forEach(function (input) {
+      editor.querySelectorAll('.summary-column-input').forEach(function (input) {
         if (input.dataset.summaryDdSync) return;
         input.dataset.summaryDdSync = '1';
         input.addEventListener('input', function () {
-          refreshSummaryDropdownSelects(block);
+          refreshSummaryDropdownSelects(editor);
         });
       });
     }
@@ -1581,8 +1669,10 @@
 
     function syncAllSummaryNames() {
       blocksContainer.querySelectorAll('.table-block').forEach(function (block) {
-        syncSummaryFieldNames(block);
-        syncSummaryDropdownFieldNames(block);
+        block.querySelectorAll('.table-summary-editor').forEach(function (editor) {
+          syncSummaryFieldNames(editor);
+          syncSummaryDropdownFieldNames(editor);
+        });
       });
     }
 

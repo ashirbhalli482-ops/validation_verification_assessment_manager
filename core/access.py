@@ -5,12 +5,66 @@ from .models import TeamMember, AuthorizedForm, AuthorizedLibraryDocument, Compa
 
 def manager_company_for_user(user):
     """Return the admin company record linked to a project manager."""
-    if not user.is_authenticated or user.user_type != 'manager':
+    if not user or not getattr(user, 'pk', None):
+        return None
+    if getattr(user, 'user_type', None) != 'manager':
         return None
     try:
         return user.managed_company
     except Company.DoesNotExist:
         return user.company if getattr(user, 'company_id', None) else None
+
+
+def user_linked_to_active_company(user):
+    """True when the account still belongs to a non-deleted company.
+
+    Admins are always allowed. Managers need a Company row. Employees need a
+    link through company FK, creator/supervisor manager, or an active team
+    assignment under a manager who still has a company.
+    """
+    if user is None:
+        return False
+    if user.user_type == 'admin':
+        return True
+    if user.user_type == 'manager':
+        return manager_company_for_user(user) is not None
+    if user.user_type != 'employee':
+        return True
+
+    if getattr(user, 'company_id', None):
+        return True
+
+    from .models import CustomUser
+
+    for related in (getattr(user, 'created_by', None), getattr(user, 'under_supervision', None)):
+        if (
+            related is not None
+            and related.user_type == 'manager'
+            and manager_company_for_user(related) is not None
+        ):
+            return True
+
+    manager_ids = TeamMember.objects.filter(
+        user=user, is_active=True,
+    ).values_list('project__manager_id', flat=True).distinct()
+    for manager in CustomUser.objects.filter(id__in=manager_ids, user_type='manager'):
+        if manager_company_for_user(manager) is not None:
+            return True
+    return False
+
+
+def enforce_active_company_for_login(user):
+    """Deactivate orphaned company users and return False when login must fail."""
+    if user is None:
+        return False
+    if user.user_type not in ('manager', 'employee'):
+        return True
+    if user_linked_to_active_company(user):
+        return True
+    if user.is_active:
+        user.is_active = False
+        user.save(update_fields=['is_active'])
+    return False
 
 
 def _document_allowed_for_companies(document, company_ids):

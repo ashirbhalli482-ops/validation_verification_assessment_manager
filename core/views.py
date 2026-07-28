@@ -38,13 +38,13 @@ from .access import (
     can_create_standalone_form_record, can_access_form_record,
     can_access_library_document, get_authorized_library_documents,
     get_employee_projects, get_team_member, can_view_report, get_manager_manageable_users,
-    company_for_project, manager_company_for_user,
+    company_for_project, manager_company_for_user, enforce_active_company_for_login,
 )
 from .permissions import AdminRequiredMixin, ManagerRequiredMixin, EmployeeBlockedMixin, ManagerOrAdminMixin
 from .context_processors import invalidate_notification_cache
 from .form_table_utils import (
     build_table_block, block_from_post, table_block_keys, stored_cells_for_layout,
-    build_summary_display, default_table_summary_seed_json,
+    build_summary_display, build_summaries_display, default_table_summary_seed_json,
 )
 from .package_seed import get_active_package_template
 
@@ -900,8 +900,12 @@ class CompanyDetailView(AdminRequiredMixin, View):
 class CompanyDeleteView(AdminRequiredMixin, DeleteView):
     model = Company
     template_name = 'core/confirm_delete.html'
-    success_url = reverse_lazy('core:company-list')
     context_object_name = 'object'
+
+    def form_valid(self, form):
+        company_name = self.object.name
+        self.object.delete()
+        return company_list_success_redirect('deleted', company_name)
 
 
 # --- Admin: Form Details (FormDefinition) ---
@@ -1069,6 +1073,15 @@ class FormTableLayoutEditView(AdminRequiredMixin, View):
             'form_def': form_def,
             'table_blocks': table_blocks,
             'empty_block': build_table_block(key='new0'),
+            'empty_summary': {
+                'index': 0,
+                'title': '',
+                'columns': [],
+                'rows': [],
+                'dropdown_rows': [],
+                'next_summary_dropdown_index': 0,
+                'enabled': True,
+            },
             'has_tables': has_tables,
             'default_summary_seed_json': default_table_summary_seed_json(),
         })
@@ -1091,6 +1104,15 @@ class FormTableLayoutEditView(AdminRequiredMixin, View):
                 'form_def': form_def,
                 'table_blocks': valid_blocks or [build_table_block(key='new0')],
                 'empty_block': build_table_block(key='new0'),
+                'empty_summary': {
+                    'index': 0,
+                    'title': '',
+                    'columns': [],
+                    'rows': [],
+                    'dropdown_rows': [],
+                    'next_summary_dropdown_index': 0,
+                    'enabled': True,
+                },
                 'has_tables': any(block.get('layout_id') for block in valid_blocks),
                 'form_error': 'Fix the highlighted table blocks before saving.',
                 'default_summary_seed_json': default_table_summary_seed_json(),
@@ -1122,8 +1144,8 @@ class FormTableLayoutEditView(AdminRequiredMixin, View):
                     'row_count': block['row_count'],
                     'column_headers': block['columns'],
                     'cell_dropdowns': block['cell_dropdowns'],
-                    'table_summary': FormTableLayout.normalize_table_summary(
-                        block.get('table_summary') or {}
+                    'table_summary': FormTableLayout.pack_table_summaries(
+                        block.get('table_summaries') or []
                     ),
                     'created_by': request.user,
                 }
@@ -1644,6 +1666,16 @@ def _build_project_form_groups(project, user=None, form_types=None):
                 'form_def': f,
                 'record': record_by_form.get(f.id),
             })
+            row = form_rows[-1]
+            record = row['record']
+            if user is not None and user.is_authenticated:
+                row['can_edit'] = bool(record and record.can_edit(user))
+                row['can_create'] = (
+                    False if record else can_create_form_record(user, project, f)
+                )
+            else:
+                row['can_edit'] = False
+                row['can_create'] = False
         if form_rows:
             sub_packages.append({'sub_package': sub, 'form_rows': form_rows})
     return sub_packages
@@ -2240,6 +2272,11 @@ class ProjectAccessView(View):
                 project=project, email__iexact=email, is_active=True
             ).select_related('user').first()
             if member and pwd in (project.access_password, vvb_pwd):
+                if not manager_company_for_user(project.manager):
+                    messages.error(request, 'Invalid email or password.')
+                    return render(request, 'core/project_access.html', {
+                        'form': form, 'project': project,
+                    })
                 user = member.user
                 if not user:
                     user, _ = CustomUser.objects.get_or_create(
@@ -2251,6 +2288,11 @@ class ProjectAccessView(View):
                     )
                     member.user = user
                     member.save()
+                if not user.is_active or not enforce_active_company_for_login(user):
+                    messages.error(request, 'Invalid email or password.')
+                    return render(request, 'core/project_access.html', {
+                        'form': form, 'project': project,
+                    })
                 user.set_password(pwd)
                 user.save()
                 login(request, user, backend='django.contrib.auth.backends.ModelBackend')
@@ -2360,6 +2402,12 @@ def _table_sections_for_record(form_def, record=None, sparse=False, summary_edit
             if cfg.get('option_map')
         }
         summary_stored = stored_summaries.get(str(layout.pk))
+        table_summaries = build_summaries_display(
+            layout,
+            cells,
+            stored_summary_raw=summary_stored,
+            editable=summary_editable,
+        )
         sections.append({
             'layout': layout,
             'table_headers': headers,
@@ -2367,12 +2415,8 @@ def _table_sections_for_record(form_def, record=None, sparse=False, summary_edit
             'option_maps': option_maps,
             'option_maps_json': json.dumps(option_maps) if option_maps else '',
             'option_maps_script_id': f'table-option-maps-{layout.pk}',
-            'table_summary': build_summary_display(
-                layout,
-                cells,
-                stored_summary_cells=summary_stored,
-                editable=summary_editable,
-            ),
+            'table_summaries': table_summaries,
+            'table_summary': table_summaries[0] if table_summaries else None,
         })
     return sections
 
@@ -2512,25 +2556,31 @@ def _parse_table_cells_from_post(post, layout, allow_legacy=False):
 
 
 def _parse_summary_cells_from_post(post, layout):
-    """Parse fill-time summary dropdown values; keep admin defaults for missing cells."""
-    summary = layout.normalized_table_summary()
-    if not summary.get('enabled'):
+    """Parse fill-time summary values for all summaries on a layout."""
+    summaries = layout.normalized_table_summaries()
+    if not summaries:
         return None
-    rows = summary.get('rows') or []
-    col_count = len(summary.get('columns') or [])
-    result = []
-    for row_idx, row in enumerate(rows):
-        row_vals = []
-        for col_idx in range(col_count):
-            admin_value = ''
-            if col_idx < len(row.get('cells') or []):
-                admin_value = str(row['cells'][col_idx].get('value') or '').strip()
-            key = f'summary_cell_{layout.pk}_{row_idx}_{col_idx}'
-            if key in post:
-                row_vals.append((post.get(key) or '').strip())
-            else:
-                row_vals.append(admin_value)
-        result.append(row_vals)
+    result = {}
+    for s_idx, summary in enumerate(summaries):
+        rows = summary.get('rows') or []
+        col_count = len(summary.get('columns') or [])
+        grid = []
+        for row_idx, row in enumerate(rows):
+            row_vals = []
+            for col_idx in range(col_count):
+                admin_value = ''
+                if col_idx < len(row.get('cells') or []):
+                    admin_value = str(row['cells'][col_idx].get('value') or '').strip()
+                key = f'summary_cell_{layout.pk}_{s_idx}_{row_idx}_{col_idx}'
+                legacy_key = f'summary_cell_{layout.pk}_{row_idx}_{col_idx}'
+                if key in post:
+                    row_vals.append((post.get(key) or '').strip())
+                elif s_idx == 0 and legacy_key in post:
+                    row_vals.append((post.get(legacy_key) or '').strip())
+                else:
+                    row_vals.append(admin_value)
+            grid.append(row_vals)
+        result[str(s_idx)] = grid
     return result
 
 

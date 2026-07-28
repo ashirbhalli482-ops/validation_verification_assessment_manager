@@ -64,7 +64,13 @@
   {% if table_layout.table_note %}
   <p class="small mt-2 mb-0">{{ table_layout.table_note|linebreaksbr }}</p>
   {% endif %}
+  {% for table_summary in section.table_summaries %}
+  {% include 'core/includes/form_table_summary.html' with table_summary=table_summary %}
+  {% empty %}
+  {% if section.table_summary %}
   {% include 'core/includes/form_table_summary.html' with table_summary=section.table_summary %}
+  {% endif %}
+  {% endfor %}
 </div>
 {% endwith %}
 {% endfor %}

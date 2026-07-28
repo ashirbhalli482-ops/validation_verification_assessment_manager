@@ -2,6 +2,8 @@ from django.contrib.auth.backends import ModelBackend
 from django.contrib.auth import get_user_model
 from django.db.models import Q
 
+from .access import enforce_active_company_for_login
+
 User = get_user_model()
 
 class EmailBackend(ModelBackend):
@@ -22,12 +24,19 @@ class EmailBackend(ModelBackend):
             return None
 
         if user.check_password(password) and self.user_can_authenticate(user):
+            if not enforce_active_company_for_login(user):
+                return None
             return user
         
         return None
     
     def get_user(self, user_id):
         try:
-            return User.objects.get(pk=user_id)
+            user = User.objects.get(pk=user_id)
         except User.DoesNotExist:
-            return None 
+            return None
+        if not self.user_can_authenticate(user):
+            return None
+        if not enforce_active_company_for_login(user):
+            return None
+        return user

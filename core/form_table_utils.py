@@ -259,11 +259,14 @@ def build_table_block(layout=None, key=None, parsed=None):
             }
             for index, entry in enumerate(layout.normalized_column_dropdowns())
         ]
-        rating_letter = detect_rating_column_letter(layout)
-        summary = layout.normalized_table_summary() or empty_table_summary(rating_letter)
-        if not summary.get('enabled'):
-            summary = empty_table_summary(rating_letter)
-        summary_dropdown_rows = _summary_dropdown_rows(summary)
+        summaries = []
+        for index, summary in enumerate(layout.normalized_table_summaries()):
+            summaries.append({
+                **summary,
+                'index': index,
+                'dropdown_rows': _summary_dropdown_rows(summary),
+                'next_summary_dropdown_index': len(summary.get('dropdowns') or []),
+            })
         return {
             'key': key or str(layout.pk),
             'layout_id': layout.pk,
@@ -276,11 +279,15 @@ def build_table_block(layout=None, key=None, parsed=None):
             'column_rows': layout.normalized_columns() or [{'label': '', 'is_active': True}],
             'dropdown_rows': dropdown_rows,
             'next_dropdown_index': len(dropdown_rows),
-            'table_summary': summary,
-            'summary_dropdown_rows': summary_dropdown_rows,
-            'next_summary_dropdown_index': len(summary_dropdown_rows),
+            'table_summaries': summaries,
+            'next_summary_index': len(summaries),
+            # Legacy single-summary keys for any leftover references.
+            'table_summary': summaries[0] if summaries else empty_table_summary(),
+            'summary_dropdown_rows': summaries[0]['dropdown_rows'] if summaries else [],
+            'next_summary_dropdown_index': (
+                summaries[0]['next_summary_dropdown_index'] if summaries else 0
+            ),
         }
-    empty_summary = empty_table_summary()
     return {
         'key': key or 'new0',
         'layout_id': None,
@@ -293,7 +300,9 @@ def build_table_block(layout=None, key=None, parsed=None):
         'column_rows': [{'label': '', 'is_active': True}],
         'dropdown_rows': [],
         'next_dropdown_index': 0,
-        'table_summary': empty_summary,
+        'table_summaries': [],
+        'next_summary_index': 0,
+        'table_summary': empty_table_summary(),
         'summary_dropdown_rows': [],
         'next_summary_dropdown_index': 0,
     }
@@ -307,8 +316,15 @@ def block_from_post(post, key, table_number=1):
         return None
     columns = parse_columns(post, prefix)
     dropdowns, dropdown_rows = parse_column_dropdowns(post, prefix, len(columns), row_count)
-    summary = parse_table_summary(post, prefix)
-    summary_dropdown_rows = _summary_dropdown_rows(summary) if summary else []
+    summaries = parse_table_summaries(post, prefix)
+    summary_blocks = []
+    for index, summary in enumerate(summaries):
+        summary_blocks.append({
+            **summary,
+            'index': index,
+            'dropdown_rows': _summary_dropdown_rows(summary),
+            'next_summary_dropdown_index': len(summary.get('dropdowns') or []),
+        })
     layout_id = post.get(f'{prefix}_id') or None
     if layout_id:
         try:
@@ -328,28 +344,114 @@ def block_from_post(post, key, table_number=1):
         'dropdown_rows': dropdown_rows,
         'columns': columns,
         'cell_dropdowns': dropdowns,
-        'table_summary': summary if summary.get('enabled') else empty_table_summary(),
-        'summary_dropdown_rows': summary_dropdown_rows if summary.get('enabled') else [],
+        'table_summaries': summary_blocks,
+        'next_summary_index': len(summary_blocks),
+        'table_summary': summary_blocks[0] if summary_blocks else empty_table_summary(),
+        'summary_dropdown_rows': summary_blocks[0]['dropdown_rows'] if summary_blocks else [],
         'next_summary_dropdown_index': (
-            max([row['index'] for row in summary_dropdown_rows], default=-1) + 1
-            if summary.get('enabled') else 0
+            summary_blocks[0]['next_summary_dropdown_index'] if summary_blocks else 0
         ),
         'next_dropdown_index': max([row['index'] for row in dropdown_rows], default=-1) + 1,
     }
 
 
+def parse_table_summaries(post, prefix):
+    """Parse one or more table summaries from admin POST fields."""
+    from core.models import FormTableLayout
+
+    indices = set()
+    marker = f'{prefix}_sum_'
+    for key in post:
+        if not key.startswith(marker):
+            continue
+        rest = key[len(marker):]
+        for suffix in ('_present', '_title', '_columns'):
+            if rest.endswith(suffix):
+                idx_part = rest[: -len(suffix)]
+                if idx_part.isdigit():
+                    indices.add(int(idx_part))
+                break
+
+    # Legacy single-summary field names (pre multi-summary).
+    if not indices and (
+        post.get(f'{prefix}_summary_enabled') == '1'
+        or post.get(f'{prefix}_summary_title')
+        or post.getlist(f'{prefix}_summary_columns')
+    ):
+        legacy = parse_table_summary(post, prefix)
+        return [legacy] if legacy else []
+
+    header_labels = post.getlist(f'{prefix}_column_headers')
+    table_col_count = len(header_labels) if header_labels else 1
+    summaries = []
+    for idx in sorted(indices):
+        sp = f'{prefix}_sum_{idx}'
+        title = (post.get(f'{sp}_title') or '').strip()
+        col_labels = post.getlist(f'{sp}_columns')
+        col_subs = post.getlist(f'{sp}_column_subs')
+        columns = []
+        for index, raw_label in enumerate(col_labels):
+            label = (raw_label or '').strip()
+            if not label:
+                continue
+            subheader = ''
+            if index < len(col_subs):
+                subheader = (col_subs[index] or '').strip()
+            columns.append({'label': label, 'subheader': subheader})
+        if not columns:
+            columns = [{'label': 'Column 1', 'subheader': ''}]
+
+        row_indices = set()
+        cell_marker = f'{sp}_cell_'
+        for key in post:
+            if not key.startswith(cell_marker):
+                continue
+            rest = key[len(cell_marker):]
+            parts = rest.split('_')
+            if len(parts) >= 2 and parts[0].isdigit():
+                row_indices.add(int(parts[0]))
+
+        col_count = len(columns)
+        rows = []
+        for row_idx in sorted(row_indices):
+            cells = []
+            for col_idx in range(col_count):
+                value = (post.get(f'{sp}_cell_{row_idx}_{col_idx}_value') or '').strip()
+                formula = (post.get(f'{sp}_cell_{row_idx}_{col_idx}_formula') or '').strip()
+                cells.append({'value': value, 'formula': formula})
+            rows.append({'label': '', 'cells': cells})
+
+        summary_row_count = max(len(rows), 1)
+        summary_dropdowns, _ = parse_summary_dropdowns(
+            post,
+            sp,
+            summary_col_count=col_count,
+            table_col_count=max(table_col_count, 1),
+            row_count=summary_row_count,
+        )
+        normalized = FormTableLayout.normalize_table_summary({
+            'enabled': True,
+            'title': title,
+            'columns': columns,
+            'rows': rows or [{'label': '', 'cells': [{'value': '', 'formula': ''} for _ in columns]}],
+            'dropdowns': summary_dropdowns,
+        })
+        if normalized:
+            summaries.append(normalized)
+    return summaries
+
+
 def parse_table_summary(post, prefix):
-    """Parse optional table summary from admin POST fields."""
+    """Parse legacy single table summary from admin POST fields."""
     from core.models import FormTableLayout
 
     enabled = post.get(f'{prefix}_summary_enabled') == '1'
     if not enabled:
         return {}
 
-    # Title always mirrors the table name.
-    title = (post.get(f'{prefix}_name') or '').strip()
+    title = (post.get(f'{prefix}_summary_title') or '').strip()
     if not title:
-        title = (post.get(f'{prefix}_summary_title') or '').strip()
+        title = (post.get(f'{prefix}_name') or '').strip()
 
     col_labels = post.getlist(f'{prefix}_summary_columns')
     col_subs = post.getlist(f'{prefix}_summary_column_subs')
@@ -406,11 +508,19 @@ def parse_table_summary(post, prefix):
 
 
 def parse_summary_dropdowns(post, prefix, summary_col_count, table_col_count, row_count=100):
-    """Parse summary dropdowns; Depends on refers to main-table columns."""
+    """Parse summary dropdowns; Depends on refers to main-table columns.
+
+    Field names: ``{prefix}_dd_{i}_*`` (multi-summary) or legacy ``{prefix}_summary_dd_{i}_*``.
+    """
     from core.models import FormTableLayout
 
+    marker_new = f'{prefix}_dd_'
+    marker_legacy = f'{prefix}_summary_dd_'
+    use_new = any(key.startswith(marker_new) for key in post)
+    marker = marker_new if use_new else marker_legacy
+    mid = 'dd' if use_new else 'summary_dd'
+
     indices = set()
-    marker = f'{prefix}_summary_dd_'
     for key in post:
         if key.startswith(marker) and key.endswith('_col'):
             parts = key[len(marker):].split('_')
@@ -421,15 +531,15 @@ def parse_summary_dropdowns(post, prefix, summary_col_count, table_col_count, ro
     parsed_rows = []
     for index in sorted(indices):
         try:
-            col = int(post.get(f'{prefix}_summary_dd_{index}_col', 0))
+            col = int(post.get(f'{prefix}_{mid}_{index}_col', 0))
         except (TypeError, ValueError):
             continue
         if col < 0 or col >= summary_col_count:
             continue
-        is_active = post.get(f'{prefix}_summary_dd_{index}_active') == '1'
-        rows = parse_rows_spec(post.get(f'{prefix}_summary_dd_{index}_rows', ''), row_count)
+        is_active = post.get(f'{prefix}_{mid}_{index}_active') == '1'
+        rows = parse_rows_spec(post.get(f'{prefix}_{mid}_{index}_rows', ''), row_count)
 
-        depends_raw = (post.get(f'{prefix}_summary_dd_{index}_depends_on') or '').strip()
+        depends_raw = (post.get(f'{prefix}_{mid}_{index}_depends_on') or '').strip()
         depends_on_table_col = None
         if depends_raw != '':
             try:
@@ -444,14 +554,14 @@ def parse_summary_dropdowns(post, prefix, summary_col_count, table_col_count, ro
                 depends_on_table_col = None
 
         option_map = {}
-        map_parents = post.getlist(f'{prefix}_summary_dd_{index}_map_parent')
+        map_parents = post.getlist(f'{prefix}_{mid}_{index}_map_parent')
         for map_index, parent_key in enumerate(map_parents):
             parent = parent_key.strip()
             if not parent:
                 continue
             child_opts = [
                 value.strip()
-                for value in post.getlist(f'{prefix}_summary_dd_{index}_map_opts_{map_index}')
+                for value in post.getlist(f'{prefix}_{mid}_{index}_map_opts_{map_index}')
                 if value.strip()
             ]
             if child_opts:
@@ -459,7 +569,7 @@ def parse_summary_dropdowns(post, prefix, summary_col_count, table_col_count, ro
 
         options = [
             value.strip()
-            for value in post.getlist(f'{prefix}_summary_dd_{index}_options')
+            for value in post.getlist(f'{prefix}_{mid}_{index}_options')
             if value.strip()
         ]
 
@@ -931,18 +1041,44 @@ def _options_from_option_map(option_map, parent_values):
     return options
 
 
-def build_summary_display(layout, cells, stored_summary_cells=None, editable=False):
+def coerce_stored_summary_map(stored_raw):
+    """Normalize stored fill values to {summary_index_str: grid}.
+
+    Legacy: a bare grid list → index \"0\".
+    New: dict of index → grid.
+    """
+    if stored_raw is None:
+        return {}
+    if isinstance(stored_raw, list):
+        return {'0': stored_raw}
+    if isinstance(stored_raw, dict):
+        return {str(key): value for key, value in stored_raw.items()}
+    return {}
+
+
+def build_summary_display(
+    layout,
+    cells,
+    stored_summary_cells=None,
+    editable=False,
+    summary=None,
+    summary_index=0,
+):
     """Return display-ready summary dict, or None when summary is disabled."""
     import json
 
-    summary = layout.normalized_table_summary()
-    if not summary.get('enabled'):
+    if summary is None:
+        summary = layout.normalized_table_summary()
+    if not summary or not summary.get('enabled', True):
+        return None
+    if not summary.get('columns'):
         return None
 
     title = (summary.get('title') or '').strip() or (layout.table_name or '').strip() or 'Summary'
     has_subheaders = any((col.get('subheader') or '').strip() for col in summary['columns'])
-    lookup = layout.summary_dropdown_lookup()
+    lookup = layout.summary_dropdown_lookup(summary)
     column_headers = layout.normalized_columns()
+    summary_uid = f'{layout.pk}-{summary_index}'
 
     # Pass 1: main-table formulas and static values.
     interim_rows = []
@@ -964,7 +1100,9 @@ def build_summary_display(layout, cells, stored_summary_cells=None, editable=Fal
                 and stored_summary_cells[row_idx][col_idx] not in (None, '')
             ):
                 value = str(stored_summary_cells[row_idx][col_idx]).strip()
-            dropdown = layout.summary_dropdown_for_cell(row_idx, col_idx, lookup=lookup)
+            dropdown = layout.summary_dropdown_for_cell(
+                row_idx, col_idx, lookup=lookup, summary=summary,
+            )
             admin_static = str(cell.get('value') or '').strip()
             computed = None
             if formula:
@@ -981,7 +1119,6 @@ def build_summary_display(layout, cells, stored_summary_cells=None, editable=Fal
                 is_editable = False
             elif value:
                 display = value
-                # Static admin labels stay locked; empty admin cells (or dropdowns) stay fillable.
                 is_editable = bool(
                     editable
                     and not formula
@@ -1044,7 +1181,6 @@ def build_summary_display(layout, cells, stored_summary_cells=None, editable=Fal
             elif cell['value']:
                 cell['display'] = cell['value']
             else:
-                # Never show raw formulas to managers; failed calc → 0.
                 cell['display'] = '0'
             cell['editable'] = False
         display_rows.append({
@@ -1094,6 +1230,8 @@ def build_summary_display(layout, cells, stored_summary_cells=None, editable=Fal
         'columns': summary['columns'],
         'rows': display_rows,
         'layout_id': layout.pk,
+        'summary_index': summary_index,
+        'summary_uid': summary_uid,
         'option_maps': option_maps,
         'option_maps_json': json.dumps(option_maps) if option_maps else '',
         'formula_grid': formula_grid,
@@ -1104,6 +1242,24 @@ def build_summary_display(layout, cells, stored_summary_cells=None, editable=Fal
         'column_headers_json': json.dumps(header_labels),
         'editable': editable,
     }
+
+
+def build_summaries_display(layout, cells, stored_summary_raw=None, editable=False):
+    """Build display dicts for all summaries on a layout."""
+    stored_map = coerce_stored_summary_map(stored_summary_raw)
+    result = []
+    for index, summary in enumerate(layout.normalized_table_summaries()):
+        display = build_summary_display(
+            layout,
+            cells,
+            stored_summary_cells=stored_map.get(str(index)),
+            editable=editable,
+            summary=summary,
+            summary_index=index,
+        )
+        if display:
+            result.append(display)
+    return result
 
 
 def stored_cells_for_layout(data, layout, all_layouts=None):

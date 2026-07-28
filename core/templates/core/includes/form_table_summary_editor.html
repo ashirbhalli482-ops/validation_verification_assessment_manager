@@ -1,0 +1,233 @@
+{# One admin summary editor. Expects: block, summary (with index, columns, rows, dropdown_rows). #}
+<div class="table-summary-editor border rounded p-3 bg-light mt-2" data-summary-index="{{ summary.index }}">
+  <input type="hidden" class="summary-present-input" name="tbl_{{ block.key }}_sum_{{ summary.index }}_present" value="1">
+  <div class="d-flex justify-content-between align-items-center mb-2">
+    <strong>Table Summary {{ summary.index|add:1 }}</strong>
+    <button type="button" class="btn btn-sm btn-outline-danger remove-summary-btn">Remove Summary</button>
+  </div>
+  <p class="text-muted small mb-2">
+    Edit title, columns, rows, and formulas freely. Example formulas:
+    <code>=COUNTIF("Bases Risk Rating","High")</code>,
+    <code>=((B2*3)+(C2*2)+(D2*1))/(B2+C2+D2)</code>.
+    Leave Comments empty so managers can type values.
+  </p>
+  <div class="mb-3">
+    <label class="small mb-1">Summary Title</label>
+    <input type="text" class="form-control form-control-sm summary-title-input" name="tbl_{{ block.key }}_sum_{{ summary.index }}_title" placeholder="Summary title" value="{{ summary.title|default:'' }}">
+  </div>
+  <div class="mb-3">
+    <label class="small d-block mb-1">Summary Columns</label>
+    <p class="text-muted small mb-2">Optional sub-label appears under the column (e.g. High → 1, Medium → 2, Low → 3).</p>
+    <div class="summary-columns">
+      {% if summary.columns %}
+        {% for col in summary.columns %}
+        <div class="form-row align-items-center mb-1 summary-column-row">
+          <div class="col-md-7">
+            <input type="text" class="form-control form-control-sm summary-column-input" name="tbl_{{ block.key }}_sum_{{ summary.index }}_columns" placeholder="Column heading" value="{{ col.label }}">
+          </div>
+          <div class="col-md-3">
+            <input type="text" class="form-control form-control-sm summary-column-sub-input" name="tbl_{{ block.key }}_sum_{{ summary.index }}_column_subs" placeholder="Sub (e.g. 1)" value="{{ col.subheader|default:'' }}">
+          </div>
+          <div class="col-md-2">
+            <button type="button" class="btn btn-sm btn-outline-secondary remove-summary-column" title="Remove column">&times;</button>
+          </div>
+        </div>
+        {% endfor %}
+      {% else %}
+        <div class="form-row align-items-center mb-1 summary-column-row">
+          <div class="col-md-7">
+            <input type="text" class="form-control form-control-sm summary-column-input" name="tbl_{{ block.key }}_sum_{{ summary.index }}_columns" placeholder="Column heading" value="High">
+          </div>
+          <div class="col-md-3">
+            <input type="text" class="form-control form-control-sm summary-column-sub-input" name="tbl_{{ block.key }}_sum_{{ summary.index }}_column_subs" placeholder="Sub (e.g. 1)" value="1">
+          </div>
+          <div class="col-md-2">
+            <button type="button" class="btn btn-sm btn-outline-secondary remove-summary-column" title="Remove column">&times;</button>
+          </div>
+        </div>
+      {% endif %}
+    </div>
+    <button type="button" class="btn btn-outline-primary btn-sm add-summary-column mt-1">
+      <i class="fa fa-plus"></i> Add Summary Column
+    </button>
+  </div>
+
+  <div class="mb-3">
+    <label class="small d-block mb-1">Summary Column Dropdowns</label>
+    <p class="text-muted small mb-2">
+      Optional. Set <strong>Depends on</strong> to a <strong>main table</strong> column so this summary column’s options change from that table column’s values.
+    </p>
+    <div class="summary-column-dropdowns" data-next-summary-dropdown-index="{{ summary.next_summary_dropdown_index|default:0 }}">
+      {% for dd in summary.dropdown_rows %}
+      <div class="card mb-2 summary-dropdown-row{% if not dd.is_active %} border-secondary{% endif %}" data-index="{{ dd.index }}">
+        <div class="card-body py-2">
+          <div class="form-row align-items-end">
+            <div class="col-md-3 mb-2">
+              <label class="small mb-1">Column</label>
+              <select name="tbl_{{ block.key }}_sum_{{ summary.index }}_dd_{{ dd.index }}_col" class="form-control form-control-sm summary-column-select">
+                {% for col in summary.columns %}
+                <option value="{{ forloop.counter0 }}" {% if dd.col == forloop.counter0 %}selected{% endif %}>{{ col.label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-3 mb-2">
+              <label class="small mb-1">Depends on (table column)</label>
+              <select name="tbl_{{ block.key }}_sum_{{ summary.index }}_dd_{{ dd.index }}_depends_on" class="form-control form-control-sm summary-depends-on-select">
+                <option value="">— None —</option>
+                {% for column in block.column_rows %}
+                {% if column.is_active %}
+                <option value="{{ forloop.counter0 }}" {% if dd.depends_on_table_col == forloop.counter0 %}selected{% endif %}>Column {{ forloop.counter }}: {{ column.label }}</option>
+                {% endif %}
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-2 mb-2">
+              <label class="small mb-1">Rows</label>
+              <input type="text"
+                     name="tbl_{{ block.key }}_sum_{{ summary.index }}_dd_{{ dd.index }}_rows"
+                     class="form-control form-control-sm summary-rows-input"
+                     placeholder="All rows"
+                     value="{{ dd.rows_text }}">
+            </div>
+            <div class="col-md-2 mb-2 text-right ml-auto">
+              <input type="hidden" name="tbl_{{ block.key }}_sum_{{ summary.index }}_dd_{{ dd.index }}_active" class="summary-dropdown-active-input" value="{% if dd.is_active %}1{% else %}0{% endif %}">
+              <button type="button" class="btn btn-sm {% if dd.is_active %}btn-outline-danger{% else %}btn-outline-success{% endif %} toggle-summary-dropdown">
+                {% if dd.is_active %}Deactivate{% else %}Activate{% endif %}
+              </button>
+            </div>
+          </div>
+
+          <div class="independent-options mt-2"{% if dd.depends_on_table_col != None or dd.depends_on_col != None %} style="display:none"{% endif %}>
+            <label class="small mb-1">Dropdown Values</label>
+            <div class="dropdown-options">
+              {% for opt in dd.options %}
+              <div class="input-group input-group-sm mb-1 option-row">
+                <input type="text" name="tbl_{{ block.key }}_sum_{{ summary.index }}_dd_{{ dd.index }}_options" class="form-control option-input" placeholder="Value" value="{{ opt }}">
+                <div class="input-group-append">
+                  <button type="button" class="btn btn-outline-secondary remove-option" title="Remove value">&times;</button>
+                </div>
+              </div>
+              {% empty %}
+              <div class="input-group input-group-sm mb-1 option-row">
+                <input type="text" name="tbl_{{ block.key }}_sum_{{ summary.index }}_dd_{{ dd.index }}_options" class="form-control option-input" placeholder="Value" value="">
+                <div class="input-group-append">
+                  <button type="button" class="btn btn-outline-secondary remove-option" title="Remove value">&times;</button>
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+            <button type="button" class="btn btn-outline-primary btn-sm add-option mt-1">+ Add Value</button>
+          </div>
+
+          <div class="dependent-options mt-2"{% if dd.depends_on_table_col == None and dd.depends_on_col == None %} style="display:none"{% endif %}>
+            <label class="small mb-1 d-block">Child values by parent selection</label>
+            <div class="option-map-groups">
+              {% for item in dd.option_map_items %}
+              <div class="border rounded p-2 mb-2 option-map-group" data-map-index="{{ forloop.counter0 }}">
+                <div class="form-row align-items-end">
+                  <div class="col-md-4 mb-2">
+                    <label class="small mb-1">When parent value is</label>
+                    <input type="text"
+                           name="tbl_{{ block.key }}_sum_{{ summary.index }}_dd_{{ dd.index }}_map_parent"
+                           class="form-control form-control-sm map-parent-input"
+                           placeholder="Parent value"
+                           value="{{ item.parent }}">
+                  </div>
+                  <div class="col-md-6 mb-2">
+                    <label class="small mb-1">Show these values</label>
+                    <div class="map-child-options">
+                      {% for opt in item.options %}
+                      <div class="input-group input-group-sm mb-1 option-row">
+                        <input type="text"
+                               name="tbl_{{ block.key }}_sum_{{ summary.index }}_dd_{{ dd.index }}_map_opts_{{ forloop.parentloop.counter0 }}"
+                               class="form-control map-option-input"
+                               placeholder="Value"
+                               value="{{ opt }}">
+                        <div class="input-group-append">
+                          <button type="button" class="btn btn-outline-secondary remove-map-option" title="Remove value">&times;</button>
+                        </div>
+                      </div>
+                      {% empty %}
+                      <div class="input-group input-group-sm mb-1 option-row">
+                        <input type="text"
+                               name="tbl_{{ block.key }}_sum_{{ summary.index }}_dd_{{ dd.index }}_map_opts_{{ forloop.parentloop.counter0 }}"
+                               class="form-control map-option-input"
+                               placeholder="Value"
+                               value="">
+                        <div class="input-group-append">
+                          <button type="button" class="btn btn-outline-secondary remove-map-option" title="Remove value">&times;</button>
+                        </div>
+                      </div>
+                      {% endfor %}
+                    </div>
+                    <button type="button" class="btn btn-outline-primary btn-sm add-map-option mt-1">+ Add Value</button>
+                  </div>
+                  <div class="col-md-2 mb-2 text-right">
+                    <button type="button" class="btn btn-sm btn-outline-danger remove-map-group">Remove</button>
+                  </div>
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+            <button type="button" class="btn btn-outline-primary btn-sm add-map-group mt-1">+ Add Parent Value Mapping</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm sync-parent-values mt-1 ml-1">Fill from parent options</button>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    <button type="button" class="btn btn-outline-primary btn-sm mt-1 add-summary-dropdown">
+      <i class="fa fa-plus"></i> Add Summary Column Dropdown
+    </button>
+  </div>
+
+  <div class="mb-2">
+    <label class="small d-block mb-1">Summary Rows</label>
+    <div class="table-responsive">
+      <table class="table table-bordered table-sm mb-0 summary-grid">
+        <thead>
+          <tr class="summary-header-row">
+            {% if summary.columns %}
+              {% for col in summary.columns %}
+              <th class="summary-col-heading">{{ col.label }}{% if col.subheader %}<div class="small text-muted">{{ col.subheader }}</div>{% endif %}</th>
+              {% endfor %}
+            {% else %}
+              <th class="summary-col-heading">High</th>
+            {% endif %}
+            <th style="width:48px"></th>
+          </tr>
+        </thead>
+        <tbody class="summary-rows">
+          {% if summary.rows %}
+            {% for row in summary.rows %}
+            <tr class="summary-row">
+              {% for cell in row.cells %}
+              <td class="summary-cell">
+                <input type="text" class="form-control form-control-sm mb-1 summary-cell-value" name="tbl_{{ block.key }}_sum_{{ summary.index }}_cell_{{ forloop.parentloop.counter0 }}_{{ forloop.counter0 }}_value" placeholder="Static value" value="{{ cell.value }}">
+                <input type="text" class="form-control form-control-sm summary-cell-formula" name="tbl_{{ block.key }}_sum_{{ summary.index }}_cell_{{ forloop.parentloop.counter0 }}_{{ forloop.counter0 }}_formula" placeholder='Formula e.g. =COUNTIF("Bases Risk Rating","High")' value="{{ cell.formula }}">
+              </td>
+              {% endfor %}
+              <td class="align-middle text-center">
+                <button type="button" class="btn btn-sm btn-outline-danger remove-summary-row" title="Remove row">&times;</button>
+              </td>
+            </tr>
+            {% endfor %}
+          {% else %}
+            <tr class="summary-row">
+              <td class="summary-cell">
+                <input type="text" class="form-control form-control-sm mb-1 summary-cell-value" name="tbl_{{ block.key }}_sum_{{ summary.index }}_cell_0_0_value" placeholder="Static value" value="">
+                <input type="text" class="form-control form-control-sm summary-cell-formula" name="tbl_{{ block.key }}_sum_{{ summary.index }}_cell_0_0_formula" placeholder='Formula e.g. =COUNTIF("Bases Risk Rating","High")' value="">
+              </td>
+              <td class="align-middle text-center">
+                <button type="button" class="btn btn-sm btn-outline-danger remove-summary-row" title="Remove row">&times;</button>
+              </td>
+            </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+    <button type="button" class="btn btn-outline-primary btn-sm add-summary-row mt-2">
+      <i class="fa fa-plus"></i> Add Summary Row
+    </button>
+  </div>
+</div>

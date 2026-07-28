@@ -185,6 +185,51 @@ class Company(models.Model):
     def projects_remaining(self):
         return max(0, self.project_limit - self.manager_project_count())
 
+    def deactivate_related_users(self):
+        """Deactivate manager and employee accounts tied to this company.
+
+        Called before company delete so those users cannot log in again.
+        Admins are never touched.
+        """
+        user_ids = set(
+            CustomUser.objects.filter(company=self).values_list('id', flat=True)
+        )
+        if self.authorized_manager_id:
+            user_ids.add(self.authorized_manager_id)
+
+        manager_ids = set(
+            CustomUser.objects.filter(
+                id__in=user_ids, user_type='manager',
+            ).values_list('id', flat=True)
+        )
+        if self.authorized_manager_id:
+            manager_ids.add(self.authorized_manager_id)
+
+        if manager_ids:
+            user_ids.update(
+                CustomUser.objects.filter(
+                    user_type='employee',
+                    created_by_id__in=manager_ids,
+                ).values_list('id', flat=True)
+            )
+            user_ids.update(
+                CustomUser.objects.filter(
+                    user_type='employee',
+                    under_supervision_id__in=manager_ids,
+                ).values_list('id', flat=True)
+            )
+            user_ids.update(
+                CustomUser.objects.filter(
+                    user_type='employee',
+                    team_assignments__project__manager_id__in=manager_ids,
+                ).values_list('id', flat=True)
+            )
+
+        for user in CustomUser.objects.filter(id__in=user_ids).exclude(user_type='admin'):
+            if user.is_active:
+                user.is_active = False
+                user.save(update_fields=['is_active'])
+
 
 class PackageTemplate(models.Model):
     """Master package definition (e.g. Validation Package Set)."""
@@ -307,14 +352,14 @@ class FormTableLayout(models.Model):
         ),
     )
     table_summary = models.JSONField(
-        default=dict,
+        default=list,
         blank=True,
         help_text=(
-            'Optional table summary: {enabled, title, columns:[{label, subheader}], '
-            'rows:[{label, cells:[{value, formula}]}], '
+            'One or more table summaries (list). Each item: {enabled, title, '
+            'columns:[{label, subheader}], rows:[{label, cells:[{value, formula}]}], '
             'dropdowns:[{col, rows, options, is_active, depends_on_table_col?, '
             'depends_on_col?, option_map?}]}. '
-            'depends_on_table_col links to the main table column; option_map maps parent value → child options. '
+            'Legacy single-dict format is still accepted on read. '
             'Admin formulas e.g. =COUNTIF("Bases Risk Rating","High"), '
             '=COUNTIFS(B:B,"Inherent Risk",F:F,"High"), or '
             '=((B2*3)+(C2*2)+(D2*1))/(B2+C2+D2).'
@@ -610,11 +655,11 @@ class FormTableLayout(models.Model):
 
     @staticmethod
     def normalize_table_summary(entry):
-        """Normalize optional summary config; empty/disabled → {}."""
+        """Normalize one summary config; empty/disabled → {}."""
         if not isinstance(entry, dict):
             return {}
-        enabled = bool(entry.get('enabled'))
-        if not enabled:
+        # Explicit False disables; otherwise presence in a summaries list means active.
+        if entry.get('enabled') is False:
             return {}
         title = str(entry.get('title') or '').strip()
         columns = []
@@ -668,29 +713,57 @@ class FormTableLayout(models.Model):
             'dropdowns': dropdowns,
         }
 
+    @staticmethod
+    def normalize_table_summaries(raw):
+        """Normalize stored summaries (list or legacy single dict) → list of enabled items."""
+        if isinstance(raw, list):
+            items = raw
+        elif isinstance(raw, dict):
+            if isinstance(raw.get('items'), list):
+                items = raw['items']
+            elif raw.get('enabled') or raw.get('columns') or raw.get('rows'):
+                items = [raw]
+            else:
+                items = []
+        else:
+            items = []
+        result = []
+        for entry in items:
+            normalized = FormTableLayout.normalize_table_summary(entry)
+            if normalized:
+                result.append(normalized)
+        return result
+
+    @staticmethod
+    def pack_table_summaries(items):
+        """Persist summaries as a clean list."""
+        return FormTableLayout.normalize_table_summaries(items or [])
+
+    def normalized_table_summaries(self):
+        return self.normalize_table_summaries(self.table_summary or [])
+
     def normalized_table_summary(self):
-        return self.normalize_table_summary(self.table_summary or {})
+        """First summary (legacy helpers); prefer normalized_table_summaries()."""
+        summaries = self.normalized_table_summaries()
+        return summaries[0] if summaries else {}
 
     def has_table_summary(self):
-        summary = self.normalized_table_summary()
-        return bool(summary.get('enabled'))
+        return bool(self.normalized_table_summaries())
 
-    def summary_dropdown_lookup(self):
+    def summary_dropdown_lookup(self, summary=None):
         """Map summary column index → active dropdown config."""
-        summary = self.normalized_table_summary()
+        if summary is None:
+            summary = self.normalized_table_summary()
         lookup = {}
-        for dropdown in summary.get('dropdowns') or []:
+        for dropdown in (summary or {}).get('dropdowns') or []:
             if not dropdown.get('is_active', True):
                 continue
             col = dropdown['col']
-            rows = dropdown.get('rows') or []
             lookup.setdefault(col, []).append(dropdown)
-            # Prefer all-rows config when multiple; keep list for row scoping
-            _ = rows
         return lookup
 
-    def summary_dropdown_for_cell(self, row_idx, col_idx, lookup=None):
-        configs = (lookup or self.summary_dropdown_lookup()).get(col_idx, [])
+    def summary_dropdown_for_cell(self, row_idx, col_idx, lookup=None, summary=None):
+        configs = (lookup if lookup is not None else self.summary_dropdown_lookup(summary)).get(col_idx, [])
         for dropdown in configs:
             rows = dropdown.get('rows') or []
             if not rows or row_idx in rows:
@@ -1061,13 +1134,14 @@ class FormRecord(models.Model):
             )
         if user.user_type == 'manager' and self.project.manager == user:
             return True
+        # Manager's authorized team users may fill/edit project forms in draft/returned.
         tm = self._team_member(user)
-        if tm and tm.role == 'team_member':
-            return self.created_by_user == user and self.status in ('draft', 'returned')
+        if tm and tm.role == 'team_member' and self.status in ('draft', 'returned'):
+            return True
         return False
 
     def can_submit(self, user):
-        """Submit for Senior Review — manager's users only, not the project manager."""
+        """Submit for Senior Review — manager's team users only, not the project manager."""
         if self.is_standalone:
             return False
         if self.status not in ('draft', 'returned'):
@@ -1076,11 +1150,7 @@ class FormRecord(models.Model):
         if user.user_type == 'manager' and self.project.manager_id == user.id:
             return False
         tm = self._team_member(user)
-        return (
-            tm is not None
-            and tm.role == 'team_member'
-            and self.created_by_user_id == user.id
-        )
+        return tm is not None and tm.role == 'team_member'
 
     def can_review(self, user):
         if self.is_standalone:
@@ -1171,3 +1241,13 @@ def notify_user(recipient, message, sender=None, link=''):
         )
         from core.context_processors import invalidate_notification_cache
         invalidate_notification_cache(recipient.pk)
+
+
+from django.db.models.signals import pre_delete
+from django.dispatch import receiver
+
+
+@receiver(pre_delete, sender=Company)
+def _deactivate_users_before_company_delete(sender, instance, **kwargs):
+    """Ensure company managers/employees cannot log in after the company is removed."""
+    instance.deactivate_related_users()

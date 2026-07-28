@@ -106,7 +106,7 @@
         <p class="small mt-3 mb-0"> {{ layout.table_note|linebreaksbr }}</p>
         {% endif %}
         {% if layout.has_table_summary %}
-        {% with summary=layout.normalized_table_summary %}
+        {% for summary in layout.normalized_table_summaries %}
         <div class="mt-3 form-table-summary form-table-summary-excel">
           <div class="table-responsive">
             <table class="table table-bordered table-sm mb-0 form-table-summary-table">
@@ -149,7 +149,7 @@
           </ul>
         </div>
         {% endif %}
-        {% endwith %}
+        {% endfor %}
         {% endif %}
         <p class="text-muted small mt-2 mb-0">
           Last updated: {{ layout.updated_at|date:"M d, Y H:i" }}

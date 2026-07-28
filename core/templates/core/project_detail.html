@@ -47,8 +47,10 @@
             <td class="text-nowrap">
               {% if row.record %}
                 <a href="{% url 'core:form-record-detail' row.record.pk %}" class="btn btn-sm btn-info">View</a>
+                {% if row.can_edit %}
                 <a href="{% url 'core:form-record-edit' row.record.pk %}" class="btn btn-sm btn-warning">Edit</a>
-              {% elif user.user_type == 'manager' or user.user_type == 'admin' or team_member and team_member.role == 'team_member' %}
+                {% endif %}
+              {% elif row.can_create %}
                 <a href="{% url 'core:form-record-create' project.pk row.form_def.pk %}" class="btn btn-sm btn-info">View</a>
                 <a href="{% url 'core:form-record-create' project.pk row.form_def.pk %}" class="btn btn-sm btn-warning">Edit</a>
               {% else %}

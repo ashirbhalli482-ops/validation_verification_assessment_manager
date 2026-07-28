@@ -1,21 +1,23 @@
 {% if table_summary %}
 <div class="mt-3 form-table-summary form-table-summary-excel"
      data-summary-layout-id="{{ table_summary.layout_id }}"
+     data-summary-uid="{{ table_summary.summary_uid|default:table_summary.layout_id }}"
+     data-summary-index="{{ table_summary.summary_index|default:0 }}"
      {% if table_summary.option_maps_json %}data-summary-option-maps="{{ table_summary.option_maps_json|escape }}"{% endif %}
      {% if table_summary.formula_grid_json %}data-summary-formulas="{{ table_summary.formula_grid_json|escape }}"{% endif %}
      {% if table_summary.static_grid_json %}data-summary-statics="{{ table_summary.static_grid_json|escape }}"{% endif %}
      {% if table_summary.column_headers_json %}data-summary-headers="{{ table_summary.column_headers_json|escape }}"{% endif %}>
   {% if table_summary.option_maps %}
-  <script type="application/json" id="summary-option-maps-{{ table_summary.layout_id }}">{{ table_summary.option_maps_json|safe }}</script>
+  <script type="application/json" id="summary-option-maps-{{ table_summary.summary_uid|default:table_summary.layout_id }}">{{ table_summary.option_maps_json|safe }}</script>
   {% endif %}
   {% if table_summary.formula_grid_json %}
-  <script type="application/json" id="summary-formulas-{{ table_summary.layout_id }}">{{ table_summary.formula_grid_json|safe }}</script>
+  <script type="application/json" id="summary-formulas-{{ table_summary.summary_uid|default:table_summary.layout_id }}">{{ table_summary.formula_grid_json|safe }}</script>
   {% endif %}
   {% if table_summary.static_grid_json %}
-  <script type="application/json" id="summary-statics-{{ table_summary.layout_id }}">{{ table_summary.static_grid_json|safe }}</script>
+  <script type="application/json" id="summary-statics-{{ table_summary.summary_uid|default:table_summary.layout_id }}">{{ table_summary.static_grid_json|safe }}</script>
   {% endif %}
   {% if table_summary.column_headers_json %}
-  <script type="application/json" id="summary-headers-{{ table_summary.layout_id }}">{{ table_summary.column_headers_json|safe }}</script>
+  <script type="application/json" id="summary-headers-{{ table_summary.summary_uid|default:table_summary.layout_id }}">{{ table_summary.column_headers_json|safe }}</script>
   {% endif %}
   <div class="table-responsive">
     <table class="table table-bordered table-sm mb-0 form-table-summary-table">
@@ -44,7 +46,7 @@
           {% for cell in row.cells %}
           <td class="summary-data-cell">
             {% if cell.editable and cell.dropdown %}
-            <select name="summary_cell_{{ table_summary.layout_id }}_{{ cell.row }}_{{ cell.col }}"
+            <select name="summary_cell_{{ table_summary.layout_id }}_{{ table_summary.summary_index|default:0 }}_{{ cell.row }}_{{ cell.col }}"
                     class="form-control form-control-sm form-summary-cell-select"
                     data-summary-col="{{ cell.col }}"
                     data-summary-row="{{ cell.row }}"
@@ -63,7 +65,7 @@
               {% endif %}
             </select>
             {% elif cell.editable %}
-            <textarea name="summary_cell_{{ table_summary.layout_id }}_{{ cell.row }}_{{ cell.col }}"
+            <textarea name="summary_cell_{{ table_summary.layout_id }}_{{ table_summary.summary_index|default:0 }}_{{ cell.row }}_{{ cell.col }}"
                       class="form-control form-control-sm form-summary-cell-input"
                       rows="1"
                       data-summary-col="{{ cell.col }}"
@@ -380,14 +382,15 @@
 
   function recalculateSummary(wrap) {
     var layoutId = wrap.getAttribute('data-summary-layout-id');
+    var uid = wrap.getAttribute('data-summary-uid') || layoutId;
     var section = wrap.closest('.form-fill-table-wrap');
     var table = section
       ? (section.querySelector('.form-fill-table[data-layout-id="' + layoutId + '"]') || section.querySelector('.form-fill-table'))
       : null;
     var grid = readTableGrid(table);
-    var formulas = parseJsonEl('summary-formulas-' + layoutId, 'data-summary-formulas', wrap) || [];
-    var statics = parseJsonEl('summary-statics-' + layoutId, 'data-summary-statics', wrap) || [];
-    var headers = parseJsonEl('summary-headers-' + layoutId, 'data-summary-headers', wrap) || [];
+    var formulas = parseJsonEl('summary-formulas-' + uid, 'data-summary-formulas', wrap) || [];
+    var statics = parseJsonEl('summary-statics-' + uid, 'data-summary-statics', wrap) || [];
+    var headers = parseJsonEl('summary-headers-' + uid, 'data-summary-headers', wrap) || [];
 
     wrap.querySelectorAll('tr[data-summary-row]').forEach(function (tr) {
       var rowIdx = parseInt(tr.getAttribute('data-summary-row'), 10);
