@@ -94,6 +94,7 @@ urlpatterns = [
     # Form Records & Workflow
     path('projects/<int:project_id>/forms/<int:form_id>/create/', views.FormRecordCreateView.as_view(), name='form-record-create'),
     path('forms/<int:pk>/', views.FormRecordDetailView.as_view(), name='form-record-detail'),
+    path('forms/<int:pk>/download-pdf/', views.FormRecordPdfDownloadView.as_view(), name='form-record-download-pdf'),
     path('forms/<int:pk>/edit/', views.FormRecordEditView.as_view(), name='form-record-edit'),
     path('forms/<int:pk>/submit/', views.FormSubmitView.as_view(), name='form-submit'),
     path('forms/<int:pk>/review/', views.FormReviewView.as_view(), name='form-review'),

@@ -7,28 +7,37 @@
       {% include 'core/includes/form_grey_header.html' with form_def=record.form_definition project=record.project record=record company=company form_owner=form_owner reviews=reviews %}
       <p><strong>Status:</strong> {{ record.get_status_display }}</p>
       {% include 'core/includes/form_table_display.html' %}
-      <div class="btn-group">
+      <div class="d-flex flex-wrap align-items-center" style="gap: 0.35rem;">
         {% if can_edit %}
         <a href="{% url 'core:form-record-edit' record.pk %}" class="btn btn-warning">Edit</a>
         {% endif %}
+        <div class="btn-group">
+          <button type="button" class="btn btn-primary dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+            Download
+          </button>
+          <div class="dropdown-menu">
+            <a class="dropdown-item" href="{% url 'core:form-record-download-pdf' record.pk %}?orientation=landscape">Landscape</a>
+            <a class="dropdown-item" href="{% url 'core:form-record-download-pdf' record.pk %}?orientation=portrait">Portrait</a>
+          </div>
+        </div>
         {% if can_submit %}
-        <form method="post" action="{% url 'core:form-submit' record.pk %}" class="d-inline">{% csrf_token %}
+        <form method="post" action="{% url 'core:form-submit' record.pk %}" class="d-inline mb-0">{% csrf_token %}
           <button class="btn btn-primary">Submit for Senior Review</button>
         </form>
         {% endif %}
         {% if can_review %}
-        <form method="post" action="{% url 'core:form-review' record.pk %}" class="d-inline">{% csrf_token %}
+        <form method="post" action="{% url 'core:form-review' record.pk %}" class="d-inline mb-0">{% csrf_token %}
           <button name="action" value="approve" class="btn btn-success">Approve Review</button>
           <button name="action" value="return" class="btn btn-danger">Return for Editing</button>
         </form>
         {% endif %}
         {% if can_finalize %}
-        <form method="post" action="{% url 'core:form-finalize' record.pk %}" class="d-inline">{% csrf_token %}
+        <form method="post" action="{% url 'core:form-finalize' record.pk %}" class="d-inline mb-0">{% csrf_token %}
           <button class="btn btn-dark">Finalize (Project Manager)</button>
         </form>
         {% endif %}
         {% if record.project_id %}
-        <a href="{% url 'core:project-detail' record.project.pk %}" class="btn btn-secondary">Back to Package</a>
+        <a href="{% url 'core:project-detail' record.project.pk %}" class="btn btn-secondary">Back to Project</a>
         {% else %}
         <a href="{% url 'core:manager-view-forms' %}" class="btn btn-secondary">Back to Forms</a>
         {% endif %}

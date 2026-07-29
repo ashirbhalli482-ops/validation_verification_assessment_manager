@@ -1,7 +1,7 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import authenticate, login, logout, update_session_auth_hash
 from django.contrib import messages
-from django.http import FileResponse, Http404
+from django.http import FileResponse, Http404, HttpResponse
 from django.core.paginator import Paginator
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.views.generic import ListView, CreateView, UpdateView, DeleteView, DetailView
@@ -46,6 +46,7 @@ from .form_table_utils import (
     build_table_block, block_from_post, table_block_keys, stored_cells_for_layout,
     build_summary_display, build_summaries_display, default_table_summary_seed_json,
 )
+from .form_pdf import build_form_record_pdf
 from .package_seed import get_active_package_template
 
 
@@ -2109,6 +2110,33 @@ class FormRecordDetailView(LoginRequiredMixin, View):
             'table_sections': display_sections,
             'other_data': other_data,
         })
+
+
+class FormRecordPdfDownloadView(LoginRequiredMixin, View):
+    """Download the form record as a PDF in portrait or landscape."""
+
+    def get(self, request, pk):
+        record = _get_form_record(pk)
+        if not can_access_form_record(request.user, record):
+            return redirect('core:dashboard')
+        orientation = (request.GET.get('orientation') or 'portrait').strip().lower()
+        if orientation not in ('portrait', 'landscape'):
+            orientation = 'portrait'
+        sections = _table_sections_for_record(
+            record.form_definition, record, sparse=True,
+        )
+        company = _company_for_form_record(record=record)
+        pdf_bytes = build_form_record_pdf(
+            record=record,
+            table_sections=sections,
+            company=company,
+            form_owner=_form_owner_label(company, record.project),
+            orientation=orientation,
+        )
+        filename = f'{record.form_definition.code}_{orientation}.pdf'
+        response = HttpResponse(pdf_bytes, content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return response
 
 
 class FormRecordEditView(LoginRequiredMixin, View):
