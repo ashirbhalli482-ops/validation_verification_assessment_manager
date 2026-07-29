@@ -6,9 +6,14 @@
     <button type="button" class="btn btn-sm btn-outline-danger remove-summary-btn">Remove Summary</button>
   </div>
   <p class="text-muted small mb-2">
-    Edit title, columns, rows, and formulas freely. Example formulas:
-    <code>=COUNTIF("Bases Risk Rating","High")</code>,
-    <code>=((B2*3)+(C2*2)+(D2*1))/(B2+C2+D2)</code>.
+    Edit title, columns, rows, and formulas freely. Multiple operations can be combined in one formula.
+    Examples:
+    <code>=SUM(C6,C7,C8)</code>,
+    <code>=SUM(C6R0,C7R0,C8R0)</code>,
+    <code>=MULTIPLY(SUM(C6),SUM(C7))</code>,
+    <code>=(SUM(C6)+SUM(C7))*SUM(C8)</code>,
+    <code>=SUM(C6R0+C7R0,C8R0)</code>,
+    <code>=C6R0+C7R0*C8R0</code>.
     Leave Comments empty so managers can type values.
   </p>
   <div class="mb-3">
@@ -75,7 +80,7 @@
               {% for cell in row.cells %}
               <td class="summary-cell">
                 <input type="text" class="form-control form-control-sm mb-1 summary-cell-value" name="tbl_{{ block.key }}_sum_{{ summary.index }}_cell_{{ forloop.parentloop.counter0 }}_{{ forloop.counter0 }}_value" placeholder="Static value" value="{{ cell.value }}">
-                <input type="text" class="form-control form-control-sm summary-cell-formula" name="tbl_{{ block.key }}_sum_{{ summary.index }}_cell_{{ forloop.parentloop.counter0 }}_{{ forloop.counter0 }}_formula" placeholder='Formula e.g. =COUNTIF("Bases Risk Rating","High")' value="{{ cell.formula }}">
+                <input type="text" class="form-control form-control-sm summary-cell-formula" name="tbl_{{ block.key }}_sum_{{ summary.index }}_cell_{{ forloop.parentloop.counter0 }}_{{ forloop.counter0 }}_formula" placeholder='Formula e.g. =SUM(C6R0,C7R0,C8R0)' value="{{ cell.formula }}">
               </td>
               {% endfor %}
               <td class="align-middle text-center">
@@ -87,7 +92,7 @@
             <tr class="summary-row">
               <td class="summary-cell">
                 <input type="text" class="form-control form-control-sm mb-1 summary-cell-value" name="tbl_{{ block.key }}_sum_{{ summary.index }}_cell_0_0_value" placeholder="Static value" value="">
-                <input type="text" class="form-control form-control-sm summary-cell-formula" name="tbl_{{ block.key }}_sum_{{ summary.index }}_cell_0_0_formula" placeholder='Formula e.g. =COUNTIF("Bases Risk Rating","High")' value="">
+                <input type="text" class="form-control form-control-sm summary-cell-formula" name="tbl_{{ block.key }}_sum_{{ summary.index }}_cell_0_0_formula" placeholder='Formula e.g. =SUM(C6R0,C7R0,C8R0)' value="">
               </td>
               <td class="align-middle text-center">
                 <button type="button" class="btn btn-sm btn-outline-danger remove-summary-row" title="Remove row">&times;</button>

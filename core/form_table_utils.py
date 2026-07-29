@@ -738,8 +738,14 @@ def default_table_summary_seed_json():
     return json.dumps(empty_table_summary(), separators=(',', ':'))
 
 
-_SUM_COL_RE = re.compile(r'^=SUM\(C(\d+)\)\s*$', re.IGNORECASE)
 _CELL_REF_RE = re.compile(r'^=C(\d+)R(\d+)\s*$', re.IGNORECASE)
+_CELL_TOKEN_RE = re.compile(r'^C(\d+)R(\d+)$', re.IGNORECASE)
+_CELL_RANGE_RE = re.compile(r'^C(\d+)R(\d+)\s*:\s*C(\d+)R(\d+)$', re.IGNORECASE)
+_CELL_EMBED_RE = re.compile(r'\bC(\d+)R(\d+)\b', re.IGNORECASE)
+_EXCEL_CELL_RE = re.compile(r'^\$?([A-Za-z]+)\$?(\d+)$')
+_EXCEL_CELL_RANGE_RE = re.compile(
+    r'^\$?([A-Za-z]+)\$?(\d+)\s*:\s*\$?([A-Za-z]+)\$?(\d+)$'
+)
 _COUNTIF_RE = re.compile(
     r'^=\s*COUNTIF\(\s*([^,]+)\s*,\s*[\'"]?([^\'")]+)[\'"]?\s*\)\s*$',
     re.IGNORECASE,
@@ -749,6 +755,8 @@ _CN_RANGE_RE = re.compile(r'^C(\d+)$', re.IGNORECASE)
 _EXCEL_COL_RE = re.compile(r'^\$?([A-Za-z]+)(?:\$?\d+)?(?::\$?[A-Za-z]+(?:\$?\d+)?)?$')
 _SUMMARY_CELL_REF_RE = re.compile(r'\$?([A-Za-z]+)\$?\d+', re.IGNORECASE)
 _SC_REF_RE = re.compile(r'SC(\d+)', re.IGNORECASE)
+_MATH_FUNC_RE = re.compile(r'(SUM|PRODUCT|MULTIPLY|SUBTRACT|DIVIDE)\s*\(', re.IGNORECASE)
+_PURE_ARITH_RE = re.compile(r'^[\d\.\+\-\*\/\(\)\s]+$')
 
 _AST_OPS = {
     ast.Add: operator.add,
@@ -806,6 +814,21 @@ def _format_number(value):
     return str(value)
 
 
+def _parse_numeric(value):
+    """Parse a cell number; accepts commas and a trailing % (e.g. 5% → 5)."""
+    raw = str(value if value is not None else '').strip().replace(',', '')
+    if not raw:
+        return None
+    if raw.endswith('%'):
+        raw = raw[:-1].strip()
+    if not raw:
+        return None
+    try:
+        return float(raw)
+    except ValueError:
+        return None
+
+
 def _safe_eval_arithmetic(expr):
     """Evaluate a sanitized arithmetic expression (+ - * / and parentheses)."""
     try:
@@ -857,7 +880,7 @@ def countif_main_column(cells, col_index, criteria):
 
 
 def _split_formula_args(inner):
-    """Split COUNTIFS(...) argument list, respecting quoted commas."""
+    """Split function args on comma or |, respecting quoted separators."""
     args = []
     current = []
     in_quote = None
@@ -871,7 +894,7 @@ def _split_formula_args(inner):
             in_quote = char
             current.append(char)
             continue
-        if char == ',':
+        if char in (',', '|'):
             args.append(''.join(current).strip())
             current = []
             continue
@@ -879,6 +902,250 @@ def _split_formula_args(inner):
     if current or args:
         args.append(''.join(current).strip())
     return args
+
+
+def sum_main_columns(cells, col_indexes):
+    """Sum numeric values across one or more main-table columns (all rows)."""
+    total = 0.0
+    found = False
+    indexes = [idx for idx in (col_indexes or []) if idx is not None and idx >= 0]
+    if not indexes:
+        return '0'
+    for row in cells or []:
+        for col_index in indexes:
+            if col_index >= len(row):
+                continue
+            number = _parse_numeric(row[col_index])
+            if number is None:
+                continue
+            total += number
+            found = True
+    if not found:
+        return '0'
+    return _format_number(total)
+
+
+def _get_cell_number(cells, col_index, row_index):
+    """Numeric value at main-table [row_index][col_index], or None."""
+    if row_index is None or col_index is None:
+        return None
+    if row_index < 0 or col_index < 0:
+        return None
+    if row_index >= len(cells or []) or col_index >= len(cells[row_index]):
+        return None
+    return _parse_numeric(cells[row_index][col_index])
+
+
+def _iter_rect_cell_numbers(cells, col1, row1, col2, row2):
+    """All numeric values in an inclusive rectangular cell range."""
+    values = []
+    c_start, c_end = sorted((col1, col2))
+    r_start, r_end = sorted((row1, row2))
+    for row_index in range(r_start, r_end + 1):
+        for col_index in range(c_start, c_end + 1):
+            number = _get_cell_number(cells, col_index, row_index)
+            values.append(0.0 if number is None else number)
+    return values
+
+
+def _looks_like_subexpression(arg):
+    """True when an arg is arithmetic / nested funcs, not a single ref or literal."""
+    text = (arg or '').strip()
+    if not text:
+        return False
+    # Quoted column header is a single reference, even if it contains '(' or '-'.
+    if len(text) >= 2 and text[0] == text[-1] and text[0] in ('"', "'"):
+        return False
+    if (
+        _CELL_RANGE_RE.match(text)
+        or _CELL_TOKEN_RE.match(text)
+        or _CN_RANGE_RE.match(text)
+        or _EXCEL_CELL_RANGE_RE.match(text)
+        or _EXCEL_CELL_RE.match(text)
+    ):
+        return False
+    if _parse_numeric(text) is not None:
+        return False
+    if _MATH_FUNC_RE.search(text):
+        return True
+    # e.g. C6R0+C7R0, C6-C7, (C6R0+1)*2
+    return bool(re.search(r'[+*/(]|[A-Za-z0-9\)"\']\s*-\s*[A-Za-z0-9\("\']', text))
+
+
+def _expand_math_arg_values(arg, cells, column_headers):
+    """
+    Resolve one math-function argument to one or more numbers.
+
+    Supports:
+      C6          → whole-column total
+      C6R0        → specific cell (col 6, row 0)
+      C6R0:C8R0   → rectangular cell range
+      G3 / G3:I3  → Excel-style cell / range (1-based rows)
+      "Header"    → whole-column total by name
+      12 / 5%     → literal number
+      C6R0+C7R0 / SUM(C6)-1 → nested multi-operation sub-expression
+    """
+    arg = (arg or '').strip()
+    if not arg:
+        return []
+
+    # Nested multi-ops inside a function argument, e.g. MULTIPLY(SUM(C6)+1, C7R0)
+    if _looks_like_subexpression(arg):
+        sub = arg
+        if _MATH_FUNC_RE.search(sub):
+            sub = _expand_math_functions(sub, cells, column_headers)
+        if _CELL_EMBED_RE.search(sub):
+            sub = _expand_cell_tokens(sub, cells)
+        if _PURE_ARITH_RE.match(sub or ''):
+            result = _safe_eval_arithmetic(sub)
+            return [_parse_numeric(result) or 0.0]
+        return [0.0]
+
+    match = _CELL_RANGE_RE.match(arg)
+    if match:
+        col1, row1, col2, row2 = (int(match.group(i)) for i in range(1, 5))
+        return _iter_rect_cell_numbers(cells, col1, row1, col2, row2)
+
+    match = _CELL_TOKEN_RE.match(arg)
+    if match:
+        number = _get_cell_number(cells, int(match.group(1)), int(match.group(2)))
+        return [0.0 if number is None else number]
+
+    # Literal numbers first so nested results like MULTIPLY(10,2) stay numbers,
+    # not column indexes.
+    literal = _parse_numeric(arg)
+    if literal is not None:
+        return [literal]
+
+    # App column indexes C0, C6, ...
+    if _CN_RANGE_RE.match(arg):
+        col_index = resolve_main_table_column(arg, column_headers=column_headers)
+        if col_index is not None:
+            return [_parse_numeric(sum_main_columns(cells, [col_index])) or 0.0]
+        return [0.0]
+
+    match = _EXCEL_CELL_RANGE_RE.match(arg)
+    if match:
+        col1 = excel_column_to_index(match.group(1))
+        row1 = int(match.group(2)) - 1
+        col2 = excel_column_to_index(match.group(3))
+        row2 = int(match.group(4)) - 1
+        if col1 is None or col2 is None:
+            return [0.0]
+        return _iter_rect_cell_numbers(cells, col1, row1, col2, row2)
+
+    match = _EXCEL_CELL_RE.match(arg)
+    if match:
+        col_index = excel_column_to_index(match.group(1))
+        row_index = int(match.group(2)) - 1
+        number = _get_cell_number(cells, col_index, row_index)
+        return [0.0 if number is None else number]
+
+    col_index = resolve_main_table_column(arg, column_headers=column_headers)
+    if col_index is not None:
+        return [_parse_numeric(sum_main_columns(cells, [col_index])) or 0.0]
+
+    return [0.0]
+
+
+def _reduce_math_values(name, values):
+    """Apply SUM/PRODUCT/MULTIPLY/SUBTRACT/DIVIDE across resolved numbers."""
+    name = (name or '').strip().upper()
+    values = list(values or [])
+    if name == 'SUM':
+        if not values:
+            return '0'
+        return _format_number(sum(values))
+
+    if not values:
+        return '0'
+
+    if name in ('PRODUCT', 'MULTIPLY'):
+        result = 1.0
+        for value in values:
+            result *= value
+        return _format_number(result)
+
+    if name == 'SUBTRACT':
+        result = values[0]
+        for value in values[1:]:
+            result -= value
+        return _format_number(result)
+
+    if name == 'DIVIDE':
+        result = values[0]
+        for value in values[1:]:
+            if value == 0:
+                return '0'
+            result /= value
+        return _format_number(result)
+
+    return None
+
+
+def _eval_column_math_func(name, args, cells, column_headers):
+    """Evaluate SUM/PRODUCT/MULTIPLY/SUBTRACT/DIVIDE over columns and/or cells."""
+    values = []
+    for arg in args or []:
+        if not str(arg or '').strip():
+            continue
+        values.extend(_expand_math_arg_values(arg, cells, column_headers))
+    return _reduce_math_values(name, values)
+
+
+def _expand_cell_tokens(expr, cells):
+    """Replace embedded C6R0-style tokens with numeric literals."""
+    def replacer(match):
+        number = _get_cell_number(cells, int(match.group(1)), int(match.group(2)))
+        return str(0 if number is None else number)
+
+    return _CELL_EMBED_RE.sub(replacer, expr or '')
+
+
+def _closing_paren_index(expr, open_index):
+    """Index of ')' matching '(' at open_index, respecting quotes."""
+    depth = 0
+    in_quote = None
+    for index in range(open_index, len(expr)):
+        char = expr[index]
+        if in_quote:
+            if char == in_quote:
+                in_quote = None
+            continue
+        if char in ('"', "'"):
+            in_quote = char
+            continue
+        if char == '(':
+            depth += 1
+        elif char == ')':
+            depth -= 1
+            if depth == 0:
+                return index
+    return None
+
+
+def _expand_math_functions(expr, cells, column_headers):
+    """Replace SUM/PRODUCT/MULTIPLY/SUBTRACT/DIVIDE(...) with numeric results."""
+    text = expr or ''
+    for _ in range(40):
+        match = _MATH_FUNC_RE.search(text)
+        if not match:
+            break
+        open_index = match.end() - 1
+        close_index = _closing_paren_index(text, open_index)
+        if close_index is None:
+            break
+        inner = text[open_index + 1:close_index]
+        if _MATH_FUNC_RE.search(inner):
+            expanded_inner = _expand_math_functions(inner, cells, column_headers)
+            text = text[:open_index + 1] + expanded_inner + text[close_index:]
+            continue
+        args = _split_formula_args(inner)
+        value = _eval_column_math_func(match.group(1), args, cells, column_headers)
+        if value is None:
+            break
+        text = text[:match.start()] + str(value) + text[close_index + 1:]
+    return text
 
 
 def _strip_formula_literal(value):
@@ -949,9 +1216,29 @@ def evaluate_summary_formula(formula, cells, row_values=None, column_headers=Non
       =COUNTIF("Bases Risk Rating","High")
       =COUNTIFS(B:B,"Inherent Risk",F:F,"High")
       =SUM(C0)
+      =SUM(C6,C7,C8)
+      =SUM(C6R0,C7R0,C8R0)
+      =SUM(C6R0:C8R0)
+      =SUM(G3:I3)
+      =SUBTRACT(C6R0,C7R0)
+      =MULTIPLY(C6R0,C7R0)
+      =DIVIDE(C6R0,C7R0)
+      =C6R0+C7R0+C8R0
+      =C6R0*C7R0/C8R0
+      =MULTIPLY(SUM(C6),SUM(C7))
+      =(SUM(C6)+SUM(C7))*SUM(C8)
+      =SUM(C6R0+C7R0,C8R0)
+      =SUM(C6)-SUM(C7)*DIVIDE(C8,C6)
+      =PRODUCT(C6,C7) / =MULTIPLY(C6,C7,C8)
+      =SUBTRACT(C6,C7)
+      =DIVIDE(C6,C7)
+      =SUM(C6)-SUM(C7)
       =C0R1
       =((B2*3)+(C2*2)+(D2*1))/(B2+C2+D2)   # same-row summary columns A=0,B=1,...
       =(SC1*3+SC2*2+SC3*1)/(SC1+SC2+SC3)
+    Values like 5% are treated as 5 in numeric math.
+    Cell refs use C<col>R<row> with 0-based indexes (C6R0 = column 6, first data row).
+    Multiple operations can be combined in one formula (+ - * / and nested functions).
     """
     formula = (formula or '').strip()
     if not formula:
@@ -976,26 +1263,6 @@ def evaluate_summary_formula(formula, cells, row_values=None, column_headers=Non
         col_index = resolve_main_table_column(countif.group(1), column_headers=column_headers)
         return countif_main_column(cells, col_index, countif.group(2))
 
-    match = _SUM_COL_RE.match(formula)
-    if match:
-        col = int(match.group(1))
-        total = 0.0
-        found = False
-        for row in cells or []:
-            if col >= len(row):
-                continue
-            raw = str(row[col] or '').strip().replace(',', '')
-            if not raw:
-                continue
-            try:
-                total += float(raw)
-                found = True
-            except ValueError:
-                continue
-        if not found:
-            return '0'
-        return _format_number(total)
-
     match = _CELL_REF_RE.match(formula)
     if match:
         col = int(match.group(1))
@@ -1004,28 +1271,33 @@ def evaluate_summary_formula(formula, cells, row_values=None, column_headers=Non
             return str(cells[row][col] or '')
         return ''
 
+    expr = formula[1:].strip()
+    if _MATH_FUNC_RE.search(expr):
+        expr = _expand_math_functions(expr, cells, column_headers)
+
+    if _CELL_EMBED_RE.search(expr):
+        expr = _expand_cell_tokens(expr, cells)
+
+    if _PURE_ARITH_RE.match(expr or ''):
+        result = _safe_eval_arithmetic(expr)
+        if result is not None:
+            return result
+
     # Arithmetic / weighted rating using same-row summary values.
     if row_values is None:
         return None
-    expr = formula[1:].strip()
 
     def replace_sc(match_obj):
         idx = int(match_obj.group(1))
         raw = row_values[idx] if 0 <= idx < len(row_values) else 0
-        try:
-            return str(float(str(raw).replace(',', '') or 0))
-        except ValueError:
-            return '0'
+        return str(_to_number(raw))
 
     def replace_letter(match_obj):
         idx = excel_column_to_index(match_obj.group(1))
         if idx is None:
             return '0'
         raw = row_values[idx] if 0 <= idx < len(row_values) else 0
-        try:
-            return str(float(str(raw).replace(',', '') or 0))
-        except ValueError:
-            return '0'
+        return str(_to_number(raw))
 
     expr = _SC_REF_RE.sub(replace_sc, expr)
     expr = _SUMMARY_CELL_REF_RE.sub(replace_letter, expr)
@@ -1033,10 +1305,8 @@ def evaluate_summary_formula(formula, cells, row_values=None, column_headers=Non
 
 
 def _to_number(value):
-    try:
-        return float(str(value or '').replace(',', '').strip() or 0)
-    except ValueError:
-        return 0.0
+    number = _parse_numeric(value)
+    return 0.0 if number is None else number
 
 
 def _unique_table_column_values(cells, col_idx):

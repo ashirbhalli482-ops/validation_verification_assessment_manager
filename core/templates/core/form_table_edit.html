@@ -262,7 +262,7 @@
 <template id="empty-summary-cell">
   <td class="summary-cell">
     <input type="text" class="form-control form-control-sm mb-1 summary-cell-value" placeholder="Static value" value="">
-    <input type="text" class="form-control form-control-sm summary-cell-formula" placeholder='Formula e.g. =COUNTIF($F$24:$F$114,"High")' value="">
+    <input type="text" class="form-control form-control-sm summary-cell-formula" placeholder='Formula e.g. =SUM(C6,C7,C8)' value="">
   </td>
 </template>
 
@@ -319,7 +319,7 @@
       cell = document.createElement('td');
       cell.className = 'summary-cell';
       cell.innerHTML = '<input type="text" class="form-control form-control-sm mb-1 summary-cell-value" placeholder="Static value" value="">' +
-        '<input type="text" class="form-control form-control-sm summary-cell-formula" placeholder=\'Formula e.g. =COUNTIF($F$24:$F$114,"High")\' value="">';
+        '<input type="text" class="form-control form-control-sm summary-cell-formula" placeholder=\'Formula e.g. =SUM(C6,C7,C8)\' value="">';
       return cell;
     }
 
