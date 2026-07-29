@@ -16,8 +16,7 @@
     <div class="form-doc-meta-cell form-doc-meta-label-cell">Issue Date:</div>
     <div class="form-doc-meta-cell form-doc-meta-value-cell">{% if company and company.issue_date %}{{ company.issue_date|date:"Y-m-d" }}{% else %}-{% endif %}</div>
     <div class="form-doc-meta-cell form-doc-meta-label-cell form-doc-meta-doc-label">Document Name:</div>
-    <div class="form-doc-meta-cell form-doc-meta-value-cell form-doc-meta-doc-code">{{ form_def.code }}</div>
-    <div class="form-doc-meta-cell form-doc-meta-value-cell form-doc-meta-doc-name">({{ form_def.name }})</div>
+    <div class="form-doc-meta-cell form-doc-meta-value-cell form-doc-meta-doc-title">{{ form_def.code }}{% if form_def.name %} ({{ form_def.name }}){% endif %}</div>
     <div class="form-doc-meta-cell form-doc-meta-label-cell">Owner:</div>
     <div class="form-doc-meta-cell form-doc-meta-value-cell">{{ form_owner|default:"VVB" }}</div>
     <div class="form-doc-meta-cell form-doc-meta-label-cell">Version:</div>

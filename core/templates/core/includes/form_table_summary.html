@@ -193,8 +193,9 @@
 
   function formatNumber(value) {
     if (typeof value !== 'number' || !isFinite(value)) return '0';
-    if (Math.abs(value - Math.round(value)) < 1e-9) return String(Math.round(value));
-    return String(Math.round(value * 1e10) / 1e10).replace(/\.?0+$/, '');
+    var rounded = Math.round(value * 1000) / 1000;
+    if (Math.abs(rounded - Math.round(rounded)) < 1e-9) return String(Math.round(rounded));
+    return String(rounded).replace(/\.?0+$/, '');
   }
 
   function toNumber(value) {

@@ -708,7 +708,7 @@
 
 .form-doc-meta-bar {
 	display: grid;
-	grid-template-columns: max-content minmax(6rem, 0.7fr) max-content max-content minmax(10rem, 1.6fr) max-content minmax(5rem, 1fr) max-content minmax(5rem, 0.8fr);
+	grid-template-columns: max-content minmax(6rem, 0.7fr) max-content minmax(12rem, 2.3fr) max-content minmax(5rem, 1fr) max-content minmax(5rem, 0.8fr);
 	width: 100%;
 	align-items: stretch;
 	background: #8bc34a;
@@ -728,7 +728,7 @@
 	padding: 0.45rem 0.75rem;
 	border-right: 1px solid rgba(255, 255, 255, 0.55);
 	font-style: italic;
-	font-size: 0.9rem;
+	font-size: 0.8rem;
 	line-height: 1.2;
 	white-space: nowrap;
 	word-break: normal;
@@ -748,9 +748,15 @@
 }
 
 .form-doc-meta-doc-label,
+.form-doc-meta-doc-title,
 .form-doc-meta-doc-code,
 .form-doc-meta-doc-name {
 	white-space: nowrap;
+}
+
+.form-doc-meta-doc-title {
+	padding-left: 0.85rem;
+	padding-right: 0.85rem;
 }
 
 .form-doc-meta-doc-name {
@@ -967,7 +973,7 @@
 
 .form-table-summary-excel .summary-title-row th {
 	background: #d9d9d9;
-	text-align: center;
+	text-align: left;
 	font-weight: 700;
 	font-size: 0.95rem;
 }

@@ -309,6 +309,8 @@ def build_table_block(layout=None, key=None, parsed=None):
 
 
 def block_from_post(post, key, table_number=1):
+    from core.models import FormTableLayout
+
     prefix = f'tbl_{key}'
     try:
         row_count = int(post.get(f'{prefix}_row_count', 100))
@@ -316,7 +318,21 @@ def block_from_post(post, key, table_number=1):
         return None
     columns = parse_columns(post, prefix)
     dropdowns, dropdown_rows = parse_column_dropdowns(post, prefix, len(columns), row_count)
-    summaries = parse_table_summaries(post, prefix)
+
+    layout_id = post.get(f'{prefix}_id') or None
+    if layout_id:
+        try:
+            layout_id = int(layout_id)
+        except (TypeError, ValueError):
+            layout_id = None
+
+    existing_summaries = None
+    if layout_id:
+        layout = FormTableLayout.objects.filter(pk=layout_id).first()
+        if layout:
+            existing_summaries = layout.normalized_table_summaries()
+
+    summaries = parse_table_summaries(post, prefix, existing_summaries=existing_summaries)
     summary_blocks = []
     for index, summary in enumerate(summaries):
         summary_blocks.append({
@@ -325,12 +341,6 @@ def block_from_post(post, key, table_number=1):
             'dropdown_rows': _summary_dropdown_rows(summary),
             'next_summary_dropdown_index': len(summary.get('dropdowns') or []),
         })
-    layout_id = post.get(f'{prefix}_id') or None
-    if layout_id:
-        try:
-            layout_id = int(layout_id)
-        except (TypeError, ValueError):
-            layout_id = None
     return {
         'key': key,
         'layout_id': layout_id,
@@ -355,7 +365,17 @@ def block_from_post(post, key, table_number=1):
     }
 
 
-def parse_table_summaries(post, prefix):
+def _summary_dropdown_fields_in_post(post, prefix):
+    """True when admin POST still includes summary dropdown fields."""
+    marker_new = f'{prefix}_dd_'
+    marker_legacy = f'{prefix}_summary_dd_'
+    for key in post:
+        if key.startswith(marker_new) or key.startswith(marker_legacy):
+            return True
+    return False
+
+
+def parse_table_summaries(post, prefix, existing_summaries=None):
     """Parse one or more table summaries from admin POST fields."""
     from core.models import FormTableLayout
 
@@ -378,7 +398,7 @@ def parse_table_summaries(post, prefix):
         or post.get(f'{prefix}_summary_title')
         or post.getlist(f'{prefix}_summary_columns')
     ):
-        legacy = parse_table_summary(post, prefix)
+        legacy = parse_table_summary(post, prefix, existing_summaries=existing_summaries)
         return [legacy] if legacy else []
 
     header_labels = post.getlist(f'{prefix}_column_headers')
@@ -429,6 +449,13 @@ def parse_table_summaries(post, prefix):
             table_col_count=max(table_col_count, 1),
             row_count=summary_row_count,
         )
+        # Admin UI no longer edits summary dropdowns; keep stored configs when not posted.
+        if not _summary_dropdown_fields_in_post(post, sp):
+            if existing_summaries and idx < len(existing_summaries):
+                summary_dropdowns = list(existing_summaries[idx].get('dropdowns') or [])
+            else:
+                summary_dropdowns = []
+
         normalized = FormTableLayout.normalize_table_summary({
             'enabled': True,
             'title': title,
@@ -441,7 +468,7 @@ def parse_table_summaries(post, prefix):
     return summaries
 
 
-def parse_table_summary(post, prefix):
+def parse_table_summary(post, prefix, existing_summaries=None):
     """Parse legacy single table summary from admin POST fields."""
     from core.models import FormTableLayout
 
@@ -497,6 +524,11 @@ def parse_table_summary(post, prefix):
         table_col_count=max(table_col_count, 1),
         row_count=summary_row_count,
     )
+    if not _summary_dropdown_fields_in_post(post, prefix):
+        if existing_summaries:
+            summary_dropdowns = list(existing_summaries[0].get('dropdowns') or [])
+        else:
+            summary_dropdowns = []
 
     return FormTableLayout.normalize_table_summary({
         'enabled': True,
@@ -767,9 +799,10 @@ def _format_number(value):
     if isinstance(value, bool):
         return str(value)
     if isinstance(value, float):
-        if value == int(value):
-            return str(int(value))
-        return str(round(value, 10)).rstrip('0').rstrip('.')
+        rounded = round(value, 3)
+        if rounded == int(rounded):
+            return str(int(rounded))
+        return str(rounded).rstrip('0').rstrip('.')
     return str(value)
 
 
