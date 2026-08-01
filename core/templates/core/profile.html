@@ -34,7 +34,6 @@
                                         {% if not is_admin_profile %}
                                         <strong>Designation:</strong> {{ logged_user.designation|default:'-' }}<br>
                                         <strong>Contact:</strong> {{ logged_user.contact_number|default:'-' }}<br>
-                                        <strong>Supervisor:</strong> {{ logged_user.under_supervision.get_full_name|default:'-' }}<br>
                                         {% if logged_user.company %}
                                         <strong>Company:</strong> {{ logged_user.company.name }}<br>
                                         {% endif %}

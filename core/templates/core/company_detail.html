@@ -71,12 +71,8 @@
       </div>
 
       {% if authorization and form_definition_groups %}
-      <form method="post">
-        {% csrf_token %}
-        {% include 'core/includes/forms_selection_table.html' with help_text="Check forms under Option for Activation to allocate them to this company." %}
-        <button type="submit" class="btn btn-primary mb-3">Save Form Allocation</button>
-      </form>
-      <div class="row text-muted small">
+      {% include 'core/includes/forms_selection_table.html' with title="Forms Allocation" help_text="Allocated forms are shown below (read-only). Use Edit to change form allocation." readonly=True %}
+      <div class="row text-muted small mt-2">
         <div class="col-md-4">
           <strong>Package Template:</strong> {{ authorization.package_template.name }}
         </div>

@@ -185,12 +185,8 @@ class Company(models.Model):
     def projects_remaining(self):
         return max(0, self.project_limit - self.manager_project_count())
 
-    def deactivate_related_users(self):
-        """Deactivate manager and employee accounts tied to this company.
-
-        Called before company delete so those users cannot log in again.
-        Admins are never touched.
-        """
+    def related_user_ids_for_delete(self):
+        """Manager/employee user IDs tied to this company (admins never included)."""
         user_ids = set(
             CustomUser.objects.filter(company=self).values_list('id', flat=True)
         )
@@ -224,11 +220,27 @@ class Company(models.Model):
                     team_assignments__project__manager_id__in=manager_ids,
                 ).values_list('id', flat=True)
             )
+        return user_ids
 
-        for user in CustomUser.objects.filter(id__in=user_ids).exclude(user_type='admin'):
-            if user.is_active:
-                user.is_active = False
-                user.save(update_fields=['is_active'])
+    def delete_related_users(self):
+        """Hard-delete manager and employee accounts tied to this company.
+
+        Called before company delete so emails are freed for re-create.
+        Admins are never touched. Cascades package authorizations/projects
+        owned by those managers.
+        """
+        user_ids = self.related_user_ids_for_delete()
+        if not user_ids:
+            return
+        # Clear reverse OneToOne before user delete to avoid FK surprises.
+        if self.authorized_manager_id and self.authorized_manager_id in user_ids:
+            type(self).objects.filter(pk=self.pk).update(authorized_manager=None)
+            self.authorized_manager_id = None
+        CustomUser.objects.filter(id__in=user_ids).exclude(user_type='admin').delete()
+
+    def deactivate_related_users(self):
+        """Deprecated alias: company delete now hard-deletes related users."""
+        self.delete_related_users()
 
 
 class PackageTemplate(models.Model):
@@ -1248,6 +1260,6 @@ from django.dispatch import receiver
 
 
 @receiver(pre_delete, sender=Company)
-def _deactivate_users_before_company_delete(sender, instance, **kwargs):
-    """Ensure company managers/employees cannot log in after the company is removed."""
-    instance.deactivate_related_users()
+def _delete_users_before_company_delete(sender, instance, **kwargs):
+    """Hard-delete company managers/employees so the company email can be reused."""
+    instance.delete_related_users()

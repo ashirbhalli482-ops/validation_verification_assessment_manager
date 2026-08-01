@@ -884,18 +884,13 @@ class CompanyDetailView(AdminRequiredMixin, View):
         auth = _company_authorization(company)
         return render(request, 'core/company_detail.html', self._context(company, auth))
 
-    @transaction.atomic
     def post(self, request, pk):
-        company = get_object_or_404(
-            Company.objects.select_related('authorized_manager'), pk=pk,
+        # Form allocation is only allowed on company edit — not on view.
+        messages.info(
+            request,
+            'Form allocation can only be changed from Edit Company.',
         )
-        auth = _company_authorization(company)
-        if auth:
-            _apply_activated_forms(auth, request.POST.getlist('activated_forms'))
-            messages.success(request, 'Form allocation saved for this company.')
-        else:
-            messages.error(request, 'No package authorization linked to this company.')
-        return redirect('core:company-detail', pk=pk)
+        return redirect('core:company-edit', pk=pk)
 
 
 class CompanyDeleteView(AdminRequiredMixin, DeleteView):
@@ -903,8 +898,10 @@ class CompanyDeleteView(AdminRequiredMixin, DeleteView):
     template_name = 'core/confirm_delete.html'
     context_object_name = 'object'
 
+    @transaction.atomic
     def form_valid(self, form):
         company_name = self.object.name
+        # pre_delete signal hard-deletes related manager/employee users (frees email).
         self.object.delete()
         return company_list_success_redirect('deleted', company_name)
 
