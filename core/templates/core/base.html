@@ -184,6 +184,14 @@
               </li>
               {% else %}
               <li class="nav-item">
+                <a class="nav-link" href="{% url 'core:approvals-list' %}">
+                  <i class="fa fa-check-square"></i> View Approvals
+                  {% if pending_approvals_count %}
+                    <span class="badge badge-warning ml-2">{{ pending_approvals_count }}</span>
+                  {% endif %}
+                </a>
+              </li>
+              <li class="nav-item">
                 <a class="nav-link" href="{% url 'core:project-list'%}"><i class="fa fa-folder"></i> View Projects</a>
               </li>
               {% endif %}

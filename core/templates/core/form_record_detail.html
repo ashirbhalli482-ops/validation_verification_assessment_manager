@@ -6,6 +6,32 @@
     <div class="card-body">
       {% include 'core/includes/form_grey_header.html' with form_def=record.form_definition project=record.project record=record company=company form_owner=form_owner reviews=reviews %}
       <p><strong>Status:</strong> {{ record.get_status_display }}</p>
+      {% if record.current_reviewer %}
+      <p class="text-muted mb-2">
+        <strong>Awaiting review by:</strong>
+        {{ record.current_reviewer.get_full_name|default:record.current_reviewer.username }}
+      </p>
+      {% endif %}
+      {% if record.status == 'returned' and record.rejection_reason %}
+      <div class="alert alert-warning">
+        <strong>Rejection reason:</strong> {{ record.rejection_reason }}
+      </div>
+      {% endif %}
+      {% if reviews %}
+      <div class="mb-3">
+        <strong>Review history</strong>
+        <ul class="mb-0 pl-3">
+          {% for rev in reviews %}
+          <li class="small">
+            {{ rev.reviewer_name }} ({{ rev.reviewer_role }}) —
+            {% if rev.returned %}Rejected{% elif rev.approved %}Approved{% else %}Reviewed{% endif %}
+            on {{ rev.reviewed_at|date:"M d, Y H:i" }}
+            {% if rev.comments %}: {{ rev.comments }}{% endif %}
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endif %}
       {% include 'core/includes/form_table_display.html' %}
       <div class="d-flex flex-wrap align-items-center" style="gap: 0.35rem;">
         {% if can_edit %}
@@ -21,15 +47,20 @@
           </div>
         </div>
         {% if can_submit %}
-        <form method="post" action="{% url 'core:form-submit' record.pk %}" class="d-inline mb-0">{% csrf_token %}
-          <button class="btn btn-primary">Submit for Senior Review</button>
-        </form>
+        <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#submitReviewModal">
+          Submit for Senior Review
+        </button>
         {% endif %}
         {% if can_review %}
-        <form method="post" action="{% url 'core:form-review' record.pk %}" class="d-inline mb-0">{% csrf_token %}
-          <button name="action" value="approve" class="btn btn-success">Approve Review</button>
-          <button name="action" value="return" class="btn btn-danger">Return for Editing</button>
-        </form>
+        <button type="button" class="btn btn-danger" data-toggle="modal" data-target="#rejectReviewModal">
+          Reject / Send Back
+        </button>
+        <button type="button" class="btn btn-info" data-toggle="modal" data-target="#forwardReviewModal">
+          Approve &amp; Forward
+        </button>
+        <button type="button" class="btn btn-success" data-toggle="modal" data-target="#finalApprovalModal">
+          Final Approval
+        </button>
         {% endif %}
         {% if can_finalize %}
         <form method="post" action="{% url 'core:form-finalize' record.pk %}" class="d-inline mb-0">{% csrf_token %}
@@ -45,4 +76,169 @@
     </div>
   </div>
 </div>
+
+{% if can_submit %}
+<div class="modal fade" id="submitReviewModal" tabindex="-1" role="dialog" aria-labelledby="submitReviewModalLabel" aria-hidden="true">
+  <div class="modal-dialog" role="document">
+    <form method="post" action="{% url 'core:form-submit' record.pk %}">
+      {% csrf_token %}
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="submitReviewModalLabel">Submit for Senior Review</h5>
+          <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+          </button>
+        </div>
+        <div class="modal-body">
+          <p class="text-muted small">Select an authorized project user to review this form.</p>
+          {% if review_candidates %}
+          <div class="form-group mb-0">
+            <label for="submit_reviewer_id">Reviewer</label>
+            <select name="reviewer_id" id="submit_reviewer_id" class="form-control" required>
+              <option value="">— Select user —</option>
+              {% for tm in review_candidates %}
+              <option value="{{ tm.user_id }}">
+                {{ tm.name }} — {% if tm.user_role %}{{ tm.get_user_role_display }}{% else %}{{ tm.get_role_display }}{% endif %}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          {% else %}
+          <div class="alert alert-warning mb-0">No other authorized users are available on this project.</div>
+          {% endif %}
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary" {% if not review_candidates %}disabled{% endif %}>Submit</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+{% if can_review %}
+<div class="modal fade" id="rejectReviewModal" tabindex="-1" role="dialog" aria-labelledby="rejectReviewModalLabel" aria-hidden="true">
+  <div class="modal-dialog" role="document">
+    <form method="post" action="{% url 'core:form-review' record.pk %}">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="reject">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="rejectReviewModalLabel">Reject / Send Back</h5>
+          <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+          </button>
+        </div>
+        <div class="modal-body">
+          {% if reject_target %}
+          <p class="text-muted small mb-2">
+            The form will be sent back <strong>one step</strong> to
+            <strong>{{ reject_target.get_full_name|default:reject_target.username }}</strong>.
+          </p>
+          {% else %}
+          <p class="text-muted small mb-2">
+            The form will be sent back one step to the previous user in the review path.
+          </p>
+          {% endif %}
+          <div class="form-group mb-0">
+            <label for="rejection_reason">Reason <span class="text-danger">*</span></label>
+            <textarea name="rejection_reason" id="rejection_reason" class="form-control" rows="4" required placeholder="Explain why the form is being rejected"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-danger">Reject &amp; Send Back</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="modal fade" id="forwardReviewModal" tabindex="-1" role="dialog" aria-labelledby="forwardReviewModalLabel" aria-hidden="true">
+  <div class="modal-dialog" role="document">
+    <form method="post" action="{% url 'core:form-review' record.pk %}">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="forward">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="forwardReviewModalLabel">Approve &amp; Forward for Senior Review</h5>
+          <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+          </button>
+        </div>
+        <div class="modal-body">
+          <p class="text-muted small">Approve from your side and send to another authorized project user.</p>
+          {% if review_candidates %}
+          <div class="form-group">
+            <label for="forward_reviewer_id">Next reviewer</label>
+            <select name="reviewer_id" id="forward_reviewer_id" class="form-control" required>
+              <option value="">— Select user —</option>
+              {% for tm in review_candidates %}
+              <option value="{{ tm.user_id }}">
+                {{ tm.name }} — {% if tm.user_role %}{{ tm.get_user_role_display }}{% else %}{{ tm.get_role_display }}{% endif %}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group mb-0">
+            <label for="forward_comments">Comments (optional)</label>
+            <textarea name="comments" id="forward_comments" class="form-control" rows="3" placeholder="Optional note for the next reviewer"></textarea>
+          </div>
+          {% else %}
+          <div class="alert alert-warning mb-0">No other authorized users are available to forward to. Use Final Approval instead.</div>
+          {% endif %}
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-info" {% if not review_candidates %}disabled{% endif %}>Approve &amp; Forward</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="modal fade" id="finalApprovalModal" tabindex="-1" role="dialog" aria-labelledby="finalApprovalModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" role="document">
+    <form method="post" action="{% url 'core:form-review' record.pk %}">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="final_approve">
+      <div class="modal-content border-0 shadow">
+        <div class="modal-header bg-success text-white">
+          <h5 class="modal-title" id="finalApprovalModalLabel">
+            <i class="fa fa-check-circle"></i> Confirm Final Approval
+          </h5>
+          <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+          </button>
+        </div>
+        <div class="modal-body">
+          <div class="d-flex align-items-start mb-3">
+            <div class="mr-3 text-success" style="font-size: 2rem; line-height: 1;">
+              <i class="fa fa-stamp"></i>
+            </div>
+            <div>
+              <p class="mb-2 font-weight-bold">Give final approval to this form?</p>
+              <p class="text-muted mb-0 small">
+                After final approval, no other user will be able to edit this form.
+                Only you (the final approver) will retain edit access.
+              </p>
+            </div>
+          </div>
+          <div class="form-group mb-0">
+            <label for="final_approval_comments">Comments <span class="text-muted">(optional)</span></label>
+            <textarea name="comments" id="final_approval_comments" class="form-control" rows="3" placeholder="Optional note for the approval record"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-success">
+            <i class="fa fa-check"></i> Confirm Final Approval
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
 {% endblock %}

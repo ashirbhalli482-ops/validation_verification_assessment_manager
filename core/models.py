@@ -1104,6 +1104,22 @@ class FormRecord(models.Model):
         related_name='finalized_forms'
     )
     finalized_at = models.DateTimeField(null=True, blank=True)
+    current_reviewer = models.ForeignKey(
+        CustomUser, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='forms_awaiting_review',
+        help_text='User currently assigned to review this form.',
+    )
+    last_submitted_by = models.ForeignKey(
+        CustomUser, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='forms_last_submitted',
+        help_text='User who last submitted/forwarded this form for review.',
+    )
+    review_chain = models.JSONField(
+        default=list,
+        blank=True,
+        help_text='Ordered user IDs in the senior-review path; reject pops one step back.',
+    )
+    rejection_reason = models.TextField(blank=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
@@ -1135,61 +1151,132 @@ class FormRecord(models.Model):
         return get_team_member(user, self.project)
 
     def can_edit(self, user):
+        if not user or not user.is_authenticated:
+            return False
         if user.user_type == 'admin':
             return True
-        if self.status in ('approved', 'finalized', 'submitted'):
-            return False
+        # After final approval, only the final approver may edit.
+        if self.status == 'finalized':
+            return self.finalized_by_id == user.id
         if self.is_standalone:
             return (
                 user.user_type == 'manager'
                 and self.owner_manager_id == user.id
             )
-        if user.user_type == 'manager' and self.project.manager == user:
+        if user.user_type == 'manager' and self.project.manager_id == user.id:
             return True
-        # Manager's authorized team users may fill/edit project forms in draft/returned.
+        # Until final approval, all authorized project team users may edit.
         tm = self._team_member(user)
-        if tm and tm.role == 'team_member' and self.status in ('draft', 'returned'):
-            return True
-        return False
+        return tm is not None
 
     def can_submit(self, user):
-        """Submit for Senior Review — manager's team users only, not the project manager."""
+        """Submit/forward for senior review — any authorized project team user (not PM)."""
         if self.is_standalone:
             return False
         if self.status not in ('draft', 'returned'):
             return False
-        # Project manager reviews/finalizes; they do not submit for senior review.
         if user.user_type == 'manager' and self.project.manager_id == user.id:
             return False
         tm = self._team_member(user)
-        return tm is not None and tm.role == 'team_member'
+        return tm is not None
 
     def can_review(self, user):
+        """Current assigned reviewer may reject, forward, or final-approve."""
         if self.is_standalone:
             return False
-        if self.status not in ('submitted', 'approved'):
+        if self.status != 'submitted':
             return False
-        if self.status == 'finalized':
+        if not user or not user.is_authenticated:
             return False
-        if self.project.manager == user:
-            return False
-        if self.reviews.filter(reviewer=user).exists():
-            return False
-        if self.reviews.filter(approved=True).count() >= 3:
+        if self.current_reviewer_id:
+            return self.current_reviewer_id == user.id
+        # Legacy fallback: senior_reviewer role when no assignee was set.
+        if self.project.manager_id == user.id:
             return False
         return TeamMember.objects.filter(
             project=self.project, user=user, role='senior_reviewer', is_active=True
         ).exists()
 
     def can_finalize(self, user):
+        """Project manager may finalize after at least one approval (legacy path)."""
         if self.is_standalone:
             return False
         return (
             user.user_type == 'manager'
-            and self.project.manager == user
+            and self.project.manager_id == user.id
             and self.status == 'approved'
             and self.reviews.filter(approved=True).exists()
         )
+
+    def review_candidates(self, exclude_user=None):
+        """Authorized project team users (with accounts) available for review assignment."""
+        if not self.project_id:
+            return TeamMember.objects.none()
+        qs = (
+            TeamMember.objects.filter(
+                project=self.project, is_active=True, user__isnull=False,
+            )
+            .select_related('user')
+            .order_by('name')
+        )
+        if exclude_user is not None:
+            qs = qs.exclude(user=exclude_user)
+        return qs
+
+    def _chain_user_ids(self):
+        chain = self.review_chain if isinstance(self.review_chain, list) else []
+        ids = []
+        for item in chain:
+            try:
+                ids.append(int(item))
+            except (TypeError, ValueError):
+                continue
+        return ids
+
+    def previous_step_user(self):
+        """Immediate previous user in the review chain (one step back on reject)."""
+        chain = self._chain_user_ids()
+        if not chain:
+            return self.last_submitted_by or self.created_by_user
+        prev_id = chain[-1]
+        return CustomUser.objects.filter(pk=prev_id).first() or (
+            self.last_submitted_by or self.created_by_user
+        )
+
+    def reject_target_user(self):
+        """Alias for previous_step_user (reject sends back one step)."""
+        return self.previous_step_user()
+
+    def apply_reject_one_step(self, reason=''):
+        """
+        Pop one step from the review chain.
+
+        - Mid-chain: previous reviewer becomes current_reviewer (status stays submitted).
+        - First step: returned to original submitter (status=returned, no current reviewer).
+        Returns the user the form was sent back to, or None.
+        """
+        chain = self._chain_user_ids()
+        target = None
+        if chain:
+            prev_id = chain.pop()
+            target = CustomUser.objects.filter(pk=prev_id).first()
+            self.review_chain = chain
+            if chain and target:
+                # Still reviewers below — hand back to previous senior.
+                self.status = 'submitted'
+                self.current_reviewer = target
+            else:
+                # Back to the original submitter.
+                self.status = 'returned'
+                self.current_reviewer = None
+        else:
+            target = self.last_submitted_by or self.created_by_user
+            self.review_chain = []
+            self.status = 'returned'
+            self.current_reviewer = None
+
+        self.rejection_reason = reason or ''
+        return target
 
     def has_user_reviewed(self, user):
         return self.reviews.filter(reviewer=user, approved=True).exists()
@@ -1200,7 +1287,7 @@ class FormRecord(models.Model):
 
 
 class FormReview(models.Model):
-    """Up to three senior-level reviews per form."""
+    """Review / forward / rejection history for a form."""
     form_record = models.ForeignKey(
         FormRecord, on_delete=models.CASCADE, related_name='reviews'
     )
@@ -1212,6 +1299,7 @@ class FormReview(models.Model):
     review_order = models.PositiveIntegerField(default=1)
     approved = models.BooleanField(default=False)
     returned = models.BooleanField(default=False)
+    comments = models.TextField(blank=True)
     reviewed_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

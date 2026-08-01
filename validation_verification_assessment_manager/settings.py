@@ -100,6 +100,7 @@ TEMPLATES = [
             'django.contrib.messages.context_processors.messages',
             'core.context_processors.logged_user_processor',
             'core.context_processors.notifications_processor',
+            'core.context_processors.pending_approvals_processor',
             'core.context_processors.static_version_processor',
         ],
         },
@@ -168,7 +169,7 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 STATICFILES_DIRS = [
     os.path.join(BASE_DIR, 'core/static'),
 ]
-STATIC_VERSION = os.environ.get('STATIC_VERSION', '18')
+STATIC_VERSION = os.environ.get('STATIC_VERSION', '19')
 
 STORAGES = {
     'default': {

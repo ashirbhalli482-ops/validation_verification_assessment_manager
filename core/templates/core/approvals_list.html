@@ -1,0 +1,149 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block breadcrumb %}
+<li class="breadcrumb-item"><a href="{% url 'core:dashboard' %}">Home</a></li>
+<li class="breadcrumb-item">View Approvals</li>
+<li class="breadcrumb-item active">Approvals</li>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+  <div class="card">
+    <div class="card-header">
+      <h4 class="card-title mb-0">
+        <i class="fa fa-clipboard-list"></i> Approvals
+        {% if pending_count %}
+          <span class="badge badge-warning ml-2">{{ pending_count }} pending</span>
+        {% endif %}
+      </h4>
+    </div>
+    <div class="card-body">
+      <ul class="nav nav-tabs mb-3">
+        <li class="nav-item">
+          <a class="nav-link {% if tab == 'approvals' %}active{% endif %}"
+             href="{% url 'core:approvals-list' %}?tab=approvals">
+            Approvals
+            {% if pending_count %}<span class="badge badge-warning">{{ pending_count }}</span>{% endif %}
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link {% if tab == 'submitted' %}active{% endif %}"
+             href="{% url 'core:approvals-list' %}?tab=submitted">
+            My Submitted
+            {% if submitted_count %}<span class="badge badge-info">{{ submitted_count }}</span>{% endif %}
+          </a>
+        </li>
+      </ul>
+
+      {% if tab == 'approvals' %}
+        {% if pending_approvals %}
+        <div class="table-responsive">
+          <table class="table table-bordered table-hover mb-0">
+            <thead>
+              <tr>
+                <th>Form</th>
+                <th>Project</th>
+                <th>Submitted by</th>
+                <th>Updated</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for record in pending_approvals %}
+              <tr>
+                <td>
+                  <strong>{{ record.form_definition.code }}</strong>
+                  {% if record.form_definition.name %}
+                    <div class="small text-muted">{{ record.form_definition.name }}</div>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if record.project %}
+                    {{ record.project.project_number }} — {{ record.project.company_name|default:record.project }}
+                  {% else %}
+                    —
+                  {% endif %}
+                </td>
+                <td>
+                  {% with submitter=record.last_submitted_by|default:record.created_by_user %}
+                    {% if submitter %}
+                      {{ submitter.get_full_name|default:submitter.username }}
+                    {% else %}
+                      —
+                    {% endif %}
+                  {% endwith %}
+                </td>
+                <td>{{ record.updated_at|date:"M d, Y H:i" }}</td>
+                <td>
+                  <a href="{% url 'core:form-record-detail' record.pk %}" class="btn btn-sm btn-primary">
+                    Review
+                  </a>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="alert alert-info mb-0">
+          No forms are waiting for your review.
+        </div>
+        {% endif %}
+      {% else %}
+        {% if my_submissions %}
+        <div class="table-responsive">
+          <table class="table table-bordered table-hover mb-0">
+            <thead>
+              <tr>
+                <th>Form</th>
+                <th>Project</th>
+                <th>Awaiting</th>
+                <th>Updated</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for record in my_submissions %}
+              <tr>
+                <td>
+                  <strong>{{ record.form_definition.code }}</strong>
+                  {% if record.form_definition.name %}
+                    <div class="small text-muted">{{ record.form_definition.name }}</div>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if record.project %}
+                    {{ record.project.project_number }} — {{ record.project.company_name|default:record.project }}
+                  {% else %}
+                    —
+                  {% endif %}
+                </td>
+                <td>
+                  {% if record.current_reviewer %}
+                    {{ record.current_reviewer.get_full_name|default:record.current_reviewer.username }}
+                  {% else %}
+                    —
+                  {% endif %}
+                </td>
+                <td>{{ record.updated_at|date:"M d, Y H:i" }}</td>
+                <td>
+                  <a href="{% url 'core:form-record-detail' record.pk %}" class="btn btn-sm btn-secondary">
+                    Open
+                  </a>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="alert alert-info mb-0">
+          You have no forms currently awaiting senior review.
+        </div>
+        {% endif %}
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

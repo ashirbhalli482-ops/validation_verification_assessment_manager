@@ -4,9 +4,10 @@ from django.conf import settings
 from django.core.cache import cache
 from django.utils.dateparse import parse_datetime
 
-from core.models import Notification
+from core.models import FormRecord, Notification
 
 NOTIFICATION_CACHE_TTL = 300
+PENDING_APPROVALS_CACHE_TTL = 60
 
 
 class _CachedNotification:
@@ -74,6 +75,33 @@ def notifications_processor(request):
 
 def invalidate_notification_cache(user_pk):
     cache.delete(_notification_cache_key(user_pk))
+    cache.delete(_pending_approvals_cache_key(user_pk))
+
+
+def _pending_approvals_cache_key(user_pk):
+    return f'pending_approvals_{user_pk}'
+
+
+def pending_approvals_processor(request):
+    """Badge count for forms awaiting this employee's review."""
+    if not request.user.is_authenticated:
+        return {'pending_approvals_count': 0}
+    if getattr(request, 'partial_nav', False):
+        return {'pending_approvals_count': 0}
+    if getattr(request.user, 'user_type', None) != 'employee':
+        return {'pending_approvals_count': 0}
+
+    cache_key = _pending_approvals_cache_key(request.user.pk)
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return {'pending_approvals_count': cached}
+
+    count = FormRecord.objects.filter(
+        current_reviewer_id=request.user.pk,
+        status='submitted',
+    ).count()
+    cache.set(cache_key, count, PENDING_APPROVALS_CACHE_TTL)
+    return {'pending_approvals_count': count}
 
 
 def static_version_processor(request):

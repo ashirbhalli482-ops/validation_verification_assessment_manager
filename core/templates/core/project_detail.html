@@ -51,8 +51,7 @@
                 <a href="{% url 'core:form-record-edit' row.record.pk %}" class="btn btn-sm btn-warning">Edit</a>
                 {% endif %}
               {% elif row.can_create %}
-                <a href="{% url 'core:form-record-create' project.pk row.form_def.pk %}" class="btn btn-sm btn-info">View</a>
-                <a href="{% url 'core:form-record-create' project.pk row.form_def.pk %}" class="btn btn-sm btn-warning">Edit</a>
+                <a href="{% url 'core:form-record-create' project.pk row.form_def.pk %}" class="btn btn-sm btn-success">Add Record</a>
               {% else %}
                 <span class="text-muted small">—</span>
               {% endif %}
@@ -70,38 +69,66 @@
   <p class="text-muted">No active forms in this package.</p>
   {% endfor %}
 
-  {% if user.user_type == 'manager' %}
   <div class="card mb-3">
-    <div class="card-header"><strong>Authorized Team Members</strong></div>
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <strong>Project Users</strong>
+      {% if is_project_manager %}
+      <a href="{% url 'core:team-member-create' project.pk %}" class="btn btn-sm btn-primary">Authorize Team</a>
+      {% endif %}
+    </div>
     <div class="card-body">
-      <table class="table table-sm">
-        <thead><tr><th>Name</th><th>Email</th><th>User Role</th><th>Authorized</th><th>Actions</th></tr></thead>
+      <table class="table table-sm mb-0">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Email</th>
+            <th>User Role</th>
+            <th>Authorized</th>
+            {% if is_project_manager %}<th>Actions</th>{% endif %}
+          </tr>
+        </thead>
         <tbody>
+          {% if project.manager %}
+          <tr>
+            <td>{{ project.manager.get_full_name|default:project.manager.username }}</td>
+            <td>{{ project.manager.email }}</td>
+            <td>Project Manager</td>
+            <td>—</td>
+            {% if is_project_manager %}
+            <td class="text-nowrap">
+              <a href="{% url 'core:user' project.manager.id %}" class="btn btn-sm btn-info">View</a>
+            </td>
+            {% endif %}
+          </tr>
+          {% endif %}
           {% for m in team_members %}
           <tr>
             <td>{{ m.name }}</td>
             <td>{{ m.email }}</td>
             <td>{{ m.get_user_role_display|default:'-' }}</td>
-            <td>{{ m.authorized_at|date:"M d, Y" }}</td>
+            <td>{% if m.authorized_at %}{{ m.authorized_at|date:"M d, Y" }}{% else %}—{% endif %}</td>
+            {% if is_project_manager %}
             <td class="text-nowrap">
               {% if m.user %}
               <a href="{% url 'core:user' m.user.id %}" class="btn btn-sm btn-info">View</a>
               {% endif %}
               <a href="{% url 'core:team-member-edit' m.pk %}" class="btn btn-sm btn-warning">Edit</a>
               <form method="post" action="{% url 'core:team-member-remove' m.pk %}" class="d-inline"
-                    onsubmit="return confirm('Remove {{ m.name }} from this project? The user account will remain in the system.');">{% csrf_token %}
+                    onsubmit="return confirm('Remove {{ m.name|escapejs }} from this project? The user account will remain in the system.');">{% csrf_token %}
                 <button class="btn btn-sm btn-danger">Remove</button>
               </form>
             </td>
+            {% endif %}
           </tr>
           {% empty %}
-          <tr><td colspan="5" class="text-muted">No team members authorized yet.</td></tr>
+          {% if not project.manager %}
+          <tr><td colspan="{% if is_project_manager %}5{% else %}4{% endif %}" class="text-muted">No users related to this project yet.</td></tr>
+          {% endif %}
           {% endfor %}
         </tbody>
       </table>
     </div>
   </div>
-  {% endif %}
 
   {% if report_records %}
   <div class="card mb-3">

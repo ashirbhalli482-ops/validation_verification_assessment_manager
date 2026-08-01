@@ -235,11 +235,15 @@ class DashboardView(LoginRequiredMixin, View):
                 form_count=Count('id'),
                 pending_forms=Count('id', filter=Q(status__in=['draft', 'returned'])),
             )
+            pending_approvals = FormRecord.objects.filter(
+                current_reviewer=user, status='submitted',
+            ).count()
             employee_ctx = {
                 'projects': team_projects,
                 'assignments': assignments,
                 'form_count': form_stats['form_count'],
-                'pending_forms': form_stats['pending_forms'],
+                'pending_forms': form_stats['pending_forms'] + pending_approvals,
+                'pending_approvals_count': pending_approvals,
                 'library_count': get_authorized_library_documents(user).count(),
             }
             ctx.update(employee_ctx)
@@ -1806,12 +1810,22 @@ class ProjectDetailView(LoginRequiredMixin, View):
             r for r in records if can_view_report(request.user, r)
         ]
         team_member = get_team_member(request.user, project)
+        team_members = (
+            project.team_members.filter(is_active=True)
+            .select_related('user')
+            .order_by('name', 'email')
+        )
+        is_project_manager = (
+            request.user.user_type == 'manager'
+            and project.manager_id == request.user.id
+        )
         return render(request, 'core/project_detail.html', {
             'project': project,
             'sub_packages': sub_packages,
-            'team_members': project.team_members.filter(is_active=True),
+            'team_members': team_members,
             'vvb_password': auth.access_password,
             'team_member': team_member,
+            'is_project_manager': is_project_manager,
             'can_authorize_library': get_authorized_library_documents(request.user).exists(),
             'report_records': report_records,
             'success_action': request.GET.get('success', ''),
@@ -2095,15 +2109,21 @@ class FormRecordDetailView(LoginRequiredMixin, View):
             record.form_definition, record, sparse=True,
         )
         company = _company_for_form_record(record=record)
+        review_candidates = []
+        if record.project_id and (record.can_submit(request.user) or record.can_review(request.user)):
+            review_candidates = list(record.review_candidates(exclude_user=request.user))
+        reject_target = record.previous_step_user() if record.can_review(request.user) else None
         return render(request, 'core/form_record_detail.html', {
             'record': record,
             'company': company,
             'form_owner': _form_owner_label(company, record.project),
-            'reviews': list(record.reviews.filter(approved=True)),
+            'reviews': list(record.reviews.all()),
             'can_edit': record.can_edit(request.user),
             'can_submit': record.can_submit(request.user),
             'can_review': record.can_review(request.user),
             'can_finalize': record.can_finalize(request.user),
+            'review_candidates': review_candidates,
+            'reject_target': reject_target,
             'table_sections': display_sections,
             'other_data': other_data,
         })
@@ -2168,28 +2188,64 @@ class FormSubmitView(LoginRequiredMixin, View):
         if record.is_standalone or not record.can_submit(request.user):
             messages.error(request, 'You cannot submit this form.')
             return redirect('core:form-record-detail', pk=pk)
+
+        reviewer_id = request.POST.get('reviewer_id')
+        try:
+            reviewer_id = int(reviewer_id)
+        except (TypeError, ValueError):
+            messages.error(request, 'Please select a user for senior review.')
+            return redirect('core:form-record-detail', pk=pk)
+
+        candidate = record.review_candidates(exclude_user=request.user).filter(
+            user_id=reviewer_id,
+        ).select_related('user').first()
+        if not candidate or not candidate.user:
+            messages.error(request, 'Selected user is not authorized on this project.')
+            return redirect('core:form-record-detail', pk=pk)
+
         record.status = 'submitted'
         record.submitted_at = timezone.now()
-        record.save()
-        seniors = TeamMember.objects.filter(
-            project=record.project, role='senior_reviewer', is_active=True
-        ).select_related('user')
-        for tm in seniors:
-            if tm.user:
-                notify_user(
-                    tm.user,
-                    f'Form {record.form_definition.code} submitted for review by {record.created_by_name}.',
-                    sender=request.user,
-                    link=reverse('core:form-record-detail', args=[pk]),
-                )
+        record.current_reviewer = candidate.user
+        record.last_submitted_by = request.user
+        record.review_chain = [request.user.id]
+        record.rejection_reason = ''
+        record.save(update_fields=[
+            'status', 'submitted_at', 'current_reviewer', 'last_submitted_by',
+            'review_chain', 'rejection_reason', 'updated_at',
+        ])
+
+        role_label = candidate.get_user_role_display() or candidate.get_role_display()
         notify_user(
-            record.project.manager,
-            f'Form {record.form_definition.code} submitted for review by {record.created_by_name}.',
+            candidate.user,
+            (
+                f'Form {record.form_definition.code} was submitted for your review '
+                f'by {request.user.get_full_name() or request.user.username}.'
+            ),
             sender=request.user,
             link=reverse('core:form-record-detail', args=[pk]),
         )
-        messages.success(request, 'Form submitted for senior review.')
+        messages.success(
+            request,
+            f'Form submitted for senior review to {candidate.name} ({role_label}).',
+        )
         return redirect('core:form-record-detail', pk=pk)
+
+
+def _next_review_order(record):
+    last = record.reviews.order_by('-review_order').values_list('review_order', flat=True).first()
+    return (last or 0) + 1
+
+
+def _reviewer_display(user, project):
+    tm = get_team_member(user, project) if project else None
+    name = (tm.name if tm else None) or user.get_full_name() or user.username
+    if tm and tm.user_role:
+        role_label = tm.get_user_role_display()
+    elif tm:
+        role_label = tm.get_role_display()
+    else:
+        role_label = user.designation or 'Reviewer'
+    return name, role_label
 
 
 class FormReviewView(LoginRequiredMixin, View):
@@ -2197,28 +2253,176 @@ class FormReviewView(LoginRequiredMixin, View):
         record = get_object_or_404(FormRecord, pk=pk)
         if record.is_standalone:
             return redirect('core:form-record-detail', pk=pk)
-        action = request.POST.get('action')
-        if action == 'approve' and record.can_review(request.user):
-            order = record.reviews.filter(approved=True).count() + 1
-            if order <= 3:
-                tm = get_team_member(request.user, record.project)
-                role_label = tm.get_role_display() if tm else (request.user.designation or 'Senior Reviewer')
-                position = tm.name if tm else request.user.get_full_name()
-                FormReview.objects.create(
-                    form_record=record,
-                    reviewer=request.user,
-                    reviewer_name=position,
-                    reviewer_role=role_label,
-                    review_order=order,
-                    approved=True,
+        if not record.can_review(request.user):
+            messages.error(request, 'You cannot review this form.')
+            return redirect('core:form-record-detail', pk=pk)
+
+        action = (request.POST.get('action') or '').strip()
+        reviewer_name, role_label = _reviewer_display(request.user, record.project)
+
+        if action == 'reject':
+            reason = (request.POST.get('rejection_reason') or '').strip()
+            if not reason:
+                messages.error(request, 'Please provide a reason for rejection.')
+                return redirect('core:form-record-detail', pk=pk)
+            FormReview.objects.create(
+                form_record=record,
+                reviewer=request.user,
+                reviewer_name=reviewer_name,
+                reviewer_role=role_label,
+                review_order=_next_review_order(record),
+                approved=False,
+                returned=True,
+                comments=reason,
+            )
+            target = record.apply_reject_one_step(reason=reason)
+            record.save(update_fields=[
+                'status', 'rejection_reason', 'current_reviewer', 'review_chain',
+                'updated_at',
+            ])
+            if target:
+                if record.status == 'returned':
+                    msg = (
+                        f'Form {record.form_definition.code} was rejected and sent back to you. '
+                        f'Reason: {reason}'
+                    )
+                else:
+                    msg = (
+                        f'Form {record.form_definition.code} was sent back one step for your review. '
+                        f'Reason: {reason}'
+                    )
+                notify_user(
+                    target,
+                    msg,
+                    sender=request.user,
+                    link=reverse('core:form-record-detail', args=[pk]),
                 )
-                if record.status == 'submitted':
-                    record.status = 'approved'
-                    record.save()
-                messages.success(request, f'Review {order} recorded.')
-        elif action == 'return' and record.can_review(request.user):
+            target_name = (
+                (target.get_full_name() or target.username) if target else 'the previous user'
+            )
+            messages.info(request, f'Form rejected and sent back one step to {target_name}.')
+            invalidate_notification_cache(request.user.pk)
+            return redirect('core:form-record-detail', pk=pk)
+
+        if action == 'forward':
+            reviewer_id = request.POST.get('reviewer_id')
+            try:
+                reviewer_id = int(reviewer_id)
+            except (TypeError, ValueError):
+                messages.error(request, 'Please select a user to forward this form to.')
+                return redirect('core:form-record-detail', pk=pk)
+            candidate = record.review_candidates(exclude_user=request.user).filter(
+                user_id=reviewer_id,
+            ).select_related('user').first()
+            if not candidate or not candidate.user:
+                messages.error(request, 'Selected user is not authorized on this project.')
+                return redirect('core:form-record-detail', pk=pk)
+
+            FormReview.objects.create(
+                form_record=record,
+                reviewer=request.user,
+                reviewer_name=reviewer_name,
+                reviewer_role=role_label,
+                review_order=_next_review_order(record),
+                approved=True,
+                returned=False,
+                comments=(request.POST.get('comments') or '').strip(),
+            )
+            chain = record._chain_user_ids()
+            if request.user.id not in chain:
+                chain.append(request.user.id)
+            record.review_chain = chain
+            record.status = 'submitted'
+            record.current_reviewer = candidate.user
+            record.rejection_reason = ''
+            record.save(update_fields=[
+                'status', 'current_reviewer', 'review_chain', 'rejection_reason', 'updated_at',
+            ])
+            notify_user(
+                candidate.user,
+                (
+                    f'Form {record.form_definition.code} was approved by '
+                    f'{reviewer_name} and forwarded for your senior review.'
+                ),
+                sender=request.user,
+                link=reverse('core:form-record-detail', args=[pk]),
+            )
+            messages.success(
+                request,
+                f'Approved and forwarded to {candidate.name} for senior review.',
+            )
+            invalidate_notification_cache(request.user.pk)
+            return redirect('core:form-record-detail', pk=pk)
+
+        if action == 'final_approve':
+            FormReview.objects.create(
+                form_record=record,
+                reviewer=request.user,
+                reviewer_name=reviewer_name,
+                reviewer_role=role_label,
+                review_order=_next_review_order(record),
+                approved=True,
+                returned=False,
+                comments=(request.POST.get('comments') or '').strip() or 'Final approval',
+            )
+            record.status = 'finalized'
+            record.finalized_by = request.user
+            record.finalized_by_name = reviewer_name
+            record.finalized_at = timezone.now()
+            record.current_reviewer = None
+            record.review_chain = []
+            record.rejection_reason = ''
+            record.save(update_fields=[
+                'status', 'finalized_by', 'finalized_by_name', 'finalized_at',
+                'current_reviewer', 'review_chain', 'rejection_reason', 'updated_at',
+            ])
+            if record.created_by_user_id and record.created_by_user_id != request.user.id:
+                notify_user(
+                    record.created_by_user,
+                    f'Form {record.form_definition.code} received final approval.',
+                    sender=request.user,
+                    link=reverse('core:form-record-detail', args=[pk]),
+                )
+            # Notify original submitter in the review chain (if different from creator / approver).
+            submitter = record.last_submitted_by
+            if (
+                submitter
+                and submitter.id != request.user.id
+                and submitter.id != record.created_by_user_id
+            ):
+                notify_user(
+                    submitter,
+                    f'Form {record.form_definition.code} received final approval.',
+                    sender=request.user,
+                    link=reverse('core:form-record-detail', args=[pk]),
+                )
+            messages.success(
+                request,
+                'Form given final approval. Only you can edit it from now on.',
+            )
+            invalidate_notification_cache(request.user.pk)
+            return redirect('core:form-record-detail', pk=pk)
+
+        # Legacy approve / return buttons (when no assignee workflow)
+        if action == 'approve':
+            order = _next_review_order(record)
+            FormReview.objects.create(
+                form_record=record,
+                reviewer=request.user,
+                reviewer_name=reviewer_name,
+                reviewer_role=role_label,
+                review_order=order,
+                approved=True,
+            )
+            if record.status == 'submitted':
+                record.status = 'approved'
+                record.current_reviewer = None
+                record.save(update_fields=['status', 'current_reviewer', 'updated_at'])
+            messages.success(request, f'Review {order} recorded.')
+        elif action == 'return':
             record.status = 'returned'
-            record.save()
+            record.current_reviewer = None
+            record.save(update_fields=['status', 'current_reviewer', 'updated_at'])
             if record.created_by_user:
                 notify_user(
                     record.created_by_user,
@@ -2326,6 +2530,46 @@ class ProjectAccessView(View):
                 return redirect('core:project-detail', pk=project_id)
             messages.error(request, 'Invalid email or password.')
         return render(request, 'core/project_access.html', {'form': form, 'project': project})
+
+
+# --- Approvals (manager's users / employees) ---
+class ApprovalsListView(LoginRequiredMixin, View):
+    """Forms awaiting the logged-in employee's senior review."""
+
+    def get(self, request):
+        if request.user.user_type != 'employee':
+            messages.error(request, 'Approvals are available for authorized project users.')
+            return redirect('core:dashboard')
+
+        tab = (request.GET.get('tab') or 'approvals').strip().lower()
+        pending = (
+            FormRecord.objects.filter(
+                current_reviewer=request.user,
+                status='submitted',
+            )
+            .select_related(
+                'form_definition', 'project', 'last_submitted_by', 'created_by_user',
+            )
+            .order_by('-updated_at')
+        )
+        my_submissions = (
+            FormRecord.objects.filter(
+                last_submitted_by=request.user,
+                status='submitted',
+            )
+            .exclude(current_reviewer=request.user)
+            .select_related(
+                'form_definition', 'project', 'current_reviewer',
+            )
+            .order_by('-updated_at')
+        )
+        return render(request, 'core/approvals_list.html', {
+            'tab': tab if tab in ('approvals', 'submitted') else 'approvals',
+            'pending_approvals': pending,
+            'my_submissions': my_submissions,
+            'pending_count': pending.count(),
+            'submitted_count': my_submissions.count(),
+        })
 
 
 # --- Notifications ---

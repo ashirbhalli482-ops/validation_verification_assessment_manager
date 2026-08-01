@@ -108,6 +108,9 @@ urlpatterns = [
     path('notifications/<int:notification_id>/mark-read/', views.MarkNotificationReadView.as_view(), name='mark-notification-read'),
     path('notifications/mark-all-read/', views.MarkAllNotificationsReadView.as_view(), name='mark-all-notifications-read'),
     path('notifications/<int:notification_id>/delete/', views.DeleteNotificationView.as_view(), name='delete-notification'),
+
+    # Approvals (manager's authorized users)
+    path('approvals/', views.ApprovalsListView.as_view(), name='approvals-list'),
 ]
 
 if settings.DEBUG:

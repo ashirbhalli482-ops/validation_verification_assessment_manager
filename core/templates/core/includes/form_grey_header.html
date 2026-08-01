@@ -60,7 +60,9 @@
   <div class="form-doc-reviews mt-2 pt-2 border-top">
     {% for rev in reviews %}
     <small class="d-inline-block mr-3">
-      <strong>Review {{ rev.review_order }}:</strong> {{ rev.reviewer_name }} — {{ rev.reviewed_at|date:"M d, Y H:i" }}
+      <strong>Review {{ rev.review_order }}:</strong> {{ rev.reviewer_name }}
+      ({% if rev.returned %}Rejected{% elif rev.approved %}Approved{% else %}Reviewed{% endif %})
+      — {{ rev.reviewed_at|date:"M d, Y H:i" }}
     </small>
     {% endfor %}
   </div>

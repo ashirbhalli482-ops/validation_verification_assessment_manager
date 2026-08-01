@@ -111,26 +111,31 @@
   <div class="col-md-3"><div class="dashboard-card"><div class="dashboard-card-title">LIBRARY</div><div class="dashboard-card-value">{{ library_count|default:0 }}</div></div></div>
 </div>
 <div class="card mb-3">
-  <div class="card-header"><strong>Select Your Project Package</strong></div>
+  <div class="card-header"><strong>Projects</strong></div>
   <div class="card-body">
-    {% if assignments %}
-    <div class="row">
-      {% for assignment in assignments %}
-      <div class="col-md-6 col-lg-4 mb-3">
-        <div class="card h-100 border-primary">
-          <div class="card-body">
-            <h6 class="card-title">{{ assignment.project.project_number }}</h6>
-            <p class="card-text small text-muted mb-1">{{ assignment.project.company_name }}</p>
-            <p class="card-text small mb-2"><strong>Project Name:</strong> {{ assignment.project.package_instance.name }}</p>
-            <p class="card-text small mb-3"><strong>Your role:</strong> {{ assignment.get_role_display }}</p>
-            <a href="{% url 'core:project-detail' assignment.project.pk %}" class="btn btn-primary btn-sm btn-block">Open Project</a>
-          </div>
-        </div>
-      </div>
-      {% endfor %}
-    </div>
+    {% if projects %}
+    <table class="table table-striped mb-0">
+      <thead>
+        <tr>
+          <th>Project #</th>
+          <th>Company</th>
+          <th>Year</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for project in projects %}
+        <tr>
+          <td>{{ project.project_number }}</td>
+          <td>{{ project.company_name }}</td>
+          <td>{{ project.year }}</td>
+          <td><a href="{% url 'core:project-detail' project.pk %}" class="btn btn-sm btn-info">Open</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
     {% else %}
-    <p class="text-muted mb-0">No project packages assigned yet. You will receive a notification when a Project Manager authorizes you.</p>
+    <p class="text-muted mb-0">No projects assigned yet. You will receive a notification when a Project Manager authorizes you.</p>
     {% endif %}
   </div>
 </div>

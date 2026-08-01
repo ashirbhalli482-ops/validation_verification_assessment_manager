@@ -68,6 +68,18 @@
 
   function runInlineScripts(container) {
     container.querySelectorAll('script:not([src])').forEach(function (oldScript) {
+      var type = (oldScript.getAttribute('type') || 'text/javascript').toLowerCase().trim();
+      // Keep JSON / template data blobs (e.g. Django json_script for dependent dropdowns).
+      if (
+        type &&
+        type !== 'text/javascript' &&
+        type !== 'application/javascript' &&
+        type !== 'module' &&
+        type !== 'text/ecmascript' &&
+        type !== 'application/ecmascript'
+      ) {
+        return;
+      }
       var code = oldScript.textContent.trim();
       if (!code) {
         oldScript.remove();
@@ -89,10 +101,37 @@
     });
   }
 
+  function cleanupOpenModals() {
+    // Modal dialogs live inside #app-main; backdrops are appended to <body>.
+    // After a partial swap the dialog is gone but the backdrop can remain and
+    // freeze the UI (gray overlay / clicks blocked).
+    if (window.jQuery) {
+      try {
+        window.jQuery('.modal').modal('hide');
+      } catch (e) { /* ignore */ }
+    }
+    document.querySelectorAll('.modal-backdrop').forEach(function (el) {
+      el.parentNode && el.parentNode.removeChild(el);
+    });
+    document.body.classList.remove('modal-open');
+    document.body.style.removeProperty('padding-right');
+    document.querySelectorAll('.modal.show').forEach(function (el) {
+      el.classList.remove('show');
+      el.style.display = 'none';
+      el.setAttribute('aria-hidden', 'true');
+      el.removeAttribute('aria-modal');
+      el.removeAttribute('role');
+    });
+  }
+
   function initSwappedPage() {
+    cleanupOpenModals();
     var main = document.getElementById('app-main');
     if (main) runInlineScripts(main);
     updateActiveNav();
+    if (typeof window.updateHeaderPageTitle === 'function') {
+      window.updateHeaderPageTitle();
+    }
     if (window.jQuery) {
       window.jQuery(function ($) {
         $('[id$="SuccessModal"]').modal('show');
@@ -102,6 +141,7 @@
   }
 
   function applyPartialHtml(html, url, pushState) {
+    cleanupOpenModals();
     var parsed = parsePartialHtml(html);
     var currentMain = document.getElementById('app-main');
     if (!parsed.nextMain || !currentMain) {
