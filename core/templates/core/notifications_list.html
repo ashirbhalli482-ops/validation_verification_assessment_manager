@@ -3,6 +3,7 @@
 
 {% block content %}
 <div class="container-fluid">
+    {% csrf_token %}
     <div class="row">
         <div class="col-12">
             <div class="card">
@@ -19,6 +20,9 @@
                     <div class="row mb-3">
                         <div class="col-md-6">
                             <form method="get" class="form-inline">
+                                {% if read_filter %}
+                                <input type="hidden" name="filter" value="{{ read_filter }}">
+                                {% endif %}
                                 <div class="input-group">
                                     <input type="text" name="search" class="form-control" placeholder="Search notifications..." 
                                            value="{{ search_query }}">
@@ -32,17 +36,20 @@
                         </div>
                         <div class="col-md-6 text-right">
                             <div class="btn-group" role="group">
-                                <a href="{% url 'core:notifications-list' %}" 
-                                   class="btn btn-outline-secondary {% if not read_filter %}active{% endif %}">
-                                    All ({{ total_count }})
+                                <a href="{% url 'core:notifications-list' %}{% if search_query %}?search={{ search_query|urlencode }}{% endif %}" 
+                                   class="btn btn-outline-secondary {% if not read_filter %}active{% endif %}"
+                                   id="notif-filter-all">
+                                    All (<span class="notif-total-count">{{ total_count|default:0 }}</span>)
                                 </a>
-                                <a href="{% url 'core:notifications-list' %}?filter=unread" 
-                                   class="btn btn-outline-warning {% if read_filter == 'unread' %}active{% endif %}">
-                                    Unread ({{ unread_count }})
+                                <a href="{% url 'core:notifications-list' %}?filter=unread{% if search_query %}&search={{ search_query|urlencode }}{% endif %}" 
+                                   class="btn btn-outline-warning {% if read_filter == 'unread' %}active{% endif %}"
+                                   id="notif-filter-unread">
+                                    Unread (<span class="notif-unread-count">{{ unread_count|default:0 }}</span>)
                                 </a>
-                                <a href="{% url 'core:notifications-list' %}?filter=read" 
-                                   class="btn btn-outline-success {% if read_filter == 'read' %}active{% endif %}">
-                                    Read ({{ read_count }})
+                                <a href="{% url 'core:notifications-list' %}?filter=read{% if search_query %}&search={{ search_query|urlencode }}{% endif %}" 
+                                   class="btn btn-outline-success {% if read_filter == 'read' %}active{% endif %}"
+                                   id="notif-filter-read">
+                                    Read (<span class="notif-read-count">{{ read_count|default:0 }}</span>)
                                 </a>
                             </div>
                             {% if unread_count > 0 %}
@@ -116,17 +123,20 @@
                                         <td>
                                             <div class="btn-group btn-group-sm" role="group">
                                                 {% if not notification.read %}
-                                                    <button type="button" class="btn btn-outline-success mark-read-btn" 
-                                                            data-notification-id="{{ notification.id }}"
+                                                    <button type="button"
+                                                            class="btn btn-outline-success js-mark-notification-read"
+                                                            data-url="{% url 'core:mark-notification-read' notification.id %}"
                                                             title="Mark as read">
                                                         <i class="fa fa-check"></i>
                                                     </button>
                                                 {% endif %}
-                                                <button type="button" class="btn btn-outline-danger delete-notification-btn" 
-                                                        data-notification-id="{{ notification.id }}"
-                                                        title="Delete notification">
-                                                    <i class="fa fa-trash"></i>
-                                                </button>
+                                                <form method="post" action="{% url 'core:delete-notification' notification.id %}" class="d-inline"
+                                                      onsubmit="return confirm('Are you sure you want to delete this notification?');">
+                                                    {% csrf_token %}
+                                                    <button type="submit" class="btn btn-outline-danger" title="Delete notification">
+                                                        <i class="fa fa-trash"></i>
+                                                    </button>
+                                                </form>
                                             </div>
                                         </td>
                                     </tr>
@@ -210,8 +220,96 @@
         </div>
     </div>
 </div>
+<script>
+  (function () {
+    var unreadCount = parseInt('{{ unread_count|default:"0" }}', 10) || 0;
+    var readCount = parseInt('{{ read_count|default:"0" }}', 10) || 0;
+    var totalCount = parseInt('{{ total_count|default:"0" }}', 10) || 0;
+    var absoluteUnread = parseInt('{{ absolute_unread_count|default:unread_count|default:"0" }}', 10) || 0;
+    var readFilter = '{{ read_filter|default:""|escapejs }}';
+
+    if (typeof window.updateNavBadges === 'function') {
+      window.updateNavBadges({ notifications: absoluteUnread });
+    }
+
+    function csrfToken() {
+      var input = document.querySelector('#app-main input[name="csrfmiddlewaretoken"]');
+      if (input && input.value) return input.value;
+      var match = document.cookie.match(/(?:^|;\s*)csrftoken=([^;]+)/);
+      return match ? decodeURIComponent(match[1]) : '';
+    }
+
+    function refreshFilterLabels() {
+      document.querySelectorAll('.notif-unread-count').forEach(function (el) {
+        el.textContent = String(unreadCount);
+      });
+      document.querySelectorAll('.notif-read-count').forEach(function (el) {
+        el.textContent = String(readCount);
+      });
+      document.querySelectorAll('.notif-total-count').forEach(function (el) {
+        el.textContent = String(totalCount);
+      });
+      var headerBadge = document.querySelector('.card-title .badge.badge-danger');
+      if (headerBadge) {
+        if (unreadCount > 0) {
+          headerBadge.textContent = unreadCount + ' unread';
+          headerBadge.style.display = '';
+        } else {
+          headerBadge.style.display = 'none';
+        }
+      }
+    }
+
+    document.querySelectorAll('.js-mark-notification-read').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var url = btn.getAttribute('data-url');
+        if (!url || btn.disabled) return;
+        btn.disabled = true;
+        fetch(url, {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRFToken': csrfToken(),
+            'Accept': 'application/json',
+          },
+        })
+          .then(function (res) {
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            return res.json();
+          })
+          .then(function (data) {
+            var row = btn.closest('tr');
+            unreadCount = typeof data.unread_count === 'number' ? data.unread_count : Math.max(0, unreadCount - 1);
+            absoluteUnread = typeof data.unread_count === 'number' ? data.unread_count : Math.max(0, absoluteUnread - 1);
+            readCount = readCount + 1;
+            if (typeof window.updateNavBadges === 'function') {
+              window.updateNavBadges({ notifications: absoluteUnread });
+            }
+            refreshFilterLabels();
+            if (readFilter === 'unread') {
+              if (row) row.remove();
+              if (!document.querySelector('tbody tr')) {
+                window.location.href = '{% url "core:notifications-list" %}?filter=unread';
+              }
+            } else if (row) {
+              row.classList.remove('table-warning');
+              var statusIcon = row.querySelector('.fa-circle.text-warning');
+              if (statusIcon) {
+                statusIcon.className = 'fa fa-check-circle text-success';
+                statusIcon.title = 'Read';
+              }
+              btn.remove();
+            }
+          })
+          .catch(function () {
+            btn.disabled = false;
+            alert('Could not mark notification as read. Please try again.');
+          });
+      });
+    });
+  })();
+</script>
 {% endblock %}
 
-{% block extra_scripts %}
-<script src="{% static 'core/js/notifications.js' %}?v={{ STATIC_VERSION }}" defer></script>
-{% endblock %} 
+{% block extra_scripts %}{% endblock %} 

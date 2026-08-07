@@ -241,4 +241,12 @@
   </div>
 </div>
 {% endif %}
+<script>
+  (function () {
+    if (typeof window.updateNavBadges === 'function') {
+      var approvalsCount = parseInt('{{ pending_approvals_count|default:"0" }}', 10) || 0;
+      window.updateNavBadges({ approvals: approvalsCount });
+    }
+  })();
+</script>
 {% endblock %}

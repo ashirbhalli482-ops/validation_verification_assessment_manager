@@ -41,11 +41,17 @@ def _notification_cache_key(user_pk):
 
 
 def notifications_processor(request):
-    """Provide unread notifications for the header dropdown."""
+    """Provide unread notifications for the header dropdown and badge counts."""
     if not request.user.is_authenticated:
-        return {'unread_notifications': []}
+        return {'unread_notifications': [], 'navbar_unread_count': 0}
+
+    unread_count = Notification.objects.filter(
+        recipient_id=request.user.pk, read=False,
+    ).count()
+
+    # Partial-nav only swaps #app-main; skip loading dropdown items, but keep count.
     if getattr(request, 'partial_nav', False):
-        return {'unread_notifications': []}
+        return {'unread_notifications': [], 'navbar_unread_count': unread_count}
 
     cache_key = _notification_cache_key(request.user.pk)
     cached_items = cache.get(cache_key)
@@ -55,6 +61,7 @@ def notifications_processor(request):
                 _CachedNotification(item['link'], item['message'], item['created_at'])
                 for item in cached_items
             ],
+            'navbar_unread_count': unread_count,
         }
 
     notifications = _fetch_unread_notifications(request.user)
@@ -70,7 +77,10 @@ def notifications_processor(request):
         ],
         NOTIFICATION_CACHE_TTL,
     )
-    return {'unread_notifications': notifications}
+    return {
+        'unread_notifications': notifications,
+        'navbar_unread_count': unread_count,
+    }
 
 
 def invalidate_notification_cache(user_pk):
@@ -86,15 +96,15 @@ def pending_approvals_processor(request):
     """Badge count for forms awaiting this employee's review."""
     if not request.user.is_authenticated:
         return {'pending_approvals_count': 0}
-    if getattr(request, 'partial_nav', False):
-        return {'pending_approvals_count': 0}
     if getattr(request.user, 'user_type', None) != 'employee':
         return {'pending_approvals_count': 0}
 
     cache_key = _pending_approvals_cache_key(request.user.pk)
-    cached = cache.get(cache_key)
-    if cached is not None:
-        return {'pending_approvals_count': cached}
+    # Always refresh count on partial-nav so swapped pages can sync sidebar badges.
+    if not getattr(request, 'partial_nav', False):
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return {'pending_approvals_count': cached}
 
     count = FormRecord.objects.filter(
         current_reviewer_id=request.user.pk,

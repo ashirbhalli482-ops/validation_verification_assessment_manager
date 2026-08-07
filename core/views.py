@@ -1,7 +1,7 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import authenticate, login, logout, update_session_auth_hash
 from django.contrib import messages
-from django.http import FileResponse, Http404, HttpResponse
+from django.http import FileResponse, Http404, HttpResponse, JsonResponse
 from django.core.paginator import Paginator
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.views.generic import ListView, CreateView, UpdateView, DeleteView, DetailView
@@ -2113,6 +2113,11 @@ class FormRecordDetailView(LoginRequiredMixin, View):
         if record.project_id and (record.can_submit(request.user) or record.can_review(request.user)):
             review_candidates = list(record.review_candidates(exclude_user=request.user))
         reject_target = record.previous_step_user() if record.can_review(request.user) else None
+        pending_approvals_count = 0
+        if request.user.user_type == 'employee':
+            pending_approvals_count = FormRecord.objects.filter(
+                current_reviewer=request.user, status='submitted',
+            ).count()
         return render(request, 'core/form_record_detail.html', {
             'record': record,
             'company': company,
@@ -2126,6 +2131,7 @@ class FormRecordDetailView(LoginRequiredMixin, View):
             'reject_target': reject_target,
             'table_sections': display_sections,
             'other_data': other_data,
+            'pending_approvals_count': pending_approvals_count,
         })
 
 
@@ -2573,37 +2579,118 @@ class ApprovalsListView(LoginRequiredMixin, View):
 
 
 # --- Notifications ---
+def _is_ajax(request):
+    return request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+
+
 class NotificationsListView(LoginRequiredMixin, ListView):
     model = Notification
     template_name = 'core/notifications_list.html'
     context_object_name = 'notifications'
     paginate_by = 20
 
+    def get(self, request, *args, **kwargs):
+        # Opening All/Read (not Unread) marks items read and clears navbar counters.
+        read_filter = (request.GET.get('filter') or '').strip().lower()
+        if read_filter != 'unread':
+            updated = Notification.objects.filter(
+                recipient=request.user, read=False,
+            ).update(read=True)
+            if updated:
+                invalidate_notification_cache(request.user.pk)
+        return super().get(request, *args, **kwargs)
+
     def get_queryset(self):
-        return Notification.objects.filter(recipient=self.request.user)
+        qs = (
+            Notification.objects.filter(recipient=self.request.user)
+            .select_related('sender')
+            .order_by('-created_at')
+        )
+        search = (self.request.GET.get('search') or '').strip()
+        if search:
+            qs = qs.filter(
+                Q(message__icontains=search)
+                | Q(sender__first_name__icontains=search)
+                | Q(sender__last_name__icontains=search)
+                | Q(sender__username__icontains=search)
+            )
+        read_filter = (self.request.GET.get('filter') or '').strip().lower()
+        if read_filter == 'unread':
+            qs = qs.filter(read=False)
+        elif read_filter == 'read':
+            qs = qs.filter(read=True)
+        return qs
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        base = Notification.objects.filter(recipient=self.request.user)
+        search = (self.request.GET.get('search') or '').strip()
+        if search:
+            base = base.filter(
+                Q(message__icontains=search)
+                | Q(sender__first_name__icontains=search)
+                | Q(sender__last_name__icontains=search)
+                | Q(sender__username__icontains=search)
+            )
+        counts = base.aggregate(
+            total_count=Count('id'),
+            unread_count=Count('id', filter=Q(read=False)),
+            read_count=Count('id', filter=Q(read=True)),
+        )
+        absolute_unread = Notification.objects.filter(
+            recipient=self.request.user, read=False,
+        ).count()
+        ctx.update({
+            'search_query': search,
+            'read_filter': (self.request.GET.get('filter') or '').strip().lower(),
+            'total_count': counts['total_count'] or 0,
+            'unread_count': counts['unread_count'] or 0,
+            'read_count': counts['read_count'] or 0,
+            'absolute_unread_count': absolute_unread,
+        })
+        return ctx
 
 
 class MarkNotificationReadView(LoginRequiredMixin, View):
     def post(self, request, notification_id):
         n = get_object_or_404(Notification, pk=notification_id, recipient=request.user)
-        n.read = True
-        n.save(update_fields=['read'])
-        invalidate_notification_cache(request.user.pk)
-        if n.link:
+        if not n.read:
+            n.read = True
+            n.save(update_fields=['read'])
+            invalidate_notification_cache(request.user.pk)
+        unread_count = Notification.objects.filter(
+            recipient=request.user, read=False,
+        ).count()
+        if _is_ajax(request):
+            return JsonResponse({'success': True, 'unread_count': unread_count})
+        next_url = (request.POST.get('next') or '').strip()
+        if next_url.startswith('/'):
+            return redirect(next_url)
+        if n.link and request.POST.get('follow_link') == '1':
             return redirect(n.link)
         return redirect('core:notifications-list')
 
 
 class MarkAllNotificationsReadView(LoginRequiredMixin, View):
     def post(self, request):
-        Notification.objects.filter(recipient=request.user, read=False).update(read=True)
+        updated = Notification.objects.filter(
+            recipient=request.user, read=False,
+        ).update(read=True)
         invalidate_notification_cache(request.user.pk)
+        if _is_ajax(request):
+            return JsonResponse({'success': True, 'updated_count': updated, 'unread_count': 0})
         return redirect('core:notifications-list')
 
 
 class DeleteNotificationView(LoginRequiredMixin, View):
     def post(self, request, notification_id):
         Notification.objects.filter(pk=notification_id, recipient=request.user).delete()
+        invalidate_notification_cache(request.user.pk)
+        unread_count = Notification.objects.filter(
+            recipient=request.user, read=False,
+        ).count()
+        if _is_ajax(request):
+            return JsonResponse({'success': True, 'unread_count': unread_count})
         return redirect('core:notifications-list')
 
 

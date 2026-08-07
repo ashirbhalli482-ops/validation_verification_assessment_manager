@@ -66,9 +66,7 @@
       <li class="nav-item dropdown">
         <a class="nav-link" data-toggle="dropdown" href="#" role="button" aria-haspopup="true" aria-expanded="false">
           <i class="fa fa-bell"></i>
-          {% if unread_notifications and unread_notifications|length > 0 %}
-            <span class="badge badge-danger">{{ unread_notifications|length }}</span>
-          {% endif %}
+          <span id="nav-notification-badge" class="badge badge-danger rounded-circle"{% if not navbar_unread_count %} style="display:none"{% endif %}>{{ navbar_unread_count|default:0 }}</span>
         </a>
         <div class="dropdown-menu dropdown-menu-right">
           <div class="dropdown-header text-center">
@@ -139,9 +137,7 @@
               <li class="nav-item">
                 <a class="nav-link" href="{% url 'core:notifications-list' %}">
                   <i class="fa fa-bell"></i> View Notifications
-                  {% if unread_notifications and unread_notifications|length > 0 %}
-                    <span class="badge badge-danger ml-2">{{ unread_notifications|length }}</span>
-                  {% endif %}
+                  <span id="sidebar-notification-badge" class="badge badge-danger ml-2 rounded-circle"{% if not navbar_unread_count %} style="display:none"{% endif %}>{{ navbar_unread_count|default:0 }}</span>
                 </a>
               </li>
               {% if user.user_type == 'admin' %}
@@ -186,9 +182,7 @@
               <li class="nav-item">
                 <a class="nav-link" href="{% url 'core:approvals-list' %}">
                   <i class="fa fa-check-square"></i> View Approvals
-                  {% if pending_approvals_count %}
-                    <span class="badge badge-warning ml-2">{{ pending_approvals_count }}</span>
-                  {% endif %}
+                  <span id="sidebar-approvals-badge" class="badge badge-warning ml-2"{% if not pending_approvals_count %} style="display:none"{% endif %}>{{ pending_approvals_count|default:0 }}</span>
                 </a>
               </li>
               <li class="nav-item">
@@ -306,16 +300,39 @@
           label = (items[items.length - 1].textContent || '').replace(/\s+/g, ' ').trim();
         }
         if (!label || /^home$/i.test(label) || /^dashboard$/i.test(label)) {
-          {% if user.user_type == 'admin' %}
-          label = 'Admin Dashboard';
-          {% elif user.user_type == 'manager' %}
-          label = 'Manager Dashboard';
-          {% else %}
-          label = 'Employee Dashboard';
-          {% endif %}
+          var userType = '{{ user.user_type|default:""|escapejs }}';
+          label = userType === 'admin'
+            ? 'Admin Dashboard'
+            : userType === 'manager'
+              ? 'Manager Dashboard'
+              : 'Employee Dashboard';
         }
         titleEl.textContent = label;
       };
+
+      window.updateNavBadges = function (opts) {
+        opts = opts || {};
+        function setBadge(id, count, hideZero) {
+          var el = document.getElementById(id);
+          if (!el) return;
+          var n = parseInt(count, 10);
+          if (isNaN(n) || n < 0) n = 0;
+          el.textContent = String(n);
+          if (hideZero && n <= 0) {
+            el.style.display = 'none';
+          } else {
+            el.style.display = '';
+          }
+        }
+        if (Object.prototype.hasOwnProperty.call(opts, 'notifications')) {
+          setBadge('nav-notification-badge', opts.notifications, true);
+          setBadge('sidebar-notification-badge', opts.notifications, true);
+        }
+        if (Object.prototype.hasOwnProperty.call(opts, 'approvals')) {
+          setBadge('sidebar-approvals-badge', opts.approvals, true);
+        }
+      };
+
       if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', window.updateHeaderPageTitle);
       } else {
